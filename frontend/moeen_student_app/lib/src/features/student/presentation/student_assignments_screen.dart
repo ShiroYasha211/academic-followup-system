@@ -12,7 +12,8 @@ class StudentAssignmentsScreen extends ConsumerStatefulWidget {
 }
 
 class _StudentAssignmentsScreenState
-    extends ConsumerState<StudentAssignmentsScreen> with SingleTickerProviderStateMixin {
+    extends ConsumerState<StudentAssignmentsScreen>
+    with SingleTickerProviderStateMixin {
   String _sortBy = 'due_date';
   late TabController _tabController;
 
@@ -40,9 +41,13 @@ class _StudentAssignmentsScreenState
         builder: (data) {
           final active = asList(data['active']).map(asMap).toList();
           final past = asList(data['past']).map(asMap).toList();
-          
-          final pending = active.where((item) => text(item, 'status') != 'submitted').toList();
-          final submitted = active.where((item) => text(item, 'status') == 'submitted').toList();
+
+          final pending = active
+              .where((item) => text(item, 'status') != 'submitted')
+              .toList();
+          final submitted = active
+              .where((item) => text(item, 'status') == 'submitted')
+              .toList();
           final missing = past;
 
           return NestedScrollView(
@@ -53,7 +58,8 @@ class _StudentAssignmentsScreenState
                   child: Column(
                     children: [
                       _AchievementHeader(
-                        total: pending.length + submitted.length + missing.length,
+                        total:
+                            pending.length + submitted.length + missing.length,
                         done: submitted.length,
                       ),
                       const SizedBox(height: 16),
@@ -78,7 +84,10 @@ class _StudentAssignmentsScreenState
                           ),
                           labelColor: AppColors.midnight,
                           unselectedLabelColor: AppColors.slate500,
-                          labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                          labelStyle: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13,
+                          ),
                           tabs: const [
                             Tab(text: 'قيد الانتظار'),
                             Tab(text: 'تم التسليم'),
@@ -142,7 +151,8 @@ class _StudentAssignmentDetailsScreenState
       title: 'تفاصيل التكليف',
       child: _AsyncBody(
         state: state,
-        onRetry: () => ref.invalidate(_assignmentDetailsProvider(widget.assignmentId)),
+        onRetry: () =>
+            ref.invalidate(_assignmentDetailsProvider(widget.assignmentId)),
         builder: (data) {
           final assignment = asMap(data['assignment']);
           final submission = asMap(data['submission']);
@@ -156,28 +166,47 @@ class _StudentAssignmentDetailsScreenState
               const SizedBox(height: 16),
               _AssignmentHeaderInfo(assignment: assignment),
               const SizedBox(height: 20),
-              _AssignmentDescription(description: text(assignment, 'description')),
+              _AssignmentDescription(
+                description: text(assignment, 'description'),
+              ),
               const SizedBox(height: 20),
               if (submission.isNotEmpty) ...[
                 _SubmissionDetails(submission: submission),
                 const SizedBox(height: 20),
               ],
               if (text(submission, 'feedback').isNotEmpty) ...[
-                _ProfessorFeedback(feedback: text(submission, 'feedback'), grade: text(submission, 'grade')),
+                _ProfessorFeedback(
+                  feedback: text(submission, 'feedback'),
+                  grade: text(submission, 'grade'),
+                ),
                 const SizedBox(height: 24),
               ],
               FilledButton.icon(
                 onPressed: _submitting ? null : () => _submit(assignment),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
                 icon: _submitting
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
                     : const Icon(Icons.upload_file_rounded),
                 label: Text(
-                  submission.isEmpty ? 'تسليم التكليف الآن' : 'تحديث التسليم السابق',
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  submission.isEmpty
+                      ? 'تسليم التكليف الآن'
+                      : 'تحديث التسليم السابق',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
                 ),
               ),
             ],
@@ -188,49 +217,105 @@ class _StudentAssignmentDetailsScreenState
   }
 
   Future<void> _submit(Map<String, dynamic> assignment) async {
+    final formKey = GlobalKey<FormState>();
     final notes = TextEditingController();
     PlatformFile? file;
+    String? fileError;
+    final requiresFile =
+        boolValue(assignment, 'requires_file') ||
+        boolValue(assignment, 'requires_submission');
     final ok = await showMoeenBottomSheet<bool>(
       context: context,
       title: 'تسليم التكليف',
       icon: Icons.upload_file_rounded,
       color: AppColors.royalBlue,
       child: StatefulBuilder(
-        builder: (sheetContext, setLocal) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: notes,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'ملاحظات اختيارية',
-                prefixIcon: Icon(Icons.notes_rounded),
+        builder: (sheetContext, setLocal) => Form(
+          key: formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (requiresFile) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.warning.withValues(alpha: 0.28),
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.attach_file_rounded, color: AppColors.warning),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'هذا التكليف يتطلب إرفاق ملف قبل الإرسال.',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              TextFormField(
+                controller: notes,
+                maxLines: 3,
+                maxLength: 500,
+                decoration: const InputDecoration(
+                  labelText: 'ملاحظات اختيارية',
+                  prefixIcon: Icon(Icons.notes_rounded),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final result = await FilePicker.platform.pickFiles(
-                  withData: false,
-                );
-                if (result != null && result.files.isNotEmpty) {
-                  setLocal(() => file = result.files.first);
-                }
-              },
-              icon: const Icon(Icons.attach_file_rounded),
-              label: Text(file?.name ?? 'اختيار ملف'),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: () => Navigator.pop(sheetContext, true),
-              child: const Text('إرسال'),
-            ),
-          ],
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final result = await FilePicker.platform.pickFiles(
+                    withData: false,
+                  );
+                  if (result != null && result.files.isNotEmpty) {
+                    setLocal(() {
+                      file = result.files.first;
+                      fileError = null;
+                    });
+                  }
+                },
+                icon: const Icon(Icons.attach_file_rounded),
+                label: Text(file?.name ?? 'اختيار ملف'),
+              ),
+              if (fileError != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  fileError!,
+                  style: const TextStyle(
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () {
+                  final valid = formKey.currentState?.validate() ?? true;
+                  if (!valid) return;
+                  if (requiresFile && file?.path == null) {
+                    setLocal(() => fileError = 'اختر ملف التكليف أولاً.');
+                    return;
+                  }
+                  Navigator.pop(sheetContext, true);
+                },
+                child: const Text('إرسال'),
+              ),
+            ],
+          ),
         ),
       ),
     );
     if (ok != true) return;
-    if (boolValue(assignment, 'requires_submission') && file?.path == null) {
+    if (requiresFile && file?.path == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -279,27 +364,35 @@ class _AssignmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = text(item, 'status', fallback: 'available');
+    final requiresFile =
+        boolValue(item, 'requires_file') ||
+        boolValue(item, 'requires_submission');
     final dueDateStr = text(item, 'due_date');
     final dueDate = DateTime.tryParse(dueDateStr);
-    final isUrgent = dueDate != null && 
-        dueDate.isAfter(DateTime.now()) && 
+    final isUrgent =
+        dueDate != null &&
+        dueDate.isAfter(DateTime.now()) &&
         dueDate.difference(DateTime.now()).inHours < 48;
-    
+
     final color = status == 'submitted'
         ? AppColors.success
-        : (status == 'missing' ? AppColors.rose : (isUrgent ? AppColors.orange : AppColors.royalBlue));
+        : (status == 'missing'
+              ? AppColors.rose
+              : (isUrgent ? AppColors.orange : AppColors.royalBlue));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        boxShadow: isUrgent ? [
-          BoxShadow(
-            color: AppColors.orange.withValues(alpha: 0.15),
-            blurRadius: 10,
-            spreadRadius: 2,
-          )
-        ] : null,
+        boxShadow: isUrgent
+            ? [
+                BoxShadow(
+                  color: AppColors.orange.withValues(alpha: 0.15),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+              ]
+            : null,
       ),
       child: Material(
         color: Colors.white,
@@ -314,7 +407,9 @@ class _AssignmentCard extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: isUrgent ? AppColors.orange.withValues(alpha: 0.4) : color.withValues(alpha: 0.12),
+                color: isUrgent
+                    ? AppColors.orange.withValues(alpha: 0.4)
+                    : color.withValues(alpha: 0.12),
                 width: isUrgent ? 1.5 : 1,
               ),
             ),
@@ -330,7 +425,9 @@ class _AssignmentCard extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        status == 'submitted' ? Icons.check_circle_rounded : Icons.assignment_rounded,
+                        status == 'submitted'
+                            ? Icons.check_circle_rounded
+                            : Icons.assignment_rounded,
                         color: color,
                         size: 20,
                       ),
@@ -343,11 +440,18 @@ class _AssignmentCard extends StatelessWidget {
                           Text(
                             text(item, 'title', fallback: 'تكليف'),
                             style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w900, color: AppColors.midnight),
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.midnight,
+                                ),
                           ),
                           Text(
                             text(item, 'subject_name', fallback: 'مادة'),
-                            style: const TextStyle(color: AppColors.slate500, fontSize: 12, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                              color: AppColors.slate500,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
                       ),
@@ -362,7 +466,10 @@ class _AssignmentCard extends StatelessWidget {
                 if (isUrgent && status != 'submitted')
                   Container(
                     margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.orange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
@@ -370,37 +477,95 @@ class _AssignmentCard extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.timer_rounded, color: AppColors.orange, size: 14),
+                        const Icon(
+                          Icons.timer_rounded,
+                          color: AppColors.orange,
+                          size: 14,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           'بقي ${_getTimeLeft(dueDate)}',
-                          style: const TextStyle(color: AppColors.orange, fontSize: 11, fontWeight: FontWeight.w900),
+                          style: const TextStyle(
+                            color: AppColors.orange,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ],
                     ),
                   ),
+                if (requiresFile) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.royalBlue.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: AppColors.royalBlue.withValues(alpha: 0.16),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.upload_file_rounded,
+                          color: AppColors.royalBlue,
+                          size: 15,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'يتطلب رفع ملف',
+                          style: TextStyle(
+                            color: AppColors.royalBlue,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.slate400),
+                        const Icon(
+                          Icons.calendar_today_rounded,
+                          size: 12,
+                          color: AppColors.slate400,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           dateOnly(dueDateStr),
-                          style: const TextStyle(color: AppColors.slate600, fontSize: 12, fontWeight: FontWeight.w700),
+                          style: const TextStyle(
+                            color: AppColors.slate600,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ],
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         _assignmentStatus(status),
-                        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900),
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
                   ],
@@ -448,12 +613,20 @@ class _AchievementHeader extends StatelessWidget {
               children: [
                 const Text(
                   'معدل الإنجاز 📈',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   'أنجزت $done من أصل $total تكاليف',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 ClipRRect(
@@ -462,7 +635,9 @@ class _AchievementHeader extends StatelessWidget {
                     value: percent,
                     minHeight: 8,
                     backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.gold),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppColors.gold,
+                    ),
                   ),
                 ),
               ],
@@ -479,7 +654,11 @@ class _AchievementHeader extends StatelessWidget {
             child: Center(
               child: Text(
                 '${(percent * 100).toInt()}%',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                ),
               ),
             ),
           ),
@@ -517,7 +696,9 @@ class _PriorityFlag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = priority == 2 ? AppColors.rose : (priority == 1 ? AppColors.orange : AppColors.slate400);
+    final color = priority == 2
+        ? AppColors.rose
+        : (priority == 1 ? AppColors.orange : AppColors.slate400);
     return PopupMenuButton<int>(
       onSelected: onChanged,
       itemBuilder: (_) => const [
@@ -537,9 +718,15 @@ class _StatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = status == 'submitted' ? AppColors.success : (status == 'missing' ? AppColors.rose : AppColors.royalBlue);
-    final icon = status == 'submitted' ? Icons.check_circle_rounded : (status == 'missing' ? Icons.error_rounded : Icons.pending_rounded);
-    final label = isGraded ? 'تم التصحيح والتقييم ✅' : _assignmentStatus(status);
+    final color = status == 'submitted'
+        ? AppColors.success
+        : (status == 'missing' ? AppColors.rose : AppColors.royalBlue);
+    final icon = status == 'submitted'
+        ? Icons.check_circle_rounded
+        : (status == 'missing' ? Icons.error_rounded : Icons.pending_rounded);
+    final label = isGraded
+        ? 'تم التصحيح والتقييم ✅'
+        : _assignmentStatus(status);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -554,7 +741,11 @@ class _StatusBanner extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             label,
-            style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 16),
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+            ),
           ),
         ],
       ),
@@ -568,6 +759,9 @@ class _AssignmentHeaderInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final requiresFile =
+        boolValue(assignment, 'requires_file') ||
+        boolValue(assignment, 'requires_submission');
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -580,20 +774,78 @@ class _AssignmentHeaderInfo extends StatelessWidget {
         children: [
           Text(
             text(assignment, 'title'),
-            style: const TextStyle(color: AppColors.midnight, fontSize: 20, fontWeight: FontWeight.w900),
+            style: const TextStyle(
+              color: AppColors.midnight,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
-            text(asMap(assignment['subject']), 'name', fallback: text(assignment, 'subject_name')),
-            style: const TextStyle(color: AppColors.slate500, fontSize: 14, fontWeight: FontWeight.w600),
+            text(
+              asMap(assignment['subject']),
+              'name',
+              fallback: text(assignment, 'subject_name'),
+            ),
+            style: const TextStyle(
+              color: AppColors.slate500,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: (requiresFile ? AppColors.warning : AppColors.success)
+                  .withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: (requiresFile ? AppColors.warning : AppColors.success)
+                    .withValues(alpha: 0.24),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  requiresFile
+                      ? Icons.upload_file_rounded
+                      : Icons.check_circle_rounded,
+                  color: requiresFile ? AppColors.warning : AppColors.success,
+                  size: 16,
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  requiresFile
+                      ? 'يتطلب إرفاق ملف عند التسليم'
+                      : 'لا يتطلب إرفاق ملف',
+                  style: TextStyle(
+                    color: requiresFile ? AppColors.warning : AppColors.success,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
           const Divider(),
           const SizedBox(height: 16),
           Row(
             children: [
-              _DetailInfo(icon: Icons.calendar_today_rounded, label: 'الموعد النهائي', value: dateOnly(text(assignment, 'due_date')), color: AppColors.rose),
-              _DetailInfo(icon: Icons.grade_rounded, label: 'الدرجة الكلية', value: text(assignment, 'marks', fallback: 'غير محدد'), color: AppColors.goldDeep),
+              _DetailInfo(
+                icon: Icons.calendar_today_rounded,
+                label: 'الموعد النهائي',
+                value: dateOnly(text(assignment, 'due_date')),
+                color: AppColors.rose,
+              ),
+              _DetailInfo(
+                icon: Icons.grade_rounded,
+                label: 'الدرجة الكلية',
+                value: text(assignment, 'marks', fallback: 'غير محدد'),
+                color: AppColors.goldDeep,
+              ),
             ],
           ),
         ],
@@ -603,7 +855,12 @@ class _AssignmentHeaderInfo extends StatelessWidget {
 }
 
 class _DetailInfo extends StatelessWidget {
-  const _DetailInfo({required this.icon, required this.label, required this.value, required this.color});
+  const _DetailInfo({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
   final IconData icon;
   final String label;
   final String value;
@@ -616,7 +873,10 @@ class _DetailInfo extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
             child: Icon(icon, color: color, size: 16),
           ),
           const SizedBox(width: 10),
@@ -624,8 +884,22 @@ class _DetailInfo extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(color: AppColors.slate500, fontSize: 10, fontWeight: FontWeight.w700)),
-                Text(value, style: const TextStyle(color: AppColors.midnight, fontSize: 13, fontWeight: FontWeight.w900)),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.slate500,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: AppColors.midnight,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ],
             ),
           ),
@@ -644,15 +918,30 @@ class _AssignmentDescription extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('وصف التكليف', style: TextStyle(color: AppColors.midnight, fontSize: 16, fontWeight: FontWeight.w900)),
+        const Text(
+          'وصف التكليف',
+          style: TextStyle(
+            color: AppColors.midnight,
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(color: AppColors.slate50, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.slate100)),
+          decoration: BoxDecoration(
+            color: AppColors.slate50,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.slate100),
+          ),
           child: Text(
             description.isEmpty ? 'لا يوجد وصف متاح.' : description,
-            style: const TextStyle(color: AppColors.slate700, fontSize: 14, height: 1.6),
+            style: const TextStyle(
+              color: AppColors.slate700,
+              fontSize: 14,
+              height: 1.6,
+            ),
           ),
         ),
       ],
@@ -678,15 +967,34 @@ class _SubmissionDetails extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(Icons.cloud_done_rounded, color: AppColors.success, size: 18),
+              Icon(
+                Icons.cloud_done_rounded,
+                color: AppColors.success,
+                size: 18,
+              ),
               SizedBox(width: 8),
-              Text('تفاصيل تسليمك', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w900, fontSize: 15)),
+              Text(
+                'تفاصيل تسليمك',
+                style: TextStyle(
+                  color: AppColors.success,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 15,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          _SubmissionRow(label: 'الملف المرفق', value: text(submission, 'file_name'), icon: Icons.insert_drive_file_rounded),
+          _SubmissionRow(
+            label: 'الملف المرفق',
+            value: text(submission, 'file_name'),
+            icon: Icons.insert_drive_file_rounded,
+          ),
           const SizedBox(height: 12),
-          _SubmissionRow(label: 'تاريخ التسليم', value: dateOnly(text(submission, 'submitted_at')), icon: Icons.access_time_filled_rounded),
+          _SubmissionRow(
+            label: 'تاريخ التسليم',
+            value: dateOnly(text(submission, 'submitted_at')),
+            icon: Icons.access_time_filled_rounded,
+          ),
         ],
       ),
     );
@@ -694,7 +1002,11 @@ class _SubmissionDetails extends StatelessWidget {
 }
 
 class _SubmissionRow extends StatelessWidget {
-  const _SubmissionRow({required this.label, required this.value, required this.icon});
+  const _SubmissionRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
   final String label;
   final String value;
   final IconData icon;
@@ -705,9 +1017,22 @@ class _SubmissionRow extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: AppColors.slate400),
         const SizedBox(width: 8),
-        Text('$label:', style: const TextStyle(color: AppColors.slate500, fontSize: 12)),
+        Text(
+          '$label:',
+          style: const TextStyle(color: AppColors.slate500, fontSize: 12),
+        ),
         const SizedBox(width: 4),
-        Expanded(child: Text(value, style: const TextStyle(color: AppColors.midnight, fontSize: 12, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis)),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.midnight,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
@@ -723,7 +1048,11 @@ class _ProfessorFeedback extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [AppColors.royalBlue.withValues(alpha: 0.05), Colors.white], begin: Alignment.topCenter, end: Alignment.bottomCenter),
+        gradient: LinearGradient(
+          colors: [AppColors.royalBlue.withValues(alpha: 0.05), Colors.white],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.royalBlue.withValues(alpha: 0.1)),
       ),
@@ -735,23 +1064,52 @@ class _ProfessorFeedback extends StatelessWidget {
             children: [
               const Row(
                 children: [
-                  Icon(Icons.forum_rounded, color: AppColors.royalBlue, size: 18),
+                  Icon(
+                    Icons.forum_rounded,
+                    color: AppColors.royalBlue,
+                    size: 18,
+                  ),
                   SizedBox(width: 8),
-                  Text('ملاحظات المحاضر', style: TextStyle(color: AppColors.royalBlue, fontWeight: FontWeight.w900, fontSize: 15)),
+                  Text(
+                    'ملاحظات المحاضر',
+                    style: TextStyle(
+                      color: AppColors.royalBlue,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
+                  ),
                 ],
               ),
               if (grade.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: AppColors.goldDeep, borderRadius: BorderRadius.circular(12)),
-                  child: Text('الدرجة: $grade', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.goldDeep,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'الدرجة: $grade',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                    ),
+                  ),
                 ),
             ],
           ),
           const SizedBox(height: 16),
           Text(
             feedback,
-            style: const TextStyle(color: AppColors.slate700, fontSize: 14, height: 1.6, fontStyle: FontStyle.italic),
+            style: const TextStyle(
+              color: AppColors.slate700,
+              fontSize: 14,
+              height: 1.6,
+              fontStyle: FontStyle.italic,
+            ),
           ),
         ],
       ),

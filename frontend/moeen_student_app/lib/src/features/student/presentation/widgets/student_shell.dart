@@ -49,6 +49,8 @@ class StudentShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(authControllerProvider).valueOrNull;
+    final unreadNotifications =
+        ref.watch(studentUnreadNotificationsCountProvider).valueOrNull ?? 0;
 
     return PopScope(
       canPop: false,
@@ -75,7 +77,11 @@ class StudentShell extends ConsumerWidget {
       child: Scaffold(
         extendBodyBehindAppBar: true,
         backgroundColor: AppColors.cream,
-        appBar: _PremiumAppBar(title: title, session: session),
+        appBar: _PremiumAppBar(
+          title: title,
+          session: session,
+          unreadNotifications: unreadNotifications,
+        ),
         body: SafeArea(bottom: false, child: child),
         floatingActionButton: floatingActionButton,
         drawer: _StudentDrawer(currentIndex: currentIndex),
@@ -85,9 +91,14 @@ class StudentShell extends ConsumerWidget {
 }
 
 class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _PremiumAppBar({required this.title, required this.session});
+  const _PremiumAppBar({
+    required this.title,
+    required this.session,
+    required this.unreadNotifications,
+  });
   final String title;
   final AuthSession? session;
+  final int unreadNotifications;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 8);
@@ -151,6 +162,64 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
             ],
           ),
           actions: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.gold.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.gold.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: IconButton(
+                      onPressed: () =>
+                          context.go(StudentNotificationsScreen.route),
+                      icon: const Icon(
+                        Icons.notifications_active_rounded,
+                        color: AppColors.goldDeep,
+                        size: 21,
+                      ),
+                      tooltip: 'التنبيهات',
+                    ),
+                  ),
+                  if (unreadNotifications > 0)
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: Container(
+                        constraints: const BoxConstraints(
+                          minWidth: 19,
+                          minHeight: 19,
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          unreadNotifications > 99
+                              ? '99+'
+                              : unreadNotifications.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
             if (session?.isPracticalDelegate == true)
               Container(
                 margin: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),

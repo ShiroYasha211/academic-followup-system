@@ -39,13 +39,13 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
   }
 
   LibraryQuery get _query => (
-        search: _search.text,
-        subjectId: _subjectId,
-        category: 'all',
-        fileType: _fileType,
-        myUploads: _myUploads,
-        page: 1,
-      );
+    search: _search.text,
+    subjectId: _subjectId,
+    category: 'all',
+    fileType: _fileType,
+    myUploads: _myUploads,
+    page: 1,
+  );
 
   @override
   void dispose() {
@@ -171,8 +171,8 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
           final filtered = catValue == 'all'
               ? resources
               : resources
-                  .where((r) => text(r, 'category') == catValue)
-                  .toList();
+                    .where((r) => text(r, 'category') == catValue)
+                    .toList();
 
           if (filtered.isEmpty) {
             return const EmptyState(
@@ -212,7 +212,10 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
     );
   }
 
-  Future<void> _download(BuildContext context, Map<String, dynamic> item) async {
+  Future<void> _download(
+    BuildContext context,
+    Map<String, dynamic> item,
+  ) async {
     final id = number(item, 'id').toInt();
     if (id <= 0) return;
 
@@ -222,12 +225,12 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
           .read(studentContentRepositoryProvider)
           .libraryDownloadUrl(id);
       if (!context.mounted) return;
-      
+
       final savedPath = await DownloadService.downloadUrl(
         url: url,
         fileName: _safeFileName(item),
       );
-      
+
       if (context.mounted && savedPath != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -255,14 +258,18 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
     BuildContext context,
     List<Map<String, dynamic>> subjects,
   ) async {
+    final formKey = GlobalKey<FormState>();
     final title = TextEditingController();
     final description = TextEditingController();
     final semester = TextEditingController();
     final lecturer = TextEditingController();
-    int? subjectId = subjects.isEmpty ? null : number(subjects.first, 'id').toInt();
+    int? subjectId = subjects.isEmpty
+        ? null
+        : number(subjects.first, 'id').toInt();
     String category = 'lectures';
     String visibility = 'batch';
     PlatformFile? selectedFile;
+    String? fileError;
 
     final ok = await showMoeenBottomSheet<bool>(
       context: context,
@@ -270,110 +277,173 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
       icon: Icons.cloud_upload_rounded,
       color: AppColors.royalBlue,
       child: StatefulBuilder(
-        builder: (sheetContext, setLocal) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: title,
-              decoration: const InputDecoration(
-                labelText: 'عنوان الملف',
-                prefixIcon: Icon(Icons.title_rounded),
-              ),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<int>(
-              value: subjectId,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'المادة'),
-              items: subjects.map((item) => DropdownMenuItem(
-                value: number(item, 'id').toInt(),
-                child: Text(text(item, 'name'), overflow: TextOverflow.ellipsis),
-              )).toList(),
-              onChanged: (value) => setLocal(() => subjectId = value),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: category,
-                    decoration: const InputDecoration(labelText: 'التصنيف'),
-                    items: _uploadCategoryOptions.entries.map((entry) => DropdownMenuItem(
-                      value: entry.key,
-                      child: Text(entry.value),
-                    )).toList(),
-                    onChanged: (value) => setLocal(() => category = value ?? 'lectures'),
-                  ),
+        builder: (sheetContext, setLocal) => Form(
+          key: formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: title,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'اكتب عنوان الملف.'
+                    : null,
+                decoration: const InputDecoration(
+                  labelText: 'عنوان الملف',
+                  prefixIcon: Icon(Icons.title_rounded),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: visibility,
-                    decoration: const InputDecoration(labelText: 'الظهور'),
-                    items: const [
-                      DropdownMenuItem(value: 'batch', child: Text('دفعتي')),
-                      DropdownMenuItem(value: 'college', child: Text('التخصص')),
-                      DropdownMenuItem(value: 'everyone', child: Text('الجميع')),
-                    ],
-                    onChanged: (value) => setLocal(() => visibility = value ?? 'batch'),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<int>(
+                value: subjectId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'المادة'),
+                items: subjects
+                    .map(
+                      (item) => DropdownMenuItem(
+                        value: number(item, 'id').toInt(),
+                        child: Text(
+                          text(item, 'name'),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => setLocal(() => subjectId = value),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: category,
+                      decoration: const InputDecoration(labelText: 'التصنيف'),
+                      items: _uploadCategoryOptions.entries
+                          .map(
+                            (entry) => DropdownMenuItem(
+                              value: entry.key,
+                              child: Text(entry.value),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setLocal(() => category = value ?? 'lectures'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: visibility,
+                      decoration: const InputDecoration(labelText: 'الظهور'),
+                      items: const [
+                        DropdownMenuItem(value: 'batch', child: Text('دفعتي')),
+                        DropdownMenuItem(
+                          value: 'college',
+                          child: Text('التخصص'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'everyone',
+                          child: Text('الجميع'),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setLocal(() => visibility = value ?? 'batch'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: semester,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'اكتب معلومات الترم.'
+                    : null,
+                decoration: const InputDecoration(
+                  labelText: 'معلومات الترم',
+                  prefixIcon: Icon(Icons.school_rounded),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: lecturer,
+                decoration: const InputDecoration(
+                  labelText: 'اسم المحاضر اختياري',
+                  prefixIcon: Icon(Icons.person_rounded),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: description,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'وصف مختصر اختياري',
+                  prefixIcon: Icon(Icons.notes_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final result = await FilePicker.platform.pickFiles(
+                    withData: false,
+                  );
+                  if (result != null && result.files.isNotEmpty) {
+                    setLocal(() {
+                      selectedFile = result.files.first;
+                      fileError = null;
+                    });
+                  }
+                },
+                icon: const Icon(Icons.attach_file_rounded),
+                label: Text(selectedFile?.name ?? 'اختيار الملف'),
+              ),
+              if (fileError != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  fileError!,
+                  style: const TextStyle(
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: semester,
-              decoration: const InputDecoration(
-                labelText: 'معلومات الترم',
-                prefixIcon: Icon(Icons.school_rounded),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () {
+                  if (formKey.currentState?.validate() != true) return;
+                  if (subjectId == null) {
+                    setLocal(() => fileError = 'اختر المادة أولاً.');
+                    return;
+                  }
+                  if (selectedFile?.path == null) {
+                    setLocal(() => fileError = 'اختر الملف قبل الرفع.');
+                    return;
+                  }
+                  Navigator.pop(sheetContext, true);
+                },
+                icon: const Icon(Icons.cloud_upload_rounded),
+                label: const Text('رفع الملف'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.royalBlue,
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: lecturer,
-              decoration: const InputDecoration(
-                labelText: 'اسم المحاضر اختياري',
-                prefixIcon: Icon(Icons.person_rounded),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: description,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'وصف مختصر اختياري',
-                prefixIcon: Icon(Icons.notes_rounded),
-              ),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final result = await FilePicker.platform.pickFiles(withData: false);
-                if (result != null && result.files.isNotEmpty) {
-                  setLocal(() => selectedFile = result.files.first);
-                }
-              },
-              icon: const Icon(Icons.attach_file_rounded),
-              label: Text(selectedFile?.name ?? 'اختيار الملف'),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: () => Navigator.pop(sheetContext, true),
-              icon: const Icon(Icons.cloud_upload_rounded),
-              label: const Text('رفع الملف'),
-              style: FilledButton.styleFrom(backgroundColor: AppColors.royalBlue),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
 
     if (ok != true) return;
     final file = selectedFile;
-    if (subjectId == null || title.text.trim().isEmpty || semester.text.trim().isEmpty || file?.path == null) {
+    if (subjectId == null ||
+        title.text.trim().isEmpty ||
+        semester.text.trim().isEmpty ||
+        file?.path == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('أكمل العنوان والمادة والترم واختر الملف أولاً.'), backgroundColor: AppColors.warning),
+          const SnackBar(
+            content: Text('أكمل العنوان والمادة والترم واختر الملف أولاً.'),
+            backgroundColor: AppColors.warning,
+          ),
         );
       }
       return;
@@ -381,17 +451,19 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
 
     setState(() => _busy = true);
     try {
-      final message = await ref.read(studentContentRepositoryProvider).uploadLibraryResource(
-        subjectId: subjectId!,
-        title: title.text.trim(),
-        category: category,
-        semesterInfo: semester.text.trim(),
-        visibility: visibility,
-        filePath: file!.path!,
-        fileName: file.name,
-        description: description.text,
-        lecturerName: lecturer.text,
-      );
+      final message = await ref
+          .read(studentContentRepositoryProvider)
+          .uploadLibraryResource(
+            subjectId: subjectId!,
+            title: title.text.trim(),
+            category: category,
+            semesterInfo: semester.text.trim(),
+            visibility: visibility,
+            filePath: file!.path!,
+            fileName: file.name,
+            description: description.text,
+            lecturerName: lecturer.text,
+          );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message), backgroundColor: AppColors.success),
@@ -401,7 +473,10 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
     } on ApiException catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message), backgroundColor: AppColors.danger),
+          SnackBar(
+            content: Text(error.message),
+            backgroundColor: AppColors.danger,
+          ),
         );
       }
     } finally {
@@ -431,11 +506,16 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'المادة'),
               items: [
-                const DropdownMenuItem<int?>(value: null, child: Text('كل المواد')),
-                ...subjects.map((item) => DropdownMenuItem<int?>(
-                  value: number(item, 'id').toInt(),
-                  child: Text(text(item, 'name')),
-                )),
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text('كل المواد'),
+                ),
+                ...subjects.map(
+                  (item) => DropdownMenuItem<int?>(
+                    value: number(item, 'id').toInt(),
+                    child: Text(text(item, 'name')),
+                  ),
+                ),
               ],
               onChanged: (val) => setLocal(() => subject = val),
             ),
@@ -460,7 +540,9 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
             const SizedBox(height: 20),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(backgroundColor: AppColors.royalBlue),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.royalBlue,
+              ),
               child: const Text('تطبيق'),
             ),
           ],
@@ -509,7 +591,7 @@ class _LibraryActionRow extends StatelessWidget {
                   color: AppColors.midnight.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
-                )
+                ),
               ],
             ),
             child: TextField(
@@ -517,7 +599,10 @@ class _LibraryActionRow extends StatelessWidget {
               onSubmitted: (_) => onSearch(),
               decoration: const InputDecoration(
                 hintText: 'ابحث عن اسم الملف أو المادة...',
-                prefixIcon: Icon(Icons.search_rounded, color: AppColors.slate400),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: AppColors.slate400,
+                ),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(vertical: 15),
               ),
@@ -526,14 +611,13 @@ class _LibraryActionRow extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         _IconButton(
-          icon: isGrid ? Icons.format_list_bulleted_rounded : Icons.grid_view_rounded,
+          icon: isGrid
+              ? Icons.format_list_bulleted_rounded
+              : Icons.grid_view_rounded,
           onTap: onToggleView,
         ),
         const SizedBox(width: 8),
-        _IconButton(
-          icon: Icons.tune_rounded,
-          onTap: onFilter,
-        ),
+        _IconButton(icon: Icons.tune_rounded, onTap: onFilter),
         if (onUpload != null) ...[
           const SizedBox(width: 8),
           _IconButton(

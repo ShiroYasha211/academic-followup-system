@@ -604,6 +604,9 @@ class _AssignmentTile extends StatelessWidget {
       'missing' => AppColors.danger,
       _ => AppColors.warning,
     };
+    final requiresFile =
+        boolValue(item, 'requires_file') ||
+        boolValue(item, 'requires_submission');
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -684,6 +687,13 @@ class _AssignmentTile extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (requiresFile) ...[
+                        const SizedBox(height: 8),
+                        const _MiniBadge(
+                          label: 'يتطلب رفع ملف',
+                          color: AppColors.royalBlue,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -2215,39 +2225,49 @@ class _QuizTile extends StatelessWidget {
 
   Future<String?> _askAccessCode(BuildContext context) async {
     final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
     return showMoeenBottomSheet<String>(
       context: context,
       title: 'كود الدخول',
       icon: Icons.password_rounded,
       color: AppColors.violet,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'هذا الكويز يحتاج إلى كود دخول. أدخل الكود ثم تابع.',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'كود الكويز',
-              prefixIcon: Icon(Icons.key_rounded),
+      child: Form(
+        key: formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'هذا الكويز يحتاج إلى كود دخول. أدخل الكود ثم تابع.',
+              style: TextStyle(fontWeight: FontWeight.w600),
             ),
-          ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: controller,
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'أدخل كود الكويز أولاً.'
+                  : null,
+              decoration: const InputDecoration(
+                labelText: 'كود الكويز',
+                prefixIcon: Icon(Icons.key_rounded),
+              ),
             ),
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text(
-              'بدء الاختبار الآن',
-              style: TextStyle(fontWeight: FontWeight.w900),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: () {
+                if (formKey.currentState?.validate() != true) return;
+                Navigator.pop(context, controller.text.trim());
+              },
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text(
+                'بدء الاختبار الآن',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

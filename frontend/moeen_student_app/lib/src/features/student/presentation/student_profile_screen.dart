@@ -208,6 +208,7 @@ class _ChangePasswordForm extends StatefulWidget {
 }
 
 class _ChangePasswordFormState extends State<_ChangePasswordForm> {
+  final _formKey = GlobalKey<FormState>();
   final _currentController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
@@ -246,104 +247,131 @@ class _ChangePasswordFormState extends State<_ChangePasswordForm> {
     });
   }
 
-  bool get _isValid =>
-      _currentController.text.isNotEmpty &&
-      _passwordController.text.length >= 8 &&
-      _passwordController.text == _confirmController.text;
-
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: _currentController,
-          obscureText: _obscureCurrent,
-          decoration: InputDecoration(
-            labelText: 'كلمة المرور الحالية',
-            prefixIcon: const Icon(Icons.lock_rounded),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscureCurrent
-                    ? Icons.visibility_rounded
-                    : Icons.visibility_off_rounded,
-              ),
-              onPressed: () =>
-                  setState(() => _obscureCurrent = !_obscureCurrent),
-            ),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _passwordController,
-          obscureText: _obscurePassword,
-          onChanged: (_) => _validate(),
-          decoration: InputDecoration(
-            labelText: 'كلمة المرور الجديدة',
-            errorText: _passwordError,
-            prefixIcon: const Icon(Icons.lock_reset_rounded),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscurePassword
-                    ? Icons.visibility_rounded
-                    : Icons.visibility_off_rounded,
-              ),
-              onPressed: () =>
-                  setState(() => _obscurePassword = !_obscurePassword),
-            ),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _confirmController,
-          obscureText: _obscureConfirm,
-          onChanged: (_) => _validate(),
-          decoration: InputDecoration(
-            labelText: 'تأكيد كلمة المرور الجديدة',
-            errorText: _confirmError,
-            prefixIcon: const Icon(Icons.verified_rounded),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscureConfirm
-                    ? Icons.visibility_rounded
-                    : Icons.visibility_off_rounded,
-              ),
-              onPressed: () =>
-                  setState(() => _obscureConfirm = !_obscureConfirm),
-            ),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ),
-        const SizedBox(height: 24),
-        FilledButton(
-          onPressed: _isValid && !_submitting ? _handleSave : null,
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          child: _submitting
-              ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : const Text(
-                  'حفظ التغييرات',
-                  style: TextStyle(fontWeight: FontWeight.w900),
+    return Form(
+      key: _formKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _currentController,
+            obscureText: _obscureCurrent,
+            validator: (value) => value == null || value.isEmpty
+                ? 'اكتب كلمة المرور الحالية.'
+                : null,
+            decoration: InputDecoration(
+              labelText: 'كلمة المرور الحالية',
+              prefixIcon: const Icon(Icons.lock_rounded),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureCurrent
+                      ? Icons.visibility_rounded
+                      : Icons.visibility_off_rounded,
                 ),
-        ),
-      ],
+                onPressed: () =>
+                    setState(() => _obscureCurrent = !_obscureCurrent),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            onChanged: (_) => _validate(),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'اكتب كلمة المرور الجديدة.';
+              }
+              if (value.length < 8) {
+                return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل.';
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              labelText: 'كلمة المرور الجديدة',
+              errorText: _passwordError,
+              prefixIcon: const Icon(Icons.lock_reset_rounded),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_rounded
+                      : Icons.visibility_off_rounded,
+                ),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _confirmController,
+            obscureText: _obscureConfirm,
+            onChanged: (_) => _validate(),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'أكد كلمة المرور الجديدة.';
+              }
+              if (value != _passwordController.text) {
+                return 'كلمة المرور غير متطابقة.';
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              labelText: 'تأكيد كلمة المرور الجديدة',
+              errorText: _confirmError,
+              prefixIcon: const Icon(Icons.verified_rounded),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureConfirm
+                      ? Icons.visibility_rounded
+                      : Icons.visibility_off_rounded,
+                ),
+                onPressed: () =>
+                    setState(() => _obscureConfirm = !_obscureConfirm),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: _submitting ? null : _handleSave,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: _submitting
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'حفظ التغييرات',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
   Future<void> _handleSave() async {
+    if (_formKey.currentState?.validate() != true) return;
     setState(() => _submitting = true);
     try {
       await widget.onSubmit(

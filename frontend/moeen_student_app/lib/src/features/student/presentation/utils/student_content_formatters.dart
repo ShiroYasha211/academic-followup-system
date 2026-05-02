@@ -12,6 +12,7 @@ Future<void> _showEditStudyItem(
   );
   DateTime? selectedDate = DateTime.tryParse(text(item, 'scheduled_date'));
   final note = TextEditingController(text: text(item, 'note'));
+  final formKey = GlobalKey<FormState>();
   String priority = ['high', 'medium', 'low'].contains(text(item, 'priority'))
       ? text(item, 'priority')
       : 'medium';
@@ -31,124 +32,140 @@ Future<void> _showEditStudyItem(
     icon: Icons.edit_note_rounded,
     color: _studyTabColor(tab),
     child: StatefulBuilder(
-      builder: (sheetContext, setDialogState) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            controller: title,
-            decoration: const InputDecoration(
-              labelText: 'العنوان',
-              prefixIcon: Icon(Icons.title_rounded),
-            ),
-          ),
-          const SizedBox(height: 12),
-          InkWell(
-            onTap: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: selectedDate ?? DateTime.now(),
-                firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                lastDate: DateTime.now().add(const Duration(days: 365)),
-              );
-              if (date != null) setDialogState(() => selectedDate = date);
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-              decoration: BoxDecoration(
-                color: AppColors.slate50,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.slate200),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.calendar_today_rounded,
-                    size: 20,
-                    color: AppColors.slate400,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    selectedDate == null
-                        ? 'اختر التاريخ'
-                        : dateOnly(selectedDate.toString()),
-                    style: TextStyle(
-                      color: selectedDate == null
-                          ? AppColors.slate400
-                          : AppColors.midnight,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+      builder: (sheetContext, setDialogState) => Form(
+        key: formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              controller: title,
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'اكتب عنوان العنصر.'
+                  : null,
+              decoration: const InputDecoration(
+                labelText: 'العنوان',
+                prefixIcon: Icon(Icons.title_rounded),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: priority,
-                  decoration: const InputDecoration(labelText: 'الأولوية'),
-                  items: const [
-                    DropdownMenuItem(value: 'high', child: Text('عالية')),
-                    DropdownMenuItem(value: 'medium', child: Text('متوسطة')),
-                    DropdownMenuItem(value: 'low', child: Text('منخفضة')),
-                  ],
-                  onChanged: (value) =>
-                      setDialogState(() => priority = value ?? 'medium'),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: selectedDate ?? DateTime.now(),
+                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                );
+                if (date != null) setDialogState(() => selectedDate = date);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 14,
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: status,
-                  decoration: const InputDecoration(labelText: 'الحالة'),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'pending',
-                      child: Text('قيد الانتظار'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'in_progress',
-                      child: Text('قيد التنفيذ'),
-                    ),
-                    DropdownMenuItem(value: 'completed', child: Text('مكتمل')),
-                    DropdownMenuItem(value: 'overdue', child: Text('متأخر')),
-                  ],
-                  onChanged: (value) =>
-                      setDialogState(() => status = value ?? 'pending'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: note,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'ملاحظة',
-              prefixIcon: Icon(Icons.notes_rounded),
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 56,
-            child: FilledButton.icon(
-              onPressed: () => Navigator.pop(sheetContext, true),
-              icon: const Icon(Icons.save_rounded),
-              label: const Text(
-                'حفظ التعديلات الآن',
-                style: TextStyle(fontWeight: FontWeight.w900),
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: _studyTabColor(tab),
-                shape: RoundedRectangleBorder(
+                decoration: BoxDecoration(
+                  color: AppColors.slate50,
                   borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.slate200),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_today_rounded,
+                      size: 20,
+                      color: AppColors.slate400,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      selectedDate == null
+                          ? 'اختر التاريخ'
+                          : dateOnly(selectedDate.toString()),
+                      style: TextStyle(
+                        color: selectedDate == null
+                            ? AppColors.slate400
+                            : AppColors.midnight,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: priority,
+                    decoration: const InputDecoration(labelText: 'الأولوية'),
+                    items: const [
+                      DropdownMenuItem(value: 'high', child: Text('عالية')),
+                      DropdownMenuItem(value: 'medium', child: Text('متوسطة')),
+                      DropdownMenuItem(value: 'low', child: Text('منخفضة')),
+                    ],
+                    onChanged: (value) =>
+                        setDialogState(() => priority = value ?? 'medium'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: status,
+                    decoration: const InputDecoration(labelText: 'الحالة'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'pending',
+                        child: Text('قيد الانتظار'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'in_progress',
+                        child: Text('قيد التنفيذ'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'completed',
+                        child: Text('مكتمل'),
+                      ),
+                      DropdownMenuItem(value: 'overdue', child: Text('متأخر')),
+                    ],
+                    onChanged: (value) =>
+                        setDialogState(() => status = value ?? 'pending'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: note,
+              maxLines: 3,
+              maxLength: 500,
+              decoration: const InputDecoration(
+                labelText: 'ملاحظة',
+                prefixIcon: Icon(Icons.notes_rounded),
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 56,
+              child: FilledButton.icon(
+                onPressed: () {
+                  if (formKey.currentState?.validate() != true) return;
+                  Navigator.pop(sheetContext, true);
+                },
+                icon: const Icon(Icons.save_rounded),
+                label: const Text(
+                  'حفظ التعديلات الآن',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _studyTabColor(tab),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );

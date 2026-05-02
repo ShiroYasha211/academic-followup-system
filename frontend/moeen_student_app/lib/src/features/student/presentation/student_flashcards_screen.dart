@@ -45,7 +45,8 @@ class StudentFlashcardsScreen extends ConsumerWidget {
                       ),
                     ),
                     TextButton.icon(
-                      onPressed: () => context.push(StudentFlashcardStoreScreen.route),
+                      onPressed: () =>
+                          context.push(StudentFlashcardStoreScreen.route),
                       icon: const Icon(Icons.storefront_rounded, size: 18),
                       label: const Text('المتجر'),
                     ),
@@ -58,12 +59,13 @@ class StudentFlashcardsScreen extends ConsumerWidget {
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 0.85,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio: 0.85,
+                        ),
                     itemCount: packs.length,
                     itemBuilder: (ctx, i) => _FlashcardPackCard(packs[i]),
                   ),
@@ -76,6 +78,7 @@ class StudentFlashcardsScreen extends ConsumerWidget {
   }
 
   Future<void> _showCreatePack(BuildContext context, WidgetRef ref) async {
+    final formKey = GlobalKey<FormState>();
     final title = TextEditingController();
     final description = TextEditingController();
     String mode = 'one_line';
@@ -88,80 +91,96 @@ class StudentFlashcardsScreen extends ConsumerWidget {
       icon: Icons.bolt_rounded,
       color: AppColors.royalBlue,
       child: StatefulBuilder(
-        builder: (sheetContext, setLocal) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: title,
-              decoration: const InputDecoration(labelText: 'اسم الحزمة'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: description,
-              maxLines: 2,
-              decoration: const InputDecoration(labelText: 'وصف مختصر'),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: mode,
-              decoration: const InputDecoration(labelText: 'نوع البطاقات'),
-              items: const [
-                DropdownMenuItem(
-                  value: 'one_line',
-                  child: Text('One Line Shot'),
-                ),
-                DropdownMenuItem(
-                  value: 'flash_card',
-                  child: Text('بطاقة أمام/خلف'),
-                ),
-                DropdownMenuItem(value: 'qa', child: Text('سؤال وجواب')),
-                DropdownMenuItem(value: 'mcq', child: Text('اختيار من متعدد')),
-              ],
-              onChanged: (value) => setLocal(() => mode = value ?? 'one_line'),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: cycle,
-                    decoration: const InputDecoration(labelText: 'التكرار'),
-                    items: const [
-                      DropdownMenuItem(value: 'daily', child: Text('يومي')),
-                      DropdownMenuItem(value: 'weekly', child: Text('أسبوعي')),
-                      DropdownMenuItem(value: 'monthly', child: Text('شهري')),
-                    ],
-                    onChanged: (value) =>
-                        setLocal(() => cycle = value ?? 'daily'),
+        builder: (sheetContext, setLocal) => Form(
+          key: formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: title,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'اكتب اسم الحزمة.'
+                    : null,
+                decoration: const InputDecoration(labelText: 'اسم الحزمة'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: description,
+                maxLines: 2,
+                decoration: const InputDecoration(labelText: 'وصف مختصر'),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: mode,
+                decoration: const InputDecoration(labelText: 'نوع البطاقات'),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'one_line',
+                    child: Text('One Line Shot'),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: color,
-                    decoration: const InputDecoration(labelText: 'اللون'),
-                    items: const [
-                      DropdownMenuItem(value: '#4338ca', child: Text('أزرق')),
-                      DropdownMenuItem(value: '#f59e0b', child: Text('ذهبي')),
-                      DropdownMenuItem(value: '#0f766e', child: Text('أخضر')),
-                      DropdownMenuItem(value: '#be123c', child: Text('أحمر')),
-                    ],
-                    onChanged: (value) =>
-                        setLocal(() => color = value ?? '#4338ca'),
+                  DropdownMenuItem(
+                    value: 'flash_card',
+                    child: Text('بطاقة أمام/خلف'),
                   ),
-                ),
-              ],
-            ),
-            SwitchListTile(
-              value: notifications,
-              onChanged: (value) => setLocal(() => notifications = value),
-              title: const Text('تفعيل التذكيرات اليومية'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(sheetContext, true),
-              child: const Text('إنشاء'),
-            ),
-          ],
+                  DropdownMenuItem(value: 'qa', child: Text('سؤال وجواب')),
+                  DropdownMenuItem(
+                    value: 'mcq',
+                    child: Text('اختيار من متعدد'),
+                  ),
+                ],
+                onChanged: (value) =>
+                    setLocal(() => mode = value ?? 'one_line'),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: cycle,
+                      decoration: const InputDecoration(labelText: 'التكرار'),
+                      items: const [
+                        DropdownMenuItem(value: 'daily', child: Text('يومي')),
+                        DropdownMenuItem(
+                          value: 'weekly',
+                          child: Text('أسبوعي'),
+                        ),
+                        DropdownMenuItem(value: 'monthly', child: Text('شهري')),
+                      ],
+                      onChanged: (value) =>
+                          setLocal(() => cycle = value ?? 'daily'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: color,
+                      decoration: const InputDecoration(labelText: 'اللون'),
+                      items: const [
+                        DropdownMenuItem(value: '#4338ca', child: Text('أزرق')),
+                        DropdownMenuItem(value: '#f59e0b', child: Text('ذهبي')),
+                        DropdownMenuItem(value: '#0f766e', child: Text('أخضر')),
+                        DropdownMenuItem(value: '#be123c', child: Text('أحمر')),
+                      ],
+                      onChanged: (value) =>
+                          setLocal(() => color = value ?? '#4338ca'),
+                    ),
+                  ),
+                ],
+              ),
+              SwitchListTile(
+                value: notifications,
+                onChanged: (value) => setLocal(() => notifications = value),
+                title: const Text('تفعيل التذكيرات اليومية'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (formKey.currentState?.validate() != true) return;
+                  Navigator.pop(sheetContext, true);
+                },
+                child: const Text('إنشاء'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -275,6 +294,7 @@ class StudentFlashcardDetailsScreen extends ConsumerWidget {
   }
 
   Future<void> _showAddItem(BuildContext context, WidgetRef ref) async {
+    final formKey = GlobalKey<FormState>();
     final front = TextEditingController();
     final back = TextEditingController();
     String type = 'one_line';
@@ -285,53 +305,66 @@ class StudentFlashcardDetailsScreen extends ConsumerWidget {
       icon: Icons.note_add_rounded,
       color: AppColors.goldDeep,
       child: StatefulBuilder(
-        builder: (sheetContext, setLocal) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: front,
-              maxLines: 3,
-              decoration: const InputDecoration(labelText: 'النص / السؤال'),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: type,
-              decoration: const InputDecoration(labelText: 'نوع العنصر'),
-              items: const [
-                DropdownMenuItem(value: 'one_line', child: Text('One Line')),
-                DropdownMenuItem(
-                  value: 'flash_card',
-                  child: Text('Flash Card'),
-                ),
-                DropdownMenuItem(value: 'qa', child: Text('Q/A')),
-              ],
-              onChanged: (value) => setLocal(() => type = value ?? 'one_line'),
-            ),
-            if (type != 'one_line') ...[
-              const SizedBox(height: 10),
-              TextField(
-                controller: back,
+        builder: (sheetContext, setLocal) => Form(
+          key: formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: front,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'اكتب نص البطاقة.'
+                    : null,
                 maxLines: 3,
-                decoration: const InputDecoration(labelText: 'الإجابة'),
+                decoration: const InputDecoration(labelText: 'النص / السؤال'),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: type,
+                decoration: const InputDecoration(labelText: 'نوع العنصر'),
+                items: const [
+                  DropdownMenuItem(value: 'one_line', child: Text('One Line')),
+                  DropdownMenuItem(
+                    value: 'flash_card',
+                    child: Text('Flash Card'),
+                  ),
+                  DropdownMenuItem(value: 'qa', child: Text('Q/A')),
+                ],
+                onChanged: (value) =>
+                    setLocal(() => type = value ?? 'one_line'),
+              ),
+              if (type != 'one_line') ...[
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: back,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'اكتب الإجابة.'
+                      : null,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'الإجابة'),
+                ),
+              ],
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: priority,
+                decoration: const InputDecoration(labelText: 'الأولوية'),
+                items: const [
+                  DropdownMenuItem(value: 'normal', child: Text('سهل')),
+                  DropdownMenuItem(value: 'high', child: Text('متوسط')),
+                  DropdownMenuItem(value: 'critical', child: Text('صعب')),
+                ],
+                onChanged: (value) =>
+                    setLocal(() => priority = value ?? 'normal'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (formKey.currentState?.validate() != true) return;
+                  Navigator.pop(sheetContext, true);
+                },
+                child: const Text('حفظ'),
               ),
             ],
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: priority,
-              decoration: const InputDecoration(labelText: 'الأولوية'),
-              items: const [
-                DropdownMenuItem(value: 'normal', child: Text('سهل')),
-                DropdownMenuItem(value: 'high', child: Text('متوسط')),
-                DropdownMenuItem(value: 'critical', child: Text('صعب')),
-              ],
-              onChanged: (value) =>
-                  setLocal(() => priority = value ?? 'normal'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(sheetContext, true),
-              child: const Text('حفظ'),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -356,6 +389,7 @@ class StudentFlashcardDetailsScreen extends ConsumerWidget {
     WidgetRef ref,
     Map<String, dynamic> parent,
   ) async {
+    final formKey = GlobalKey<FormState>();
     final title = TextEditingController();
     final description = TextEditingController();
     String mode = 'one_line';
@@ -366,54 +400,65 @@ class StudentFlashcardDetailsScreen extends ConsumerWidget {
       icon: Icons.account_tree_rounded,
       color: AppColors.royalBlue,
       child: StatefulBuilder(
-        builder: (sheetContext, setLocal) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: title,
-              decoration: const InputDecoration(labelText: 'اسم الحزمة'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: description,
-              maxLines: 2,
-              decoration: const InputDecoration(labelText: 'وصف مختصر'),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: mode,
-              decoration: const InputDecoration(labelText: 'نوع البطاقات'),
-              items: const [
-                DropdownMenuItem(
-                  value: 'one_line',
-                  child: Text('One Line Shot'),
-                ),
-                DropdownMenuItem(
-                  value: 'flash_card',
-                  child: Text('Flash Card'),
-                ),
-                DropdownMenuItem(value: 'qa', child: Text('Q/A')),
-                DropdownMenuItem(value: 'mcq', child: Text('MCQ')),
-              ],
-              onChanged: (value) => setLocal(() => mode = value ?? 'one_line'),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: color,
-              decoration: const InputDecoration(labelText: 'اللون'),
-              items: const [
-                DropdownMenuItem(value: '#4338ca', child: Text('أزرق')),
-                DropdownMenuItem(value: '#f59e0b', child: Text('ذهبي')),
-                DropdownMenuItem(value: '#0f766e', child: Text('أخضر')),
-                DropdownMenuItem(value: '#be123c', child: Text('أحمر')),
-              ],
-              onChanged: (value) => setLocal(() => color = value ?? '#4338ca'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(sheetContext, true),
-              child: const Text('إنشاء'),
-            ),
-          ],
+        builder: (sheetContext, setLocal) => Form(
+          key: formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: title,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'اكتب اسم الحزمة.'
+                    : null,
+                decoration: const InputDecoration(labelText: 'اسم الحزمة'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: description,
+                maxLines: 2,
+                decoration: const InputDecoration(labelText: 'وصف مختصر'),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: mode,
+                decoration: const InputDecoration(labelText: 'نوع البطاقات'),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'one_line',
+                    child: Text('One Line Shot'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'flash_card',
+                    child: Text('Flash Card'),
+                  ),
+                  DropdownMenuItem(value: 'qa', child: Text('Q/A')),
+                  DropdownMenuItem(value: 'mcq', child: Text('MCQ')),
+                ],
+                onChanged: (value) =>
+                    setLocal(() => mode = value ?? 'one_line'),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: color,
+                decoration: const InputDecoration(labelText: 'اللون'),
+                items: const [
+                  DropdownMenuItem(value: '#4338ca', child: Text('أزرق')),
+                  DropdownMenuItem(value: '#f59e0b', child: Text('ذهبي')),
+                  DropdownMenuItem(value: '#0f766e', child: Text('أخضر')),
+                  DropdownMenuItem(value: '#be123c', child: Text('أحمر')),
+                ],
+                onChanged: (value) =>
+                    setLocal(() => color = value ?? '#4338ca'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (formKey.currentState?.validate() != true) return;
+                  Navigator.pop(sheetContext, true);
+                },
+                child: const Text('إنشاء'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -492,8 +537,19 @@ class _StudentFlashcardReviewScreenState
             );
           }
           final item = items[_index.clamp(0, items.length - 1)];
-          final color = Color(_parseHex(text(item, 'item_color', 
-              fallback: text(asMap(item['pack']), 'color', fallback: '#4338ca'))));
+          final color = Color(
+            _parseHex(
+              text(
+                item,
+                'item_color',
+                fallback: text(
+                  asMap(item['pack']),
+                  'color',
+                  fallback: '#4338ca',
+                ),
+              ),
+            ),
+          );
 
           return Container(
             decoration: BoxDecoration(
@@ -523,7 +579,10 @@ class _StudentFlashcardReviewScreenState
                       const SizedBox(width: 12),
                       Text(
                         '${_index + 1} / ${items.length}',
-                        style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.slate600),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.slate600,
+                        ),
                       ),
                     ],
                   ),
@@ -540,7 +599,10 @@ class _StudentFlashcardReviewScreenState
                       padding: const EdgeInsets.only(bottom: 20),
                       child: Text(
                         'اضغط على البطاقة لرؤية الإجابة',
-                        style: TextStyle(color: color.withValues(alpha: 0.6), fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          color: color.withValues(alpha: 0.6),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   Row(
@@ -702,7 +764,10 @@ class _FlashcardPackCard extends ConsumerWidget {
       children: [
         // 3D Stack Effect
         Positioned(
-          left: 10, right: 10, top: 4, bottom: 4,
+          left: 10,
+          right: 10,
+          top: 4,
+          bottom: 4,
           child: Container(
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
@@ -711,7 +776,10 @@ class _FlashcardPackCard extends ConsumerWidget {
           ),
         ),
         Positioned(
-          left: 6, right: 6, top: 8, bottom: 8,
+          left: 6,
+          right: 6,
+          top: 8,
+          bottom: 8,
           child: Container(
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.2),
@@ -753,9 +821,14 @@ class _FlashcardPackCard extends ConsumerWidget {
                           color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 20),
+                        child: const Icon(
+                          Icons.bolt_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
-                      if (trailing == null) _FlashcardPackMenu(pack: pack, isDark: true),
+                      if (trailing == null)
+                        _FlashcardPackMenu(pack: pack, isDark: true),
                     ],
                   ),
                   const Spacer(),
@@ -773,11 +846,19 @@ class _FlashcardPackCard extends ConsumerWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.style_rounded, color: Colors.white70, size: 12),
+                      const Icon(
+                        Icons.style_rounded,
+                        color: Colors.white70,
+                        size: 12,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '$count بطاقة',
-                        style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ],
                   ),
@@ -804,7 +885,10 @@ class _FlashcardPackMenu extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return PopupMenuButton<String>(
-      icon: Icon(Icons.more_vert_rounded, color: isDark ? Colors.white70 : AppColors.slate500),
+      icon: Icon(
+        Icons.more_vert_rounded,
+        color: isDark ? Colors.white70 : AppColors.slate500,
+      ),
       padding: EdgeInsets.zero,
       onSelected: (value) async {
         final id = number(pack, 'id').toInt();
@@ -904,7 +988,11 @@ class _ReviewButton extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               label,
-              style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12),
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+              ),
             ),
           ],
         ),
@@ -942,18 +1030,29 @@ class _MasteryHeader extends StatelessWidget {
                   children: [
                     const Text(
                       'مستوى الإتقان 🔥',
-                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'أنت في سلسلة مراجعة منذ 5 أيام!',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
@@ -962,7 +1061,14 @@ class _MasteryHeader extends StatelessWidget {
                   children: [
                     Icon(Icons.bolt_rounded, color: AppColors.gold, size: 16),
                     SizedBox(width: 4),
-                    Text('Shot X12', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                    Text(
+                      'Shot X12',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -971,7 +1077,11 @@ class _MasteryHeader extends StatelessWidget {
           const SizedBox(height: 20),
           Row(
             children: [
-              _StatMini(label: 'الإجمالي', value: text(stats, 'total_cards', fallback: '0'), color: Colors.blue),
+              _StatMini(
+                label: 'الإجمالي',
+                value: text(stats, 'total_cards', fallback: '0'),
+                color: Colors.blue,
+              ),
               _StatMini(label: 'المتقن', value: '85%', color: Colors.green),
               _StatMini(label: 'قيد التعلم', value: '12', color: Colors.orange),
             ],
@@ -983,7 +1093,11 @@ class _MasteryHeader extends StatelessWidget {
 }
 
 class _StatMini extends StatelessWidget {
-  const _StatMini({required this.label, required this.value, required this.color});
+  const _StatMini({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
   final String label;
   final String value;
   final Color color;
@@ -993,8 +1107,22 @@ class _StatMini extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
-          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10, fontWeight: FontWeight.w700)),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
@@ -1002,7 +1130,12 @@ class _StatMini extends StatelessWidget {
 }
 
 class _FlashCardPreview extends StatelessWidget {
-  const _FlashCardPreview({required this.content, this.backContent, required this.color, required this.onTap});
+  const _FlashCardPreview({
+    required this.content,
+    this.backContent,
+    required this.color,
+    required this.onTap,
+  });
   final String content;
   final String? backContent;
   final Color color;

@@ -200,7 +200,17 @@ class _GradesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = asList(grades['items']);
+    final rawItems = asList(grades['items']);
+    final hasCategoryItems = rawItems.any(
+      (item) => text(asMap(item), 'type') == 'category',
+    );
+    final items = hasCategoryItems
+        ? rawItems
+              .where(
+                (item) => text(asMap(item), 'type') != 'general_continuous',
+              )
+              .toList()
+        : rawItems;
     final summary = asMap(grades['summary']);
     final totalScore = text(grades, 'total_score', fallback: '0');
     final maxPossible = text(grades, 'max_possible', fallback: '0');
