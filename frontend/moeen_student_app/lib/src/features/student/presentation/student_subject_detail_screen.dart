@@ -30,7 +30,7 @@ class StudentSubjectDetailsScreen extends ConsumerWidget {
           final attendance = asList(data['attendance_history']);
 
           return DefaultTabController(
-            length: 5,
+            length: 6,
             child: NestedScrollView(
               headerSliverBuilder: (context, innerBoxIsScrolled) => [
                 SliverToBoxAdapter(
@@ -65,6 +65,7 @@ class StudentSubjectDetailsScreen extends ConsumerWidget {
                         ),
                         tabs: const [
                           Tab(text: 'نظرة عامة'),
+                          Tab(text: 'الدرجات'),
                           Tab(text: 'المحاضرات'),
                           Tab(text: 'التكاليف'),
                           Tab(text: 'المصادر'),
@@ -84,18 +85,54 @@ class StudentSubjectDetailsScreen extends ConsumerWidget {
                     children: [
                       _MetricGrid(
                         items: [
-                          _Metric('الحضور', '${text(progress, 'attendance_percentage', fallback: '0')}%', Icons.fact_check_rounded, AppColors.success),
-                          _Metric('الغياب', text(progress, 'absences', fallback: '0'), Icons.person_off_rounded, AppColors.danger),
-                          _Metric('أعمال السنة', _gradeLabel(continuous), Icons.leaderboard_rounded, const Color(0xFF7C3AED)),
-                          _Metric('النهائي', _gradeLabel(finalGrade), Icons.workspace_premium_rounded, const Color(0xFFBE123C)),
+                          _Metric(
+                            'الحضور',
+                            '${text(progress, 'attendance_percentage', fallback: '0')}%',
+                            Icons.fact_check_rounded,
+                            AppColors.success,
+                          ),
+                          _Metric(
+                            'الغياب',
+                            text(progress, 'absences', fallback: '0'),
+                            Icons.person_off_rounded,
+                            AppColors.danger,
+                          ),
+                          _Metric(
+                            'أعمال السنة',
+                            _gradeLabel(continuous),
+                            Icons.leaderboard_rounded,
+                            const Color(0xFF7C3AED),
+                          ),
+                          _Metric(
+                            'النهائي',
+                            _gradeLabel(finalGrade),
+                            Icons.workspace_premium_rounded,
+                            const Color(0xFFBE123C),
+                          ),
                           if (grades['total_percentage'] != null)
-                            _Metric('المعدل الكلي', '${grades['total_percentage']}%', Icons.analytics_rounded, AppColors.royalBlue),
-                          _Metric('الأعذار', text(progress, 'excused', fallback: '0'), Icons.verified_rounded, AppColors.info),
+                            _Metric(
+                              'المعدل الكلي',
+                              '${grades['total_percentage']}%',
+                              Icons.analytics_rounded,
+                              AppColors.royalBlue,
+                            ),
+                          _Metric(
+                            'الأعذار',
+                            text(progress, 'excused', fallback: '0'),
+                            Icons.verified_rounded,
+                            AppColors.info,
+                          ),
                         ],
                       ),
                       const SizedBox(height: 20),
                       _DeprivationCard(info: deprivation),
                     ],
+                  ),
+                  // Grades Tab
+                  _GradesTab(
+                    grades: grades,
+                    onRefresh: () async =>
+                        ref.invalidate(_subjectDetailsProvider(subjectId)),
                   ),
                   // Lectures Tab
                   _TabList(
@@ -138,8 +175,10 @@ class StudentSubjectDetailsScreen extends ConsumerWidget {
                     emptyMessage: 'لا يوجد سجل حضور مسجل لهذه المادة.',
                     children: attendance
                         .map(
-                          (item) =>
-                              _AttendanceTile(asMap(item), subjectId: subjectId),
+                          (item) => _AttendanceTile(
+                            asMap(item),
+                            subjectId: subjectId,
+                          ),
                         )
                         .toList(),
                   ),
@@ -151,6 +190,309 @@ class StudentSubjectDetailsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _GradesTab extends StatelessWidget {
+  const _GradesTab({required this.grades, required this.onRefresh});
+
+  final Map<String, dynamic> grades;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = asList(grades['items']);
+    final summary = asMap(grades['summary']);
+    final totalScore = text(grades, 'total_score', fallback: '0');
+    final maxPossible = text(grades, 'max_possible', fallback: '0');
+    final percentage = text(grades, 'total_percentage', fallback: '-');
+
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: [
+                  Color(0xFF172B4D),
+                  Color(0xFF406AB4),
+                  Color(0xFFF1C63B),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.royalBlue.withValues(alpha: 0.22),
+                  blurRadius: 26,
+                  offset: const Offset(0, 14),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(
+                        Icons.grade_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'درجات المقرر',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 23,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          Text(
+                            'تفصيل الدرجات حسب التقسيم الذي حدده دكتور المادة.',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.78),
+                              fontWeight: FontWeight.w700,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _GradeHeroMetric(
+                        'المجموع',
+                        '$totalScore / $maxPossible',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _GradeHeroMetric(
+                        'النسبة',
+                        percentage == '-' ? '-' : '$percentage%',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          _MetricGrid(
+            items: [
+              _Metric(
+                'المدخلة',
+                text(summary, 'entered_count', fallback: '0'),
+                Icons.edit_note_rounded,
+                AppColors.royalBlue,
+              ),
+              _Metric(
+                'المعتمدة',
+                text(summary, 'approved_count', fallback: '0'),
+                Icons.verified_rounded,
+                AppColors.success,
+              ),
+              _Metric(
+                'قيد المراجعة',
+                text(summary, 'pending_count', fallback: '0'),
+                Icons.hourglass_top_rounded,
+                AppColors.warning,
+              ),
+              _Metric(
+                'غير مرصودة',
+                text(summary, 'not_entered_count', fallback: '0'),
+                Icons.pending_actions_rounded,
+                AppColors.slate500,
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          if (items.isEmpty)
+            const EmptyState(
+              message: 'لم يتم إنشاء تقسيم درجات أو رصد درجات لهذه المادة بعد.',
+            )
+          else
+            ...items.map((raw) => _GradeBreakdownCard(asMap(raw))),
+        ],
+      ),
+    );
+  }
+}
+
+class _GradeHeroMetric extends StatelessWidget {
+  const _GradeHeroMetric(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.72),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GradeBreakdownCard extends StatelessWidget {
+  const _GradeBreakdownCard(this.item);
+
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = text(item, 'status', fallback: 'not_entered');
+    final color = switch (status) {
+      'approved' => AppColors.success,
+      'pending' => AppColors.warning,
+      'rejected' => AppColors.danger,
+      _ => AppColors.slate500,
+    };
+    final score = item['score'] == null ? '-' : text(item, 'score');
+    final max = text(item, 'max_score', fallback: '0');
+    final percentage = item['percentage'] == null
+        ? '-'
+        : '${text(item, 'percentage')}%';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(_gradeTypeIcon(text(item, 'type')), color: color),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text(item, 'name', fallback: 'درجة'),
+                  style: const TextStyle(
+                    color: AppColors.midnight,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'الحالة: ${_gradeStatusLabel(status)}${text(item, 'created_by').isNotEmpty ? ' • بواسطة ${text(item, 'created_by')}' : ''}',
+                  style: const TextStyle(
+                    color: AppColors.slate500,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '$score / $max',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                percentage,
+                style: const TextStyle(
+                  color: AppColors.slate500,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _gradeTypeIcon(String type) {
+  return switch (type) {
+    'final' => Icons.workspace_premium_rounded,
+    'category' => Icons.category_rounded,
+    'general_continuous' => Icons.leaderboard_rounded,
+    _ => Icons.grade_rounded,
+  };
+}
+
+String _gradeStatusLabel(String status) {
+  return switch (status) {
+    'approved' => 'معتمدة',
+    'pending' => 'قيد المراجعة',
+    'rejected' => 'مرفوضة',
+    'not_entered' => 'لم ترصد بعد',
+    _ => status,
+  };
 }
 
 class _SubjectDetailHeader extends StatelessWidget {

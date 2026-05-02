@@ -5,7 +5,10 @@ import '../../features/auth/logic/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
+import '../../features/delegate/presentation/delegate_screens.dart';
+import '../../features/delegate/presentation/widgets/delegate_shell.dart';
 import '../../features/home/presentation/home_placeholder_screen.dart';
+import '../../features/practical_delegate/presentation/practical_delegate_screens.dart';
 import '../../features/student/presentation/student_dashboard_screen.dart';
 import '../../features/student/presentation/student_content_screens.dart';
 import '../../features/student/presentation/student_ledger_screen.dart';
@@ -173,6 +176,127 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => StudentPlaceholderScreen(
           feature: state.pathParameters['feature'] ?? 'more',
         ),
+      ),
+      GoRoute(
+        path: PracticalDelegateHomeScreen.route,
+        builder: (context, state) => const PracticalDelegateHomeScreen(),
+      ),
+      GoRoute(
+        path: PracticalLogbookScreen.route,
+        builder: (context, state) => const PracticalLogbookScreen(),
+      ),
+      GoRoute(
+        path: PracticalCasesScreen.route,
+        builder: (context, state) => const PracticalCasesScreen(),
+      ),
+      GoRoute(
+        path: PracticalDelegationsScreen.route,
+        builder: (context, state) => const PracticalDelegationsScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.dashboard,
+        builder: (context, state) => const DelegateDashboardScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.news,
+        builder: (context, state) => const DelegateNewsScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.notifications,
+        builder: (context, state) => const DelegateNotificationsScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.students,
+        builder: (context, state) => const DelegateStudentsScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.subjects,
+        builder: (context, state) => const DelegateSubjectsScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.schedules,
+        builder: (context, state) => const DelegateSchedulesScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.exams,
+        builder: (context, state) => const DelegateExamSchedulesScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.assignments,
+        builder: (context, state) => const DelegateAssignmentsScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.resources,
+        builder: (context, state) => const DelegateResourcesScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.libraryImport,
+        builder: (context, state) => const DelegateLibraryImportScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.reminders,
+        builder: (context, state) => const DelegateRemindersScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.announcements,
+        builder: (context, state) => const DelegateAnnouncementsScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.attendance,
+        builder: (context, state) => const DelegateAttendanceScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.qrAttendance,
+        builder: (context, state) => const DelegateQrAttendanceScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.absenceAlerts,
+        builder: (context, state) => const DelegateAbsenceAlertsScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.authorizedGrades,
+        builder: (context, state) => const DelegateAuthorizedGradesScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.gradeDelegations,
+        builder: (context, state) =>
+            const DelegateGradeHelperDelegationsScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.messages,
+        builder: (context, state) => const DelegateMessagesScreen(),
+      ),
+      GoRoute(
+        path: '${DelegateRoutes.messages}/:id',
+        builder: (context, state) => DelegateConversationScreen(
+          conversationId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: DelegateRoutes.doctorChats,
+        builder: (context, state) => const DelegateDoctorChatsScreen(),
+      ),
+      GoRoute(
+        path: '${DelegateRoutes.doctorChats}/:id',
+        builder: (context, state) => DelegateDoctorConversationScreen(
+          conversationId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: DelegateRoutes.inquiries,
+        builder: (context, state) => const DelegateInquiriesScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.subscription,
+        builder: (context, state) => const DelegateSubscriptionScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.ledger,
+        builder: (context, state) => const DelegateLedgerScreen(),
+      ),
+      GoRoute(
+        path: DelegateRoutes.profile,
+        builder: (context, state) => const DelegateProfileScreen(),
       ),
     ],
   );

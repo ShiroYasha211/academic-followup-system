@@ -2652,10 +2652,6 @@ class _ExamTimelineItem extends StatelessWidget {
     final month = _monthName(date?.month ?? 0);
     final dayLabel = _dayLabel(date?.weekday.toString() ?? '');
 
-    final period = text(item, 'period');
-    final isMorning =
-        period.contains('صباح') || period.toLowerCase().contains('morning');
-
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2864,10 +2860,7 @@ class _TimelineIconInfo extends StatelessWidget {
 }
 
 class _CourseResourceCard extends StatefulWidget {
-  const _CourseResourceCard({
-    required this.item,
-    required this.onDownload,
-  });
+  const _CourseResourceCard({required this.item, required this.onDownload});
 
   final Map<String, dynamic> item;
   final VoidCallback onDownload;
@@ -2882,7 +2875,11 @@ class _CourseResourceCardState extends State<_CourseResourceCard> {
   @override
   Widget build(BuildContext context) {
     final subject = asMap(widget.item['subject']);
-    final fileType = text(widget.item, 'file_type', fallback: 'file').toLowerCase();
+    final fileType = text(
+      widget.item,
+      'file_type',
+      fallback: 'file',
+    ).toLowerCase();
     final color = _fileColor(fileType);
     final size = text(widget.item, 'file_size', fallback: '---');
 
@@ -2947,7 +2944,10 @@ class _CourseResourceCardState extends State<_CourseResourceCard> {
                       children: [
                         _FileMeta(label: size, icon: Icons.sd_storage_rounded),
                         const SizedBox(width: 12),
-                        _FileMeta(label: prettyDate(text(widget.item, 'created_at')), icon: Icons.calendar_today_rounded),
+                        _FileMeta(
+                          label: prettyDate(text(widget.item, 'created_at')),
+                          icon: Icons.calendar_today_rounded,
+                        ),
                       ],
                     ),
                   ],
@@ -2955,18 +2955,27 @@ class _CourseResourceCardState extends State<_CourseResourceCard> {
               ),
               const SizedBox(width: 8),
               IconButton.filledTonal(
-                onPressed: _isDownloading ? null : () async {
-                  setState(() => _isDownloading = true);
-                  widget.onDownload();
-                  await Future.delayed(const Duration(seconds: 2));
-                  if (mounted) setState(() => _isDownloading = false);
-                },
+                onPressed: _isDownloading
+                    ? null
+                    : () async {
+                        setState(() => _isDownloading = true);
+                        widget.onDownload();
+                        await Future.delayed(const Duration(seconds: 2));
+                        if (mounted) setState(() => _isDownloading = false);
+                      },
                 style: IconButton.styleFrom(
                   backgroundColor: AppColors.slate100,
                   foregroundColor: AppColors.midnight,
                 ),
                 icon: _isDownloading
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.midnight))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.midnight,
+                        ),
+                      )
                     : const Icon(Icons.download_rounded, size: 18),
               ),
             ],
@@ -2977,6 +2986,7 @@ class _CourseResourceCardState extends State<_CourseResourceCard> {
   }
 }
 
+// ignore: unused_element
 class _ModernBadge extends StatelessWidget {
   const _ModernBadge({
     required this.label,
@@ -3044,7 +3054,9 @@ Color _fileColor(String type) {
   return AppColors.slate500;
 }
 
+// ignore: unused_element
 class _ResourceSkeleton extends StatelessWidget {
+  // ignore: unused_element_parameter
   const _ResourceSkeleton({this.isGrid = false});
   final bool isGrid;
 
@@ -3151,7 +3163,8 @@ class _CourseResourceGridCard extends StatefulWidget {
   final VoidCallback onDownload;
 
   @override
-  State<_CourseResourceGridCard> createState() => _CourseResourceGridCardState();
+  State<_CourseResourceGridCard> createState() =>
+      _CourseResourceGridCardState();
 }
 
 class _CourseResourceGridCardState extends State<_CourseResourceGridCard> {
@@ -3159,7 +3172,11 @@ class _CourseResourceGridCardState extends State<_CourseResourceGridCard> {
 
   @override
   Widget build(BuildContext context) {
-    final fileType = text(widget.item, 'file_type', fallback: 'file').toLowerCase();
+    final fileType = text(
+      widget.item,
+      'file_type',
+      fallback: 'file',
+    ).toLowerCase();
     final color = _fileColor(fileType);
 
     return Container(
@@ -3219,18 +3236,26 @@ class _CourseResourceGridCardState extends State<_CourseResourceGridCard> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.tonal(
-                  onPressed: _isDownloading ? null : () async {
-                    setState(() => _isDownloading = true);
-                    widget.onDownload();
-                    await Future.delayed(const Duration(seconds: 2));
-                    if (mounted) setState(() => _isDownloading = false);
-                  },
+                  onPressed: _isDownloading
+                      ? null
+                      : () async {
+                          setState(() => _isDownloading = true);
+                          widget.onDownload();
+                          await Future.delayed(const Duration(seconds: 2));
+                          if (mounted) setState(() => _isDownloading = false);
+                        },
                   style: FilledButton.styleFrom(
                     padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: _isDownloading
-                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Icon(Icons.download_rounded, size: 16),
                 ),
               ),
@@ -3256,7 +3281,11 @@ class _FileMeta extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(fontSize: 10, color: AppColors.slate500, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            fontSize: 10,
+            color: AppColors.slate500,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -3740,6 +3769,7 @@ class _CompactHeader extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _CategoryScrollRow extends StatelessWidget {
   const _CategoryScrollRow({
     required this.selected,
@@ -3815,6 +3845,7 @@ class _IconButton extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _QuickFilterChip extends StatelessWidget {
   const _QuickFilterChip({
     required this.label,

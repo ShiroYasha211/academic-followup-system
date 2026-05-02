@@ -12,6 +12,7 @@ import '../../../../shared/widgets/moeen_logo.dart';
 import '../../../auth/data/auth_session.dart';
 import '../../../auth/logic/auth_controller.dart';
 import '../../../auth/presentation/login_screen.dart';
+import '../../../practical_delegate/presentation/practical_delegate_screens.dart';
 import '../../data/student_repositories.dart';
 import '../../logic/student_controllers.dart';
 import '../student_content_screens.dart';
@@ -356,6 +357,37 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           true,
         ),
       ]),
+      if (session?.isPracticalDelegate == true)
+        _DrawerGroup('العملي والسريري', [
+          _DrawerItem(
+            'مركز المندوب العملي',
+            Icons.local_hospital_rounded,
+            30,
+            PracticalDelegateHomeScreen.route,
+            true,
+          ),
+          _DrawerItem(
+            'السجل العملي',
+            Icons.menu_book_rounded,
+            31,
+            PracticalLogbookScreen.route,
+            true,
+          ),
+          _DrawerItem(
+            'مراجعة الحالات',
+            Icons.rule_rounded,
+            32,
+            PracticalCasesScreen.route,
+            true,
+          ),
+          _DrawerItem(
+            'تفويض مساعدين',
+            Icons.group_add_rounded,
+            33,
+            PracticalDelegationsScreen.route,
+            true,
+          ),
+        ]),
     ];
 
     return Drawer(

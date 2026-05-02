@@ -15,12 +15,13 @@ Future<void> _showEditStudyItem(
   String priority = ['high', 'medium', 'low'].contains(text(item, 'priority'))
       ? text(item, 'priority')
       : 'medium';
-  String status = [
-    'pending',
-    'in_progress',
-    'completed',
-    'overdue',
-  ].contains(text(item, 'status'))
+  String status =
+      [
+        'pending',
+        'in_progress',
+        'completed',
+        'overdue',
+      ].contains(text(item, 'status'))
       ? text(item, 'status')
       : 'pending';
 
@@ -60,12 +61,20 @@ Future<void> _showEditStudyItem(
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.calendar_today_rounded, size: 20, color: AppColors.slate400),
+                  const Icon(
+                    Icons.calendar_today_rounded,
+                    size: 20,
+                    color: AppColors.slate400,
+                  ),
                   const SizedBox(width: 12),
                   Text(
-                    selectedDate == null ? 'اختر التاريخ' : dateOnly(selectedDate.toString()),
+                    selectedDate == null
+                        ? 'اختر التاريخ'
+                        : dateOnly(selectedDate.toString()),
                     style: TextStyle(
-                      color: selectedDate == null ? AppColors.slate400 : AppColors.midnight,
+                      color: selectedDate == null
+                          ? AppColors.slate400
+                          : AppColors.midnight,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -95,8 +104,14 @@ Future<void> _showEditStudyItem(
                   value: status,
                   decoration: const InputDecoration(labelText: 'الحالة'),
                   items: const [
-                    DropdownMenuItem(value: 'pending', child: Text('قيد الانتظار')),
-                    DropdownMenuItem(value: 'in_progress', child: Text('قيد التنفيذ')),
+                    DropdownMenuItem(
+                      value: 'pending',
+                      child: Text('قيد الانتظار'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'in_progress',
+                      child: Text('قيد التنفيذ'),
+                    ),
                     DropdownMenuItem(value: 'completed', child: Text('مكتمل')),
                     DropdownMenuItem(value: 'overdue', child: Text('متأخر')),
                   ],
@@ -121,10 +136,15 @@ Future<void> _showEditStudyItem(
             child: FilledButton.icon(
               onPressed: () => Navigator.pop(sheetContext, true),
               icon: const Icon(Icons.save_rounded),
-              label: const Text('حفظ التعديلات الآن', style: TextStyle(fontWeight: FontWeight.w900)),
+              label: const Text(
+                'حفظ التعديلات الآن',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: _studyTabColor(tab),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
             ),
           ),
@@ -135,13 +155,15 @@ Future<void> _showEditStudyItem(
 
   if (ok != true) return;
   try {
-    final message = await ref.read(studentContentRepositoryProvider).updateStudyItem(id, {
-      'title': title.text.trim(),
-      'scheduled_date': selectedDate?.toIso8601String().substring(0, 10),
-      'note': note.text.trim(),
-      'priority': priority,
-      'status': status,
-    });
+    final message = await ref
+        .read(studentContentRepositoryProvider)
+        .updateStudyItem(id, {
+          'title': title.text.trim(),
+          'scheduled_date': selectedDate?.toIso8601String().substring(0, 10),
+          'note': note.text.trim(),
+          'priority': priority,
+          'status': status,
+        });
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: AppColors.success),
@@ -151,7 +173,10 @@ Future<void> _showEditStudyItem(
   } on ApiException catch (error) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message), backgroundColor: AppColors.danger),
+        SnackBar(
+          content: Text(error.message),
+          backgroundColor: AppColors.danger,
+        ),
       );
     }
   }
@@ -526,8 +551,10 @@ const _uploadCategoryOptions = {
   'other': 'أخرى',
 };
 
+// ignore: unused_element
 String _categoryLabel(String value) => _categoryOptions[value] ?? 'أخرى';
 
+// ignore: unused_element
 Color _categoryColor(String value) {
   return switch (value) {
     'lectures' => AppColors.royalBlue,
@@ -731,13 +758,18 @@ String absoluteUrl(String url) {
   if (url.startsWith('/')) return '$base$url';
   return '$base/$url';
 }
+
 bool isTimeInRange(String startStr, String endStr) {
   if (startStr.isEmpty || endStr.isEmpty) return false;
   try {
     final now = DateTime.now();
     final today = dateOnly(now.toString());
-    final start = DateTime.parse('$today ${startStr.length == 5 ? "$startStr:00" : startStr}');
-    final end = DateTime.parse('$today ${endStr.length == 5 ? "$endStr:00" : endStr}');
+    final start = DateTime.parse(
+      '$today ${startStr.length == 5 ? "$startStr:00" : startStr}',
+    );
+    final end = DateTime.parse(
+      '$today ${endStr.length == 5 ? "$endStr:00" : endStr}',
+    );
     return now.isAfter(start) && now.isBefore(end);
   } catch (_) {
     return false;
