@@ -21,6 +21,11 @@ final delegateLedgerProvider =
       DelegateLedgerController.new,
     );
 
+final delegateStudentsProvider =
+    AsyncNotifierProvider<DelegateStudentsController, Map<String, dynamic>>(
+      DelegateStudentsController.new,
+    );
+
 final delegateUnreadNotificationsCountProvider =
     FutureProvider.autoDispose<int>((ref) async {
       final data = await ref.watch(delegateRepositoryProvider).notifications();
@@ -89,6 +94,30 @@ class DelegateLedgerController extends AsyncNotifier<FinancialLedger> {
     return _guard(
       ref,
       () => ref.watch(delegateLedgerRepositoryProvider).fetch(page: page),
+    );
+  }
+}
+
+class DelegateStudentsController extends AsyncNotifier<Map<String, dynamic>> {
+  int _page = 1;
+
+  int get page => _page;
+
+  @override
+  Future<Map<String, dynamic>> build() => _fetch(1);
+
+  Future<void> goToPage(int page) async {
+    // No longer needed for 'all' mode, but kept for compatibility if needed.
+  }
+
+  Future<void> search(String? query) async {
+    // Search is now handled locally in the UI to prevent reloading.
+  }
+
+  Future<Map<String, dynamic>> _fetch(int page) {
+    return _guard(
+      ref,
+      () => ref.watch(delegateRepositoryProvider).students(all: true),
     );
   }
 }

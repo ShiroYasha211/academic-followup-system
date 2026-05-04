@@ -164,7 +164,10 @@ class _StudentAssignmentDetailsScreenState
             children: [
               _StatusBanner(status: status, isGraded: isGraded),
               const SizedBox(height: 16),
-              _AssignmentHeaderInfo(assignment: assignment),
+              _AssignmentHeaderInfo(
+                assignment: assignment,
+                submission: submission,
+              ),
               const SizedBox(height: 20),
               _AssignmentDescription(
                 description: text(assignment, 'description'),
@@ -718,15 +721,16 @@ class _StatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = status == 'submitted'
-        ? AppColors.success
-        : (status == 'missing' ? AppColors.rose : AppColors.royalBlue);
-    final icon = status == 'submitted'
-        ? Icons.check_circle_rounded
-        : (status == 'missing' ? Icons.error_rounded : Icons.pending_rounded);
-    final label = isGraded
-        ? 'تم التصحيح والتقييم ✅'
-        : _assignmentStatus(status);
+    final normalized = isGraded && status == 'pending' ? 'accepted' : status;
+    final color = _submissionReviewColor(normalized);
+    final icon = switch (normalized) {
+      'accepted' || 'approved' || 'graded' => Icons.verified_rounded,
+      'rejected' => Icons.cancel_rounded,
+      'missing' => Icons.error_rounded,
+      'pending' || 'submitted' => Icons.pending_actions_rounded,
+      _ => Icons.assignment_rounded,
+    };
+    final label = _submissionReviewLabel(normalized);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -753,9 +757,33 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
+String _submissionReviewLabel(String status) {
+  return switch (status) {
+    'accepted' || 'approved' || 'graded' => 'مقبول',
+    'rejected' => 'مرفوض',
+    'pending' || 'submitted' => 'قيد المراجعة',
+    'missing' => 'متأخر',
+    _ => _assignmentStatus(status),
+  };
+}
+
+Color _submissionReviewColor(String status) {
+  return switch (status) {
+    'accepted' || 'approved' || 'graded' => AppColors.success,
+    'rejected' => AppColors.danger,
+    'pending' || 'submitted' => AppColors.warning,
+    'missing' => AppColors.rose,
+    _ => AppColors.royalBlue,
+  };
+}
+
 class _AssignmentHeaderInfo extends StatelessWidget {
-  const _AssignmentHeaderInfo({required this.assignment});
+  const _AssignmentHeaderInfo({
+    required this.assignment,
+    required this.submission,
+  });
   final Map<String, dynamic> assignment;
+  final Map<String, dynamic> submission;
 
   @override
   Widget build(BuildContext context) {
@@ -843,7 +871,9 @@ class _AssignmentHeaderInfo extends StatelessWidget {
               _DetailInfo(
                 icon: Icons.grade_rounded,
                 label: 'الدرجة الكلية',
-                value: text(assignment, 'marks', fallback: 'غير محدد'),
+                value: text(assignment, 'marks').isNotEmpty
+                    ? text(assignment, 'marks')
+                    : text(submission, 'grade', fallback: 'غير محدد'),
                 color: AppColors.goldDeep,
               ),
             ],
@@ -955,12 +985,18 @@ class _SubmissionDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final status = text(submission, 'status', fallback: 'pending');
+    final grade = text(submission, 'grade');
+    final normalized = grade.isNotEmpty && status == 'pending'
+        ? 'accepted'
+        : status;
+    final color = _submissionReviewColor(normalized);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.success.withValues(alpha: 0.03),
+        color: color.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.success.withValues(alpha: 0.1)),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -984,6 +1020,18 @@ class _SubmissionDetails extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
+          _SubmissionRow(
+            label: 'حالة التسليم',
+            value: _submissionReviewLabel(normalized),
+            icon: Icons.fact_check_rounded,
+          ),
+          const SizedBox(height: 12),
+          _SubmissionRow(
+            label: 'درجة التكليف',
+            value: grade.isEmpty ? 'لم تحدد بعد' : grade,
+            icon: Icons.grade_rounded,
+          ),
+          const SizedBox(height: 12),
           _SubmissionRow(
             label: 'الملف المرفق',
             value: text(submission, 'file_name'),

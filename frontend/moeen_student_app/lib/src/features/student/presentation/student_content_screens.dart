@@ -15,13 +15,16 @@ import '../../../core/downloads/download_service.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/moeen_dialogs.dart';
+import '../../auth/logic/auth_controller.dart';
 import '../data/student_repositories.dart';
+import '../logic/student_controllers.dart';
 import 'widgets/student_shell.dart';
 import 'widgets/student_widgets.dart';
 
 part 'student_subjects_screen.dart';
 part 'student_subject_detail_screen.dart';
 part 'student_study_center_screen.dart';
+part 'student_study_session_screen.dart';
 part 'student_schedule_screen.dart';
 part 'student_news_screen.dart';
 part 'student_quizzes_screen.dart';
@@ -37,6 +40,7 @@ part 'student_reminders_screen.dart';
 part 'student_messages_screen.dart';
 part 'student_inquiries_screen.dart';
 part 'student_profile_screen.dart';
+part 'student_clinical_screen.dart';
 part 'widgets/student_content_widgets.dart';
 part 'utils/student_content_formatters.dart';
 
@@ -52,6 +56,11 @@ final _subjectDetailsProvider = FutureProvider.autoDispose
 final _studyProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, String>((ref, tab) {
       return ref.watch(studentContentRepositoryProvider).studyCenter(tab: tab);
+    });
+
+final _studySessionProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, int>((ref, id) {
+      return ref.watch(studentContentRepositoryProvider).studySession(id);
     });
 
 final _scheduleProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
@@ -177,6 +186,36 @@ final _messagesProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
 ) {
   return ref.watch(studentContentRepositoryProvider).messages();
 });
+
+final _clinicalLogbookProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
+      return ref.watch(studentContentRepositoryProvider).clinicalLogbook();
+    });
+
+final _clinicalEvaluationsProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
+      return ref.watch(studentContentRepositoryProvider).clinicalEvaluations();
+    });
+
+final _clinicalMockExamsProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
+      return ref.watch(studentContentRepositoryProvider).clinicalMockExams();
+    });
+
+final _clinicalRareCasesProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
+      return ref.watch(studentContentRepositoryProvider).clinicalRareCases();
+    });
+
+final _clinicalMockTakeProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, int>((ref, id) {
+      return ref.watch(studentContentRepositoryProvider).clinicalMockTake(id);
+    });
+
+final _clinicalMockResultProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, int>((ref, id) {
+      return ref.watch(studentContentRepositoryProvider).clinicalMockResult(id);
+    });
 
 final _conversationProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, int>((ref, id) {

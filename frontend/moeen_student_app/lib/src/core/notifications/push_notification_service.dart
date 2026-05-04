@@ -21,6 +21,8 @@ class PushNotificationService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
+  static final StreamController<String> _navigationController =
+      StreamController<String>.broadcast();
 
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
     'moeen_push',
@@ -32,6 +34,16 @@ class PushNotificationService {
 
   static bool _initialized = false;
   static StreamSubscription<String>? _tokenRefreshSubscription;
+  static String? _pendingNavigationPath;
+
+  static Stream<String> get navigationRequests =>
+      _navigationController.stream;
+
+  static String? takePendingNavigationPath() {
+    final path = _pendingNavigationPath;
+    _pendingNavigationPath = null;
+    return path;
+  }
 
   static Future<void> initialize() async {
     if (_initialized) return;
@@ -43,7 +55,19 @@ class PushNotificationService {
       '@mipmap/ic_launcher',
     );
     const settings = InitializationSettings(android: androidSettings);
-    await _localNotifications.initialize(settings);
+    await _localNotifications.initialize(
+      settings,
+      onDidReceiveNotificationResponse: (response) {
+        if (response.payload == null || response.payload!.isEmpty) return;
+        try {
+          final data = jsonDecode(response.payload!) as Map<String, dynamic>;
+          _handleNotificationNavigation(data);
+        } catch (error, stackTrace) {
+          debugPrint('Failed to parse notification payload: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        }
+      },
+    );
 
     final androidPlugin = _localNotifications
         .resolvePlatformSpecificImplementation<
@@ -69,6 +93,15 @@ class PushNotificationService {
     );
 
     FirebaseMessaging.onMessage.listen(_showForegroundNotification);
+    FirebaseMessaging.onMessageOpenedApp.listen(
+      (message) => _handleNotificationNavigation(message.data),
+    );
+
+    final initialMessage = await _messaging.getInitialMessage();
+    if (initialMessage != null) {
+      _handleNotificationNavigation(initialMessage.data);
+    }
+
     _initialized = true;
   }
 
@@ -150,6 +183,30 @@ class PushNotificationService {
       NotificationDetails(android: androidDetails),
       payload: jsonEncode(message.data),
     );
+  }
+
+  static void _handleNotificationNavigation(Map<String, dynamic> data) {
+    final path = _pathFromNotificationData(data);
+    if (path == null) return;
+
+    if (_navigationController.hasListener) {
+      _navigationController.add(path);
+    } else {
+      _pendingNavigationPath = path;
+    }
+  }
+
+  static String? _pathFromNotificationData(Map<String, dynamic> data) {
+    final targetScreen = data['target_screen']?.toString();
+    final scheduleItemId = data['schedule_item_id']?.toString();
+
+    if (targetScreen == 'study_session' &&
+        scheduleItemId != null &&
+        scheduleItemId.isNotEmpty) {
+      return '/student/study-center/$scheduleItemId/session';
+    }
+
+    return null;
   }
 
   static String get _platformName {

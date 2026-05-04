@@ -17,7 +17,10 @@ class StudentMessagesScreen extends ConsumerWidget {
         backgroundColor: AppColors.royalBlue,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.chat_bubble_rounded),
-        label: const Text('مراسلة المندوب', style: TextStyle(fontWeight: FontWeight.w800)),
+        label: const Text(
+          'مراسلة المندوب',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
       ),
       child: _AsyncBody(
         state: state,
@@ -29,16 +32,28 @@ class StudentMessagesScreen extends ConsumerWidget {
         ),
         builder: (data) {
           final delegate = asMap(data['delegate']);
-          final conversations = asList(data['conversations']).map(asMap).toList();
+          final conversations = asList(
+            data['conversations'],
+          ).map(asMap).toList();
+          final unreadCount = number(data, 'unread_count').toInt();
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(_messagesProvider),
+            onRefresh: () async {
+              ref.invalidate(_messagesProvider);
+              ref.invalidate(studentUnreadMessagesCountProvider);
+            },
             child: CustomScrollView(
               slivers: [
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
                   sliver: SliverToBoxAdapter(
-                    child: _DelegateHeader(delegate: delegate),
+                    child: Column(
+                      children: [
+                        _DelegateHeader(delegate: delegate),
+                        const SizedBox(height: 12),
+                        _UnreadMessagesHeader(unreadCount: unreadCount),
+                      ],
+                    ),
                   ),
                 ),
                 if (conversations.isEmpty)
@@ -58,7 +73,9 @@ class StudentMessagesScreen extends ConsumerWidget {
                       itemBuilder: (context, index) {
                         return _EntryAnimation(
                           index: index,
-                          child: _ConversationCard(conversation: conversations[index]),
+                          child: _ConversationCard(
+                            conversation: conversations[index],
+                          ),
                         );
                       },
                     ),
@@ -79,6 +96,7 @@ class StudentMessagesScreen extends ConsumerWidget {
           .startConversation();
       final id = number(data, 'conversation_id').toInt();
       ref.invalidate(_messagesProvider);
+      ref.invalidate(studentUnreadMessagesCountProvider);
       if (context.mounted && id > 0) {
         context.push(StudentMessagesScreen.conversationPath(id));
       }
@@ -108,6 +126,7 @@ class _StudentConversationScreenState
     extends ConsumerState<StudentConversationScreen> {
   final _message = TextEditingController();
   bool _sending = false;
+  bool _refreshedUnreadCount = false;
 
   @override
   void dispose() {
@@ -123,18 +142,29 @@ class _StudentConversationScreenState
       title: 'المحادثة',
       child: _AsyncBody(
         state: state,
-        onRetry: () => ref.invalidate(_conversationProvider(widget.conversationId)),
+        onRetry: () =>
+            ref.invalidate(_conversationProvider(widget.conversationId)),
         builder: (data) {
           final conversation = asMap(data['conversation']);
           final delegate = asMap(conversation['delegate']);
           final messages = asList(data['messages']).map(asMap).toList();
+          if (!_refreshedUnreadCount) {
+            _refreshedUnreadCount = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              ref.invalidate(_messagesProvider);
+              ref.invalidate(studentUnreadMessagesCountProvider);
+            });
+          }
 
           return Column(
             children: [
               _ChatHeader(delegate: delegate),
               Expanded(
                 child: messages.isEmpty
-                    ? const EmptyState(message: 'لا توجد رسائل في هذه المحادثة.')
+                    ? const EmptyState(
+                        message: 'لا توجد رسائل في هذه المحادثة.',
+                      )
                     : ListView.builder(
                         reverse: true,
                         padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
@@ -142,7 +172,8 @@ class _StudentConversationScreenState
                         itemBuilder: (context, index) {
                           final item = messages[messages.length - 1 - index];
                           final sender = asMap(item['sender']);
-                          final isMine = text(sender, 'role') == 'student' ||
+                          final isMine =
+                              text(sender, 'role') == 'student' ||
                               text(item, 'type') == 'student_to_delegate';
 
                           // Date Divider logic
@@ -150,14 +181,23 @@ class _StudentConversationScreenState
                           String dateLabel = '';
                           if (index == messages.length - 1) {
                             showDate = true;
-                            dateLabel = _formatChatDate(text(item, 'created_at'));
+                            dateLabel = _formatChatDate(
+                              text(item, 'created_at'),
+                            );
                           } else {
-                            final nextItem = messages[messages.length - 2 - index];
-                            final currentDate = dateOnly(text(item, 'created_at'));
-                            final nextDate = dateOnly(text(nextItem, 'created_at'));
+                            final nextItem =
+                                messages[messages.length - 2 - index];
+                            final currentDate = dateOnly(
+                              text(item, 'created_at'),
+                            );
+                            final nextDate = dateOnly(
+                              text(nextItem, 'created_at'),
+                            );
                             if (currentDate != nextDate) {
                               showDate = true;
-                              dateLabel = _formatChatDate(text(item, 'created_at'));
+                              dateLabel = _formatChatDate(
+                                text(item, 'created_at'),
+                              );
                             }
                           }
 
@@ -205,6 +245,7 @@ class _StudentConversationScreenState
       _message.clear();
       ref.invalidate(_conversationProvider(widget.conversationId));
       ref.invalidate(_messagesProvider);
+      ref.invalidate(studentUnreadMessagesCountProvider);
     } on ApiException catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -217,6 +258,56 @@ class _StudentConversationScreenState
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+}
+
+class _UnreadMessagesHeader extends StatelessWidget {
+  const _UnreadMessagesHeader({required this.unreadCount});
+
+  final int unreadCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasUnread = unreadCount > 0;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: hasUnread
+            ? AppColors.danger.withValues(alpha: 0.08)
+            : AppColors.slate50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: hasUnread
+              ? AppColors.danger.withValues(alpha: 0.18)
+              : AppColors.slate100,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            hasUnread
+                ? Icons.mark_chat_unread_rounded
+                : Icons.mark_chat_read_rounded,
+            color: hasUnread ? AppColors.danger : AppColors.slate400,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              hasUnread
+                  ? 'لديك $unreadCount رسالة غير مقروءة'
+                  : 'كل الرسائل مقروءة',
+              style: TextStyle(
+                color: hasUnread ? AppColors.danger : AppColors.slate500,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -252,7 +343,11 @@ class _DelegateHeader extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 24),
+            child: const Icon(
+              Icons.support_agent_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -302,20 +397,25 @@ class _ConversationCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: (unread > 0 ? AppColors.royalBlue : AppColors.slate200).withValues(alpha: 0.06),
+            color: (unread > 0 ? AppColors.royalBlue : AppColors.slate200)
+                .withValues(alpha: 0.06),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: unread > 0 ? AppColors.royalBlue.withValues(alpha: 0.12) : AppColors.slate100,
+          color: unread > 0
+              ? AppColors.royalBlue.withValues(alpha: 0.12)
+              : AppColors.slate100,
           width: 1.2,
         ),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
         onTap: () => context.push(
-          StudentMessagesScreen.conversationPath(number(conversation, 'id').toInt()),
+          StudentMessagesScreen.conversationPath(
+            number(conversation, 'id').toInt(),
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -333,7 +433,9 @@ class _ConversationCard extends StatelessWidget {
                           child: Text(
                             name,
                             style: TextStyle(
-                              fontWeight: unread > 0 ? FontWeight.w900 : FontWeight.w800,
+                              fontWeight: unread > 0
+                                  ? FontWeight.w900
+                                  : FontWeight.w800,
                               fontSize: 16,
                               color: AppColors.slate900,
                             ),
@@ -355,8 +457,12 @@ class _ConversationCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: unread > 0 ? AppColors.slate800 : AppColors.slate500,
-                        fontWeight: unread > 0 ? FontWeight.w700 : FontWeight.w500,
+                        color: unread > 0
+                            ? AppColors.slate800
+                            : AppColors.slate500,
+                        fontWeight: unread > 0
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                         fontSize: 13,
                       ),
                     ),
@@ -366,7 +472,10 @@ class _ConversationCard extends StatelessWidget {
               if (unread > 0)
                 Container(
                   margin: const EdgeInsetsDirectional.only(start: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.royalBlue,
                     borderRadius: BorderRadius.circular(20),
@@ -390,7 +499,11 @@ class _ConversationCard extends StatelessWidget {
               else
                 Padding(
                   padding: const EdgeInsetsDirectional.only(start: 12),
-                  child: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.slate300),
+                  child: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color: AppColors.slate300,
+                  ),
                 ),
             ],
           ),
@@ -407,7 +520,12 @@ class _UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = name.split(' ').take(2).map((e) => e.isNotEmpty ? e[0] : '').join().toUpperCase();
+    final initials = name
+        .split(' ')
+        .take(2)
+        .map((e) => e.isNotEmpty ? e[0] : '')
+        .join()
+        .toUpperCase();
     return Container(
       width: size,
       height: size,
@@ -421,7 +539,10 @@ class _UserAvatar extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.royalBlue.withValues(alpha: 0.1), width: 1.5),
+        border: Border.all(
+          color: AppColors.royalBlue.withValues(alpha: 0.1),
+          width: 1.5,
+        ),
       ),
       alignment: Alignment.center,
       child: Text(
@@ -465,11 +586,18 @@ class _ChatHeader extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
                 ),
                 const Text(
                   'المندوب',
-                  style: TextStyle(fontSize: 11, color: AppColors.slate400, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.slate400,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -490,7 +618,9 @@ class _ChatBubble extends StatelessWidget {
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+        ),
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
@@ -508,10 +638,14 @@ class _ChatBubble extends StatelessWidget {
               offset: const Offset(0, 4),
             ),
           ],
-          border: isMine ? null : Border.all(color: AppColors.slate100, width: 1.2),
+          border: isMine
+              ? null
+              : Border.all(color: AppColors.slate100, width: 1.2),
         ),
         child: Column(
-          crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: isMine
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
           children: [
             Text(
               text(message, 'body'),
@@ -526,7 +660,9 @@ class _ChatBubble extends StatelessWidget {
             Text(
               timeOnly(text(message, 'created_at')),
               style: TextStyle(
-                color: isMine ? Colors.white.withValues(alpha: 0.7) : AppColors.slate400,
+                color: isMine
+                    ? Colors.white.withValues(alpha: 0.7)
+                    : AppColors.slate400,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
@@ -582,7 +718,12 @@ class _MessageComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.paddingOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        12 + MediaQuery.paddingOf(context).bottom,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -607,7 +748,10 @@ class _MessageComposer extends StatelessWidget {
                 controller: controller,
                 minLines: 1,
                 maxLines: 5,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
                 decoration: const InputDecoration(
                   hintText: 'اكتب رسالتك...',
                   hintStyle: TextStyle(color: AppColors.slate400),
@@ -640,9 +784,16 @@ class _MessageComposer extends StatelessWidget {
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
                     )
-                  : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                  : const Icon(
+                      Icons.send_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
             ),
           ),
         ],

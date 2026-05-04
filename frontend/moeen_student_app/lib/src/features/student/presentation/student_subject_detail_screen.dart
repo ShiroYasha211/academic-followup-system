@@ -1,9 +1,14 @@
 part of 'student_content_screens.dart';
 
 class StudentSubjectDetailsScreen extends ConsumerWidget {
-  const StudentSubjectDetailsScreen({super.key, required this.subjectId});
+  const StudentSubjectDetailsScreen({
+    super.key,
+    required this.subjectId,
+    this.initialTabIndex = 0,
+  });
 
   final int subjectId;
+  final int initialTabIndex;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,6 +36,7 @@ class StudentSubjectDetailsScreen extends ConsumerWidget {
 
           return DefaultTabController(
             length: 6,
+            initialIndex: initialTabIndex.clamp(0, 5),
             child: NestedScrollView(
               headerSliverBuilder: (context, innerBoxIsScrolled) => [
                 SliverToBoxAdapter(
@@ -562,7 +568,7 @@ class _SubjectDetailHeader extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'د. ${text(doctor, 'name', fallback: 'لم يحدد')} • ${text(term, 'name', fallback: '')} ${text(semester, 'name', fallback: '')}',
+                      'د. ${text(doctor, 'name').isNotEmpty ? text(doctor, 'name') : (subject['doctor'] is String ? subject['doctor'].toString() : text(subject, 'doctor_name', fallback: 'لم يحدد'))} • ${text(term, 'name', fallback: '')} ${text(semester, 'name', fallback: '')}',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 13,

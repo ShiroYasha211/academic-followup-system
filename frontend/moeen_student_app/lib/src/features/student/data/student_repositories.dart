@@ -132,9 +132,12 @@ class StudentContentRepository {
       'attendance_id': attendanceId,
       'reason': reason,
       if (filePath != null && fileName != null)
-        'attachment': await MultipartFile.fromFile(filePath, filename: fileName),
+        'attachment': await MultipartFile.fromFile(
+          filePath,
+          filename: fileName,
+        ),
     });
-    final response = await _api.post('/student/excuses/store', data: form);
+    final response = await _api.post('/student/excuse', data: form);
     return (response['message'] ?? 'تم إرسال العذر بنجاح.').toString();
   }
 
@@ -142,6 +145,63 @@ class StudentContentRepository {
     final response = await _api.get(
       '/student/study-center',
       queryParameters: {if (tab != null) 'tab': tab},
+    );
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> studySession(int id) async {
+    final response = await _api.get('/student/study-center/$id/session');
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> addStudySessionColumn({
+    required int itemId,
+    required String name,
+  }) async {
+    final response = await _api.post(
+      '/student/study-center/$itemId/columns',
+      data: {'name': name},
+    );
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> updateStudySessionColumn({
+    required int columnId,
+    required String name,
+  }) async {
+    final response = await _api.put(
+      '/student/study-center/columns/$columnId',
+      data: {'name': name},
+    );
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> deleteStudySessionColumn(int columnId) async {
+    final response = await _api.delete(
+      '/student/study-center/columns/$columnId',
+    );
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> incrementStudySessionColumn(int columnId) async {
+    final response = await _api.post(
+      '/student/study-center/columns/$columnId/increment',
+    );
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> undoStudySessionAction(int itemId) async {
+    final response = await _api.post(
+      '/student/study-center/$itemId/undo-last-action',
+    );
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> undoStudySessionColumnAction(
+    int columnId,
+  ) async {
+    final response = await _api.post(
+      '/student/study-center/columns/$columnId/undo-last-action',
     );
     return _data(response);
   }
@@ -534,6 +594,108 @@ class StudentContentRepository {
       '/student/messages/$conversationId/send',
       data: {'body': body},
     );
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> clinicalLogbook() async {
+    final response = await _api.get('/student/clinical/logbook');
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> createClinicalLog(
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _api.post('/student/clinical/logbook', data: data);
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> updateClinicalLog(
+    int id,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _api.put(
+      '/student/clinical/logbook/$id',
+      data: data,
+    );
+    return _data(response);
+  }
+
+  Future<String> deleteClinicalLog(int id) async {
+    final response = await _api.delete('/student/clinical/logbook/$id');
+    return (response['message'] ?? 'تم حذف السجل العملي.').toString();
+  }
+
+  Future<Map<String, dynamic>> submitClinicalAssignment({
+    required int assignmentId,
+    required String message,
+  }) async {
+    final response = await _api.post(
+      '/student/clinical/assignments/$assignmentId/submit-review',
+      data: {'student_completion_message': message},
+    );
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> clinicalEvaluations() async {
+    final response = await _api.get('/student/clinical/evaluations');
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> clinicalMockExams() async {
+    final response = await _api.get('/student/clinical/mock-exams');
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> createClinicalCustomChecklist(
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _api.post(
+      '/student/clinical/mock-exams/custom',
+      data: data,
+    );
+    return _data(response);
+  }
+
+  Future<String> deleteClinicalCustomChecklist(int id) async {
+    final response = await _api.delete(
+      '/student/clinical/mock-exams/custom/$id',
+    );
+    return (response['message'] ?? 'تم حذف النموذج المخصص.').toString();
+  }
+
+  Future<Map<String, dynamic>> clinicalMockTake(int checklistId) async {
+    final response = await _api.get(
+      '/student/clinical/mock-exams/$checklistId/take',
+    );
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> submitClinicalMockExam({
+    required int checklistId,
+    required int timeTaken,
+    required Map<String, dynamic> scores,
+  }) async {
+    final response = await _api.post(
+      '/student/clinical/mock-exams/$checklistId/submit',
+      data: {'time_taken': timeTaken, 'scores': scores},
+    );
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> clinicalMockResult(int evaluationId) async {
+    final response = await _api.get(
+      '/student/clinical/mock-exams/results/$evaluationId',
+    );
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> clinicalRareCases() async {
+    final response = await _api.get('/student/clinical/rare-cases');
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> clinicalRareCase(int id) async {
+    final response = await _api.get('/student/clinical/rare-cases/$id');
     return _data(response);
   }
 

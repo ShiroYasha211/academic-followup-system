@@ -60,7 +60,9 @@ class MoeenDesktopApp extends StatelessWidget {
         cardTheme: CardThemeData(
           color: AppPalette.card,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
           margin: EdgeInsets.zero,
         ),
         useMaterial3: true,
@@ -111,7 +113,10 @@ class _DesktopAttendanceAppState extends State<DesktopAttendanceApp> {
         return;
       }
 
-      final api = DesktopApiClient(baseUrl: stored.baseUrl, token: stored.token);
+      final api = DesktopApiClient(
+        baseUrl: stored.baseUrl,
+        token: stored.token,
+      );
       final refreshed = await api.me();
       final hydrated = stored.copyWith(
         workspace: refreshed.workspace,
@@ -155,7 +160,10 @@ class _DesktopAttendanceAppState extends State<DesktopAttendanceApp> {
     final session = _session;
     if (session != null) {
       try {
-        final api = DesktopApiClient(baseUrl: session.baseUrl, token: session.token);
+        final api = DesktopApiClient(
+          baseUrl: session.baseUrl,
+          token: session.token,
+        );
         await api.logout();
       } catch (_) {
         // Keep local logout resilient even if the server is unreachable.
@@ -185,10 +193,7 @@ class _DesktopAttendanceAppState extends State<DesktopAttendanceApp> {
       );
     }
 
-    return SessionSetupScreen(
-      session: _session!,
-      onUnpair: _logout,
-    );
+    return SessionSetupScreen(session: _session!, onUnpair: _logout);
   }
 }
 
@@ -212,7 +217,9 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
   final _formKey = GlobalKey<FormState>();
   final _baseUrlController = TextEditingController();
   final _pairingCodeController = TextEditingController();
-  final _deviceNameController = TextEditingController(text: 'Classroom Display');
+  final _deviceNameController = TextEditingController(
+    text: 'Classroom Display',
+  );
 
   bool _submitting = false;
   String? _error;
@@ -254,7 +261,9 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
     } on ApiException catch (error) {
       setState(() => _error = error.message);
     } catch (_) {
-      setState(() => _error = 'تعذر الاتصال بالخادم. تأكد من الرابط ثم أعد المحاولة.');
+      setState(
+        () => _error = 'تعذر الاتصال بالخادم. تأكد من الرابط ثم أعد المحاولة.',
+      );
     } finally {
       if (mounted) {
         setState(() => _submitting = false);
@@ -271,101 +280,111 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.45)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: 44,
-                    offset: const Offset(0, 22),
+              padding: const EdgeInsets.all(32),
+              child: Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.96),
+                  borderRadius: BorderRadius.circular(32),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.45),
                   ),
-                ],
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const _BrandBadge(label: 'Moeen'),
-                    const SizedBox(height: 18),
-                    const _SectionHeader(
-                      title: 'ربط تطبيق العرض',
-                      subtitle: 'أدخل رابط السيرفر ورمز الربط الذي تم توليده من صفحة الحضور في الموقع.',
-                    ),
-                    const SizedBox(height: 24),
-                    _AppTextField(
-                      controller: _baseUrlController,
-                      label: 'رابط النظام',
-                      hint: 'https://moeen.tech',
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'رابط النظام مطلوب.';
-                        }
-
-                        final normalized = normalizeBaseUrl(value);
-                        final uri = Uri.tryParse(normalized);
-                        if (uri == null || !(uri.hasScheme && uri.host.isNotEmpty)) {
-                          return 'أدخل رابطًا صالحًا مثل https://moeen.tech';
-                        }
-
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _AppTextField(
-                      controller: _pairingCodeController,
-                      label: 'رمز الربط',
-                      hint: 'ABCD-1234',
-                      textCapitalization: TextCapitalization.characters,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'رمز الربط مطلوب.';
-                        }
-                        if (DesktopSession.normalizePairingCode(value).length < 8) {
-                          return 'أدخل رمز الربط كاملًا.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _AppTextField(
-                      controller: _deviceNameController,
-                      label: 'اسم الجهاز',
-                      hint: 'Classroom Display',
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 18),
-                      _ErrorBanner(message: _error!),
-                    ],
-                    const SizedBox(height: 22),
-                    FilledButton(
-                      onPressed: _submitting ? null : _submit,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppPalette.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                      ),
-                      child: _submitting
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('ربط الجهاز'),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 44,
+                      offset: const Offset(0, 22),
                     ),
                   ],
                 ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const _BrandBadge(label: 'Moeen'),
+                      const SizedBox(height: 18),
+                      const _SectionHeader(
+                        title: 'ربط تطبيق العرض',
+                        subtitle:
+                            'أدخل رابط السيرفر ورمز الربط الذي تم توليده من صفحة الحضور في الموقع.',
+                      ),
+                      const SizedBox(height: 24),
+                      _AppTextField(
+                        controller: _baseUrlController,
+                        label: 'رابط النظام',
+                        hint: 'https://moeen.tech',
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'رابط النظام مطلوب.';
+                          }
+
+                          final normalized = normalizeBaseUrl(value);
+                          final uri = Uri.tryParse(normalized);
+                          if (uri == null ||
+                              !(uri.hasScheme && uri.host.isNotEmpty)) {
+                            return 'أدخل رابطًا صالحًا مثل https://moeen.tech';
+                          }
+
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      _AppTextField(
+                        controller: _pairingCodeController,
+                        label: 'رمز الربط',
+                        hint: 'ABCD-1234',
+                        textCapitalization: TextCapitalization.characters,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'رمز الربط مطلوب.';
+                          }
+                          if (DesktopSession.normalizePairingCode(
+                                value,
+                              ).length <
+                              8) {
+                            return 'أدخل رمز الربط كاملًا.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      _AppTextField(
+                        controller: _deviceNameController,
+                        label: 'اسم الجهاز',
+                        hint: 'Classroom Display',
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 18),
+                        _ErrorBanner(message: _error!),
+                      ],
+                      const SizedBox(height: 22),
+                      FilledButton(
+                        onPressed: _submitting ? null : _submit,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppPalette.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                        ),
+                        child: _submitting
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('ربط الجهاز'),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
             ),
           ),
         ),
@@ -408,7 +427,8 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
       baseUrl: widget.session.baseUrl,
       token: widget.session.token,
     );
-    _titleController.text = 'محاضرة ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}';
+    _titleController.text =
+        'محاضرة ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}';
     final sessionContext = widget.session.sessionContext;
     _subjects = sessionContext.subject.id == 0 ? [] : [sessionContext.subject];
     _selectedSubject = _subjects.isNotEmpty ? _subjects.first : null;
@@ -526,7 +546,9 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
   @override
   Widget build(BuildContext context) {
     final user = widget.session.userName;
-    final workspace = widget.session.workspace == 'doctor' ? 'الدكتور' : 'المندوب';
+    final workspace = widget.session.workspace == 'doctor'
+        ? 'الدكتور'
+        : 'المندوب';
 
     return Scaffold(
       appBar: AppBar(
@@ -535,10 +557,15 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('إعداد جلسة QR', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'إعداد جلسة QR',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             Text(
               '$workspace: $user',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: const Color(0xFF64748B)),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: const Color(0xFF64748B)),
             ),
           ],
         ),
@@ -577,7 +604,9 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
                 ],
               ),
               child: _loadingSubjects
-                  ? const _LoadingSection(message: 'جارٍ تحميل المواد المسموح التحضير لها...')
+                  ? const _LoadingSection(
+                      message: 'جارٍ تحميل المواد المسموح التحضير لها...',
+                    )
                   : Form(
                       key: _formKey,
                       child: Column(
@@ -587,7 +616,8 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
                           const SizedBox(height: 16),
                           const _SectionHeader(
                             title: 'بيانات الجلسة',
-                            subtitle: 'اختر المادة ثم اضبط عنوان الجلسة وتاريخها قبل عرض QR على الشاشة.',
+                            subtitle:
+                                'اختر المادة ثم اضبط عنوان الجلسة وتاريخها قبل عرض QR على الشاشة.',
                           ),
                           if (_error != null) ...[
                             const SizedBox(height: 16),
@@ -609,7 +639,8 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
                                 )
                                 .toList(),
                             onChanged: null,
-                            validator: (value) => value == null ? 'اختر المادة أولًا.' : null,
+                            validator: (value) =>
+                                value == null ? 'اختر المادة أولًا.' : null,
                           ),
                           if (_selectedSubject != null) ...[
                             const SizedBox(height: 12),
@@ -651,7 +682,9 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
                           ),
                           const SizedBox(height: 26),
                           FilledButton(
-                            onPressed: _starting || _subjects.isEmpty ? null : _startSession,
+                            onPressed: _starting || _subjects.isEmpty
+                                ? null
+                                : _startSession,
                             style: FilledButton.styleFrom(
                               backgroundColor: AppPalette.primary,
                               foregroundColor: Colors.white,
@@ -664,7 +697,10 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
                                 ? const SizedBox(
                                     height: 18,
                                     width: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
                                   )
                                 : const Text('بدء الجلسة وعرض QR'),
                           ),
@@ -739,8 +775,14 @@ class _LiveQrScreenState extends State<LiveQrScreen> {
     _rotateTimer?.cancel();
     _countdownTimer?.cancel();
 
-    _statusTimer = Timer.periodic(const Duration(seconds: 3), (_) => _refreshStatus());
-    _rotateTimer = Timer.periodic(Duration(seconds: _rotationSeconds), (_) => _rotateToken());
+    _statusTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => _refreshStatus(),
+    );
+    _rotateTimer = Timer.periodic(
+      Duration(seconds: _rotationSeconds),
+      (_) => _rotateToken(),
+    );
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       setState(() {
@@ -796,8 +838,10 @@ class _LiveQrScreenState extends State<LiveQrScreen> {
             subjectName: widget.subject.name,
             sessionTitle: payload.title,
             redirectUrl: null,
-            missingScanCount: payload.verificationSummary['missing_scan_count'] ?? 0,
-            sampleCheckCount: payload.verificationSummary['sample_check_count'] ?? 0,
+            missingScanCount:
+                payload.verificationSummary['missing_scan_count'] ?? 0,
+            sampleCheckCount:
+                payload.verificationSummary['sample_check_count'] ?? 0,
             endedExternally: true,
           ),
         );
@@ -861,10 +905,17 @@ class _LiveQrScreenState extends State<LiveQrScreen> {
   Widget build(BuildContext context) {
     final payload = _payload;
     final students = payload?.students ?? const <StudentScanStatus>[];
-    final pendingStudents = students.where((student) => student.status != 'present').toList();
-    final allPresentStudents = students.where((student) => student.status == 'present').toList();
-    final scannedStudents = payload?.recentScans ?? allPresentStudents.take(12).toList();
-    final attendeeSample = allPresentStudents.take(math.min(allPresentStudents.length, 18)).toList();
+    final pendingStudents = students
+        .where((student) => student.status != 'present')
+        .toList();
+    final allPresentStudents = students
+        .where((student) => student.status == 'present')
+        .toList();
+    final scannedStudents =
+        payload?.recentScans ?? allPresentStudents.take(12).toList();
+    final attendeeSample = allPresentStudents
+        .take(math.min(allPresentStudents.length, 18))
+        .toList();
 
     if (_showFullscreenQr) {
       return _LiveFullscreenQr(
@@ -886,7 +937,9 @@ class _LiveQrScreenState extends State<LiveQrScreen> {
             Text(widget.subject.name),
             Text(
               payload?.title ?? widget.startedSession.title,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.white70),
             ),
           ],
         ),
@@ -907,15 +960,22 @@ class _LiveQrScreenState extends State<LiveQrScreen> {
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFF7ED),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: const Color(0xFFFDBA74)),
                 ),
                 child: Text(
-                  _error ?? 'انقطع الاتصال مؤقتًا. سيتم الاستئناف تلقائيًا عند عودة الشبكة.',
-                  style: const TextStyle(color: Color(0xFF9A3412), fontWeight: FontWeight.w700),
+                  _error ??
+                      'انقطع الاتصال مؤقتًا. سيتم الاستئناف تلقائيًا عند عودة الشبكة.',
+                  style: const TextStyle(
+                    color: Color(0xFF9A3412),
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             Expanded(
@@ -939,14 +999,20 @@ class _LiveQrScreenState extends State<LiveQrScreen> {
                       child: Column(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 10,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFE2E8F0),
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
                               'يتجدد خلال $_remainingSeconds ثانية',
-                              style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF334155),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -965,7 +1031,9 @@ class _LiveQrScreenState extends State<LiveQrScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  border: Border.all(
+                                    color: const Color(0xFFE2E8F0),
+                                  ),
                                 ),
                                 child: QrImageView(
                                   data: _token,
@@ -1011,9 +1079,14 @@ class _LiveQrScreenState extends State<LiveQrScreen> {
                                 ? const SizedBox(
                                     height: 18,
                                     width: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
                                   )
-                                : const Text('إنهاء الجلسة وتحويل المراجعة إلى الموقع'),
+                                : const Text(
+                                    'إنهاء الجلسة وتحويل المراجعة إلى الموقع',
+                                  ),
                           ),
                         ],
                       ),
@@ -1037,7 +1110,8 @@ class _LiveQrScreenState extends State<LiveQrScreen> {
                         Expanded(
                           child: _StudentPanel(
                             title: 'عينة من الحاضرين',
-                            subtitle: 'أسماء مختصرة من الطلاب الذين تم تسجيلهم كحضور',
+                            subtitle:
+                                'أسماء مختصرة من الطلاب الذين تم تسجيلهم كحضور',
                             students: attendeeSample,
                             emptyLabel: 'لم يتم تسجيل أي طالب كحاضر حتى الآن.',
                             accent: AppPalette.accent,
@@ -1110,8 +1184,11 @@ class SessionClosedSummaryScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _SectionHeader(
-                    title: summary.endedExternally ? 'الجلسة أُغلقت من مكان آخر' : 'تم إغلاق الجلسة بنجاح',
-                    subtitle: '${summary.subjectName} • ${summary.sessionTitle}',
+                    title: summary.endedExternally
+                        ? 'الجلسة أُغلقت من مكان آخر'
+                        : 'تم إغلاق الجلسة بنجاح',
+                    subtitle:
+                        '${summary.subjectName} • ${summary.sessionTitle}',
                   ),
                   const SizedBox(height: 24),
                   Row(
@@ -1145,7 +1222,10 @@ class SessionClosedSummaryScreen extends StatelessWidget {
                       summary.redirectUrl == null
                           ? 'راجع الحضور النهائي من الموقع نفسه لأن الجلسة أُغلقت خارج تطبيق الديسكتوب.'
                           : 'المراجعة النهائية لا تزال على الموقع. افتح الصفحة الآن لتأكيد غير الماسحين وعينة التحقق 2%.',
-                      style: const TextStyle(color: Color(0xFF475569), height: 1.8),
+                      style: const TextStyle(
+                        color: Color(0xFF475569),
+                        height: 1.8,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 22),
@@ -1163,7 +1243,9 @@ class SessionClosedSummaryScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton(
-                    onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+                    onPressed: () => Navigator.of(
+                      context,
+                    ).popUntil((route) => route.isFirst),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(
@@ -1247,7 +1329,10 @@ class _LiveFullscreenQr extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 18),
-                  _MetaPill(label: 'يتجدد خلال', value: '$remainingSeconds ثانية'),
+                  _MetaPill(
+                    label: 'يتجدد خلال',
+                    value: '$remainingSeconds ثانية',
+                  ),
                 ],
               ),
             ),
@@ -1266,9 +1351,7 @@ class _LoadingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: _LoadingSection(message: message),
-      ),
+      body: Center(child: _LoadingSection(message: message)),
     );
   }
 }
@@ -1329,10 +1412,7 @@ class _BrandBadge extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SectionHeader({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
@@ -1345,17 +1425,17 @@ class _SectionHeader extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: AppPalette.midnight,
-              ),
+            fontWeight: FontWeight.w800,
+            color: AppPalette.midnight,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
           subtitle,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppPalette.muted,
-                height: 1.7,
-              ),
+            color: AppPalette.muted,
+            height: 1.7,
+          ),
         ),
       ],
     );
@@ -1389,7 +1469,13 @@ class _MetricCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(color: AppPalette.muted, fontWeight: FontWeight.w700)),
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppPalette.muted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 10),
           Text(
             value,
@@ -1439,9 +1525,19 @@ class _StudentPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(fontWeight: FontWeight.w900, color: accent, fontSize: 18)),
+          Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: accent,
+              fontSize: 18,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(subtitle, style: const TextStyle(color: AppPalette.muted, height: 1.6)),
+          Text(
+            subtitle,
+            style: const TextStyle(color: AppPalette.muted, height: 1.6),
+          ),
           const SizedBox(height: 14),
           Expanded(
             child: students.isEmpty
@@ -1463,22 +1559,39 @@ class _StudentPanel extends StatelessWidget {
                           radius: 20,
                           backgroundColor: accent.withValues(alpha: 0.12),
                           child: Text(
-                            student.name.isEmpty ? '?' : student.name.substring(0, 1),
-                            style: TextStyle(color: accent, fontWeight: FontWeight.w900),
+                            student.name.isEmpty
+                                ? '?'
+                                : student.name.substring(0, 1),
+                            style: TextStyle(
+                              color: accent,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
-                        title: Text(student.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        title: Text(
+                          student.name,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
                         subtitle: Text(student.studentNumber ?? 'بدون رقم قيد'),
                         trailing: student.scannedAt == null
                             ? Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: accent.withValues(alpha: 0.10),
                                   borderRadius: BorderRadius.circular(999),
                                 ),
                                 child: Text(
-                                  student.status == 'present' ? 'حاضر' : 'بانتظار المسح',
-                                  style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 12),
+                                  student.status == 'present'
+                                      ? 'حاضر'
+                                      : 'بانتظار المسح',
+                                  style: TextStyle(
+                                    color: accent,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               )
                             : Text(
@@ -1524,10 +1637,7 @@ class _SubjectMetaCard extends StatelessWidget {
 }
 
 class _MetaPill extends StatelessWidget {
-  const _MetaPill({
-    required this.label,
-    required this.value,
-  });
+  const _MetaPill({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -1541,7 +1651,10 @@ class _MetaPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: Text('$label: $value', style: const TextStyle(fontWeight: FontWeight.w700)),
+      child: Text(
+        '$label: $value',
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ),
     );
   }
 }
@@ -1595,7 +1708,12 @@ class _DatePickerField extends StatelessWidget {
         decoration: inputDecoration(label),
         child: Row(
           children: [
-            Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w700))),
+            Expanded(
+              child: Text(
+                value,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
             const Icon(Icons.calendar_month_outlined),
           ],
         ),
@@ -1674,9 +1792,18 @@ class DesktopStorage {
     final workspace = await _storage.read(key: 'desktop_workspace');
     final userName = await _storage.read(key: 'desktop_user_name');
     final userRole = await _storage.read(key: 'desktop_user_role');
-    final sessionContextJson = await _storage.read(key: 'desktop_session_context');
+    final sessionContextJson = await _storage.read(
+      key: 'desktop_session_context',
+    );
 
-    if ([baseUrl, token, workspace, userName, userRole, sessionContextJson].any((value) => value == null || value.isEmpty)) {
+    if ([
+      baseUrl,
+      token,
+      workspace,
+      userName,
+      userRole,
+      sessionContextJson,
+    ].any((value) => value == null || value.isEmpty)) {
       return null;
     }
 
@@ -1686,7 +1813,9 @@ class DesktopStorage {
       workspace: workspace!,
       userName: userName!,
       userRole: userRole!,
-      sessionContext: SessionContext.fromJson(jsonDecode(sessionContextJson!) as Map<String, dynamic>),
+      sessionContext: SessionContext.fromJson(
+        jsonDecode(sessionContextJson!) as Map<String, dynamic>,
+      ),
     );
   }
 
@@ -1701,10 +1830,7 @@ class DesktopStorage {
 }
 
 class DesktopApiClient {
-  DesktopApiClient({
-    required this.baseUrl,
-    this.token,
-  });
+  DesktopApiClient({required this.baseUrl, this.token});
 
   final String baseUrl;
   final String? token;
@@ -1746,7 +1872,9 @@ class DesktopApiClient {
       workspace: data['workspace'] as String,
       userName: (data['user'] as Map<String, dynamic>)['name'] as String,
       userRole: (data['user'] as Map<String, dynamic>)['role'].toString(),
-      sessionContext: SessionContext.fromJson(data['session_context'] as Map<String, dynamic>),
+      sessionContext: SessionContext.fromJson(
+        data['session_context'] as Map<String, dynamic>,
+      ),
     );
   }
 
@@ -1791,7 +1919,9 @@ class DesktopApiClient {
     final subjects = (data['subjects'] as List<dynamic>? ?? const <dynamic>[]);
 
     return subjects
-        .map((subject) => SubjectOption.fromJson(subject as Map<String, dynamic>))
+        .map(
+          (subject) => SubjectOption.fromJson(subject as Map<String, dynamic>),
+        )
         .toList();
   }
 
@@ -1858,8 +1988,12 @@ class DesktopApiClient {
 
     final payload = _decode(response);
     final data = _unwrap(response, payload);
-    final verification = (data['verification'] as Map<String, dynamic>? ?? const <String, dynamic>{});
-    final summary = (verification['summary'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+    final verification =
+        (data['verification'] as Map<String, dynamic>? ??
+        const <String, dynamic>{});
+    final summary =
+        (verification['summary'] as Map<String, dynamic>? ??
+        const <String, dynamic>{});
 
     return FinalizeResult(
       redirectUrl: data['redirect_url'] as String?,
@@ -1876,10 +2010,15 @@ class DesktopApiClient {
     return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
-  Map<String, dynamic> _unwrap(http.Response response, Map<String, dynamic> payload) {
+  Map<String, dynamic> _unwrap(
+    http.Response response,
+    Map<String, dynamic> payload,
+  ) {
     final success = payload['success'];
     if (response.statusCode >= 400 || success == false) {
-      throw ApiException(payload['message']?.toString() ?? 'حدث خطأ غير متوقع.');
+      throw ApiException(
+        payload['message']?.toString() ?? 'حدث خطأ غير متوقع.',
+      );
     }
 
     return (payload['data'] as Map<String, dynamic>? ?? payload);
@@ -1939,7 +2078,13 @@ class SessionContext {
 
   factory SessionContext.empty() {
     return const SessionContext(
-      subject: SubjectOption(id: 0, name: '', code: null, majorName: '', levelName: ''),
+      subject: SubjectOption(
+        id: 0,
+        name: '',
+        code: null,
+        majorName: '',
+        levelName: '',
+      ),
       date: '',
       title: '',
     );
@@ -1947,7 +2092,9 @@ class SessionContext {
 
   factory SessionContext.fromJson(Map<String, dynamic> json) {
     return SessionContext(
-      subject: SubjectOption.fromJson(json['subject'] as Map<String, dynamic>? ?? const <String, dynamic>{}),
+      subject: SubjectOption.fromJson(
+        json['subject'] as Map<String, dynamic>? ?? const <String, dynamic>{},
+      ),
       date: json['date']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
       lectureNumber: json['lecture_number']?.toString(),
@@ -1983,12 +2130,21 @@ class SubjectOption {
 
   factory SubjectOption.fromJson(Map<String, dynamic> json) {
     if (json.isEmpty) {
-      return const SubjectOption(id: 0, name: '', code: null, majorName: '', levelName: '');
+      return const SubjectOption(
+        id: 0,
+        name: '',
+        code: null,
+        majorName: '',
+        levelName: '',
+      );
     }
 
-    final major = json['major'] as Map<String, dynamic>? ?? const <String, dynamic>{};
-    final level = json['level'] as Map<String, dynamic>? ?? const <String, dynamic>{};
-    final doctor = json['doctor'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final major =
+        json['major'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final level =
+        json['level'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final doctor =
+        json['doctor'] as Map<String, dynamic>? ?? const <String, dynamic>{};
 
     return SubjectOption(
       id: (json['id'] as num).toInt(),
@@ -2027,10 +2183,7 @@ class StartedQrSession {
 }
 
 class RotatedToken {
-  const RotatedToken({
-    required this.token,
-    required this.rotationSeconds,
-  });
+  const RotatedToken({required this.token, required this.rotationSeconds});
 
   final String token;
   final int rotationSeconds;
@@ -2059,13 +2212,23 @@ class SessionStatusPayload {
 
   factory SessionStatusPayload.fromJson(Map<String, dynamic> json) {
     final students = (json['students'] as List<dynamic>? ?? const <dynamic>[])
-        .map((student) => StudentScanStatus.fromJson(student as Map<String, dynamic>))
+        .map(
+          (student) =>
+              StudentScanStatus.fromJson(student as Map<String, dynamic>),
+        )
         .toList();
     final recent = (json['recent_scans'] as List<dynamic>? ?? const <dynamic>[])
-        .map((student) => StudentScanStatus.fromJson(student as Map<String, dynamic>))
+        .map(
+          (student) =>
+              StudentScanStatus.fromJson(student as Map<String, dynamic>),
+        )
         .toList();
-    final verification = (json['verification'] as Map<String, dynamic>? ?? const <String, dynamic>{});
-    final summary = (verification['summary'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+    final verification =
+        (json['verification'] as Map<String, dynamic>? ??
+        const <String, dynamic>{});
+    final summary =
+        (verification['summary'] as Map<String, dynamic>? ??
+        const <String, dynamic>{});
 
     return SessionStatusPayload(
       sessionStatus: json['session_status']?.toString() ?? 'active',
@@ -2076,8 +2239,10 @@ class SessionStatusPayload {
       students: students,
       recentScans: recent,
       verificationSummary: {
-        'missing_scan_count': (summary['missing_scan_count'] as num?)?.toInt() ?? 0,
-        'sample_check_count': (summary['sample_check_count'] as num?)?.toInt() ?? 0,
+        'missing_scan_count':
+            (summary['missing_scan_count'] as num?)?.toInt() ?? 0,
+        'sample_check_count':
+            (summary['sample_check_count'] as num?)?.toInt() ?? 0,
       },
     );
   }
@@ -2106,7 +2271,9 @@ class StudentScanStatus {
       name: json['name']?.toString() ?? '',
       status: json['status']?.toString() ?? 'pending',
       studentNumber: json['student_number']?.toString(),
-      scannedAt: scannedAt == null || scannedAt.isEmpty ? null : DateTime.tryParse(scannedAt),
+      scannedAt: scannedAt == null || scannedAt.isEmpty
+          ? null
+          : DateTime.tryParse(scannedAt),
     );
   }
 }
@@ -2161,6 +2328,8 @@ String normalizeBaseUrl(String value) {
   return normalized;
 }
 
-String formatDate(DateTime date) => '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+String formatDate(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
-String timeOnly(DateTime value) => '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+String timeOnly(DateTime value) =>
+    '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';

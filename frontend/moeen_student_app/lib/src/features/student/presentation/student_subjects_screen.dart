@@ -22,15 +22,21 @@ class StudentSubjectsScreen extends ConsumerWidget {
             children: [
               _HeroPanel(
                 title: '${subjects.length} مقرراً دراسياً',
-                subtitle: 'استعرض مقرراتك الدراسية، تفاصيل الحضور، والدرجات الأكاديمية.',
+                subtitle:
+                    'استعرض مقرراتك الدراسية، تفاصيل الحضور، والدرجات الأكاديمية.',
                 icon: Icons.auto_stories_rounded,
                 colors: const [Color(0xFF4338CA), Color(0xFF0EA5E9)],
               ),
               const SizedBox(height: 24),
-              const SectionTitle(title: 'قائمة المواد المسجلة', icon: Icons.library_books_rounded),
+              const SectionTitle(
+                title: 'قائمة المواد المسجلة',
+                icon: Icons.library_books_rounded,
+              ),
               const SizedBox(height: 16),
               if (subjects.isEmpty)
-                const EmptyState(message: 'لا توجد مقررات مرتبطة بحسابك حالياً.')
+                const EmptyState(
+                  message: 'لا توجد مقررات مرتبطة بحسابك حالياً.',
+                )
               else
                 ...subjects.indexed.map((entry) {
                   final index = entry.$1;
@@ -42,9 +48,21 @@ class StudentSubjectsScreen extends ConsumerWidget {
                   return _SubjectCard(
                     color: color,
                     subject: subject,
-                    doctorName: text(doctor, 'name', fallback: 'لم يحدد بعد'),
-                    termName: text(term, 'name', fallback: text(subject, 'term', fallback: '')),
-                    semesterName: text(semester, 'name', fallback: text(subject, 'semester', fallback: '')),
+                    doctorName: text(doctor, 'name').isNotEmpty 
+                      ? text(doctor, 'name') 
+                      : (subject['doctor'] is String 
+                          ? subject['doctor'].toString() 
+                          : text(subject, 'doctor_name', fallback: 'لم يحدد بعد')),
+                    termName: text(
+                      term,
+                      'name',
+                      fallback: text(subject, 'term', fallback: ''),
+                    ),
+                    semesterName: text(
+                      semester,
+                      'name',
+                      fallback: text(subject, 'semester', fallback: ''),
+                    ),
                     onTap: () {
                       final id = number(subject, 'id').toInt();
                       if (id > 0) {

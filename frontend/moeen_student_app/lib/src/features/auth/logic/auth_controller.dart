@@ -44,4 +44,24 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     await ref.read(sessionStorageProvider).clear();
     state = const AsyncData(null);
   }
+
+  Future<AuthSession?> switchWorkspace(AuthWorkspace workspace) async {
+    final session = state.valueOrNull;
+    if (session == null || session.workspace == workspace) return session;
+
+    if (workspace == AuthWorkspace.delegate &&
+        !session.canAccessDelegateWorkspace) {
+      return session;
+    }
+    if (workspace == AuthWorkspace.student &&
+        !session.canAccessStudentWorkspace) {
+      return session;
+    }
+
+    final updated = session.copyWith(workspace: workspace);
+    await ref.read(sessionStorageProvider).save(updated);
+    await PushNotificationService.registerDevice(updated);
+    state = AsyncData(updated);
+    return updated;
+  }
 }

@@ -94,13 +94,19 @@ class AuthRepository {
   AuthSession _sessionFromStudentResponse(Map<String, dynamic> response) {
     final data = response['data'] as Map<String, dynamic>;
     final user = data['user'] as Map<String, dynamic>;
+    final major = user['major'];
+    final role = _roleValue(user['role']);
+    final isPracticalDelegate = user['is_practical_delegate'] == true;
     return AuthSession(
       token: data['token'].toString(),
-      workspace: AuthWorkspace.student,
-      role: _roleValue(user['role']),
+      workspace: role == 'delegate' && !isPracticalDelegate
+          ? AuthWorkspace.delegate
+          : AuthWorkspace.student,
+      role: role,
       name: user['name'].toString(),
       email: user['email']?.toString(),
-      isPracticalDelegate: user['is_practical_delegate'] == true,
+      isPracticalDelegate: isPracticalDelegate,
+      hasClinical: major is Map && major['has_clinical'] == true,
     );
   }
 
@@ -114,6 +120,7 @@ class AuthRepository {
       name: user['name'].toString(),
       email: user['email']?.toString(),
       isPracticalDelegate: user['is_practical_delegate'] == true,
+      hasClinical: user['is_clinical_delegate'] == true,
     );
   }
 

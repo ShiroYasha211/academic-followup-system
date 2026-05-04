@@ -576,6 +576,12 @@ class _AlertsSection extends StatelessWidget {
             title: 'مهلة تقديم عذر غياب',
             message: warning.message,
             color: AppColors.warning,
+            actionLabel: warning.subjectId > 0 ? 'تقديم عذر الآن' : null,
+            onAction: warning.subjectId > 0
+                ? () => context.go(
+                    '${StudentSubjectsScreen.detailsPath(warning.subjectId)}?tab=attendance',
+                  )
+                : null,
           ),
       ],
     );
@@ -587,11 +593,15 @@ class _AlertTile extends StatelessWidget {
     required this.title,
     required this.message,
     required this.color,
+    this.actionLabel,
+    this.onAction,
   });
 
   final String title;
   final String message;
   final Color color;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -637,6 +647,34 @@ class _AlertTile extends StatelessWidget {
                     height: 1.4,
                   ),
                 ),
+                if (actionLabel != null && onAction != null) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: FilledButton.icon(
+                      onPressed: onAction,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: color,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add_moderator_rounded, size: 16),
+                      label: Text(
+                        actionLabel!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

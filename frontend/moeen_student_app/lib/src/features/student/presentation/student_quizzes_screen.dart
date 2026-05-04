@@ -21,6 +21,8 @@ class StudentQuizzesScreen extends ConsumerWidget {
           final competitions = asList(data['competitions']);
           final attempts = asList(data['my_attempts']);
 
+          Future<void> onRefresh() => ref.refresh(_quizzesProvider.future);
+
           return DefaultTabController(
             length: 3,
             child: NestedScrollView(
@@ -36,7 +38,10 @@ class StudentQuizzesScreen extends ConsumerWidget {
                   delegate: _SliverAppBarDelegate(
                     child: Container(
                       color: AppColors.slate50,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 8,
+                      ),
                       child: TabBar(
                         isScrollable: false,
                         labelColor: Colors.white,
@@ -59,9 +64,24 @@ class StudentQuizzesScreen extends ConsumerWidget {
               ],
               body: TabBarView(
                 children: [
-                  _QuizList(items: doctorQuizzes, emptyMessage: 'لا توجد كويزات متاحة حالياً.'),
-                  _QuizList(items: competitions, emptyMessage: 'لا توجد مسابقات نشطة.'),
-                  _AttemptList(items: attempts),
+                  RefreshIndicator(
+                    onRefresh: onRefresh,
+                    child: _QuizList(
+                      items: doctorQuizzes,
+                      emptyMessage: 'لا توجد كويزات متاحة حالياً.',
+                    ),
+                  ),
+                  RefreshIndicator(
+                    onRefresh: onRefresh,
+                    child: _QuizList(
+                      items: competitions,
+                      emptyMessage: 'لا توجد مسابقات نشطة.',
+                    ),
+                  ),
+                  RefreshIndicator(
+                    onRefresh: onRefresh,
+                    child: _AttemptList(items: attempts),
+                  ),
                 ],
               ),
             ),
@@ -105,12 +125,20 @@ class _QuizPageHeader extends StatelessWidget {
               children: [
                 const Text(
                   'مركز الاختبارات',
-                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'أنجزت $completed من أصل $total اختبار متاح',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -121,7 +149,11 @@ class _QuizPageHeader extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 32),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              color: Colors.white,
+              size: 32,
+            ),
           ),
         ],
       ),
@@ -136,14 +168,21 @@ class _QuizList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) return EmptyState(message: emptyMessage);
+    if (items.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          const SizedBox(height: 100),
+          EmptyState(message: emptyMessage),
+        ],
+      );
+    }
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(18),
       itemCount: items.length,
-      itemBuilder: (context, index) => _EntryAnimation(
-        index: index,
-        child: _QuizTile(asMap(items[index])),
-      ),
+      itemBuilder: (context, index) =>
+          _EntryAnimation(index: index, child: _QuizTile(asMap(items[index]))),
     );
   }
 }
@@ -154,8 +193,17 @@ class _AttemptList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) return const EmptyState(message: 'لم تقم بأي محاولات بعد.');
+    if (items.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 100),
+          EmptyState(message: 'لم تقم بأي محاولات بعد.'),
+        ],
+      );
+    }
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(18),
       itemCount: items.length,
       itemBuilder: (context, index) => _EntryAnimation(
@@ -167,12 +215,17 @@ class _AttemptList extends StatelessWidget {
 }
 
 class StudentQuizTakeScreen extends ConsumerStatefulWidget {
-  const StudentQuizTakeScreen({super.key, required this.quizId, this.accessCode});
+  const StudentQuizTakeScreen({
+    super.key,
+    required this.quizId,
+    this.accessCode,
+  });
   final int quizId;
   final String? accessCode;
 
   @override
-  ConsumerState<StudentQuizTakeScreen> createState() => _StudentQuizTakeScreenState();
+  ConsumerState<StudentQuizTakeScreen> createState() =>
+      _StudentQuizTakeScreenState();
 }
 
 class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
@@ -203,7 +256,9 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
           final attempt = asMap(data['attempt']);
           final questions = asList(data['questions']);
           final totalQuestions = questions.length;
-          final progress = totalQuestions > 0 ? (_currentIndex + 1) / totalQuestions : 0.0;
+          final progress = totalQuestions > 0
+              ? (_currentIndex + 1) / totalQuestions
+              : 0.0;
 
           return Column(
             children: [
@@ -212,7 +267,9 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
                 decoration: const BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+                  borderRadius: BorderRadius.vertical(
+                    bottom: Radius.circular(32),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -222,12 +279,30 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(text(quiz, 'title'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                              Text('السؤال ${_currentIndex + 1} من $totalQuestions', style: const TextStyle(color: AppColors.slate500, fontSize: 12, fontWeight: FontWeight.w700)),
+                              Text(
+                                text(quiz, 'title'),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                'السؤال ${_currentIndex + 1} من $totalQuestions',
+                                style: const TextStyle(
+                                  color: AppColors.slate500,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ],
                           ),
                         ),
-                        _TimerWidget(durationMinutes: number(quiz, 'duration_minutes').toInt()),
+                        _TimerWidget(
+                          durationMinutes: number(
+                            quiz,
+                            'duration_minutes',
+                          ).toInt(),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -237,7 +312,9 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
                         value: progress,
                         minHeight: 8,
                         backgroundColor: AppColors.slate100,
-                        valueColor: const AlwaysStoppedAnimation(AppColors.royalBlue),
+                        valueColor: const AlwaysStoppedAnimation(
+                          AppColors.royalBlue,
+                        ),
                       ),
                     ),
                   ],
@@ -263,46 +340,90 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
               ),
               // Navigation Bottom Bar
               Container(
-                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -5))],
-                ),
-                child: Row(
-                  children: [
-                    if (_currentIndex > 0)
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
-                          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                          child: const Text('السابق', style: TextStyle(fontWeight: FontWeight.w900)),
-                        ),
-                      ),
-                    if (_currentIndex > 0) const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: FilledButton(
-                        onPressed: () {
-                          if (_currentIndex < totalQuestions - 1) {
-                            _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-                          } else {
-                            _confirmSubmit(number(attempt, 'id').toInt());
-                          }
-                        },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _currentIndex == totalQuestions - 1 ? AppColors.success : AppColors.royalBlue,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                        child: _submitting
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : Text(
-                                _currentIndex == totalQuestions - 1 ? 'إرسال الإجابات' : 'التالي',
-                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-                              ),
-                      ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 20,
+                      offset: const Offset(0, -5),
                     ),
                   ],
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      children: [
+                        if (_currentIndex > 0)
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => _pageController.previousPage(
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              child: const Text(
+                                'السابق',
+                                style: TextStyle(fontWeight: FontWeight.w900),
+                              ),
+                            ),
+                          ),
+                        if (_currentIndex > 0) const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: FilledButton(
+                            onPressed: () {
+                              if (_currentIndex < totalQuestions - 1) {
+                                _pageController.nextPage(
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                );
+                              } else {
+                                _confirmSubmit(number(attempt, 'id').toInt());
+                              }
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor:
+                                  _currentIndex == totalQuestions - 1
+                                  ? AppColors.success
+                                  : AppColors.royalBlue,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: _submitting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    _currentIndex == totalQuestions - 1
+                                        ? 'إرسال الإجابات'
+                                        : 'التالي',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -316,7 +437,8 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
     final confirmed = await showMoeenConfirmDialog(
       context: context,
       title: 'تأكيد الإرسال',
-      message: 'هل أنت متأكد من رغبتك في إرسال الإجابات؟ لا يمكنك التراجع بعد الإرسال.',
+      message:
+          'هل أنت متأكد من رغبتك في إرسال الإجابات؟ لا يمكنك التراجع بعد الإرسال.',
       confirmLabel: 'نعم، إرسال الآن',
       color: AppColors.success,
     );
@@ -327,14 +449,21 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
     if (attemptId <= 0) return;
     setState(() => _submitting = true);
     try {
-      final response = await ref.read(studentContentRepositoryProvider).submitQuiz(attemptId, _answers);
+      final response = await ref
+          .read(studentContentRepositoryProvider)
+          .submitQuiz(attemptId, _answers);
       final id = number(response, 'attempt_id', fallback: attemptId).toInt();
       if (mounted) {
         context.go(StudentQuizzesScreen.resultPath(id));
       }
     } on ApiException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message), backgroundColor: AppColors.danger));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error.message),
+            backgroundColor: AppColors.danger,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -358,7 +487,10 @@ class _TimerWidgetState extends State<_TimerWidget> {
   void initState() {
     super.initState();
     _secondsLeft = widget.durationMinutes * 60;
-    _timerStream = Stream.periodic(const Duration(seconds: 1), (i) => _secondsLeft - i - 1).take(_secondsLeft);
+    _timerStream = Stream.periodic(
+      const Duration(seconds: 1),
+      (i) => _secondsLeft - i - 1,
+    ).take(_secondsLeft);
   }
 
   @override
@@ -376,16 +508,26 @@ class _TimerWidgetState extends State<_TimerWidget> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: (isLow ? AppColors.danger : AppColors.royalBlue).withValues(alpha: 0.1),
+            color: (isLow ? AppColors.danger : AppColors.royalBlue).withValues(
+              alpha: 0.1,
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
-              Icon(Icons.timer_outlined, size: 16, color: isLow ? AppColors.danger : AppColors.royalBlue),
+              Icon(
+                Icons.timer_outlined,
+                size: 16,
+                color: isLow ? AppColors.danger : AppColors.royalBlue,
+              ),
               const SizedBox(width: 6),
               Text(
                 '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}',
-                style: TextStyle(color: isLow ? AppColors.danger : AppColors.royalBlue, fontWeight: FontWeight.w900, fontFamily: 'monospace'),
+                style: TextStyle(
+                  color: isLow ? AppColors.danger : AppColors.royalBlue,
+                  fontWeight: FontWeight.w900,
+                  fontFamily: 'monospace',
+                ),
               ),
             ],
           ),
@@ -412,9 +554,45 @@ class StudentQuizResultScreen extends ConsumerWidget {
         builder: (data) {
           final quiz = asMap(data['quiz']);
           final attempt = asMap(data['attempt']);
-          final score = number(attempt, 'score').toDouble();
+          final score = number(attempt, 'percentage').toDouble();
           final isSuccess = score >= 50;
           final color = isSuccess ? AppColors.success : AppColors.danger;
+          final maxScore = number(attempt, 'max_score').toDouble();
+          final duration = number(attempt, 'duration').toInt();
+          final message = data['message']?.toString();
+
+          if (message != null && message.isNotEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.visibility_off_rounded,
+                      size: 64,
+                      color: AppColors.slate300,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: AppColors.slate600,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: () => context.pop(),
+                      child: const Text('العودة'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
 
           return ListView(
             padding: const EdgeInsets.all(24),
@@ -425,7 +603,13 @@ class StudentQuizResultScreen extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(32),
-                  boxShadow: [BoxShadow(color: color.withValues(alpha: 0.1), blurRadius: 30, offset: const Offset(0, 15))],
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.1),
+                      blurRadius: 30,
+                      offset: const Offset(0, 15),
+                    ),
+                  ],
                 ),
                 child: Column(
                   children: [
@@ -447,11 +631,19 @@ class StudentQuizResultScreen extends ConsumerWidget {
                           children: [
                             Text(
                               '${score.toInt()}%',
-                              style: TextStyle(fontSize: 42, fontWeight: FontWeight.w900, color: color),
+                              style: TextStyle(
+                                fontSize: 42,
+                                fontWeight: FontWeight.w900,
+                                color: color,
+                              ),
                             ),
                             Text(
-                              isSuccess ? 'عمل رائع!' : 'تحتاج للمذاكرة',
-                              style: TextStyle(color: color.withValues(alpha: 0.6), fontWeight: FontWeight.w800, fontSize: 14),
+                              '${number(attempt, 'score').toStringAsFixed(0)} / ${maxScore.toStringAsFixed(0)} درجة',
+                              style: TextStyle(
+                                color: color.withValues(alpha: 0.6),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                              ),
                             ),
                           ],
                         ),
@@ -461,12 +653,20 @@ class StudentQuizResultScreen extends ConsumerWidget {
                     Text(
                       text(quiz, 'title'),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.midnight),
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.midnight,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'تم تقديم المحاولة في ${dateOnly(text(attempt, 'submitted_at'))}',
-                      style: const TextStyle(color: AppColors.slate400, fontWeight: FontWeight.w600, fontSize: 12),
+                      'تم تقديم المحاولة في ${dateTime(text(attempt, 'submitted_at'))}',
+                      style: const TextStyle(
+                        color: AppColors.slate400,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -476,30 +676,65 @@ class StudentQuizResultScreen extends ConsumerWidget {
               Row(
                 children: [
                   _ResultStatTile(
-                    label: 'الإجابات الصحيحة',
-                    value: text(attempt, 'correct_answers_count', fallback: '-'),
+                    label: 'إجابات صحيحة',
+                    value: text(
+                      attempt,
+                      'correct_answers_count',
+                      fallback: '0',
+                    ),
                     icon: Icons.check_circle_rounded,
                     color: AppColors.success,
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   _ResultStatTile(
-                    label: 'الإجابات الخاطئة',
-                    value: text(attempt, 'wrong_answers_count', fallback: '-'),
+                    label: 'إجابات خاطئة',
+                    value: text(attempt, 'wrong_answers_count', fallback: '0'),
                     icon: Icons.cancel_rounded,
                     color: AppColors.danger,
                   ),
+                  if (duration > 0) ...[
+                    const SizedBox(width: 12),
+                    _ResultStatTile(
+                      label: 'دقيقة',
+                      value: '$duration',
+                      icon: Icons.timer_rounded,
+                      color: AppColors.royalBlue,
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 32),
+              // Answers Review
+              if (boolValue(quiz, 'show_correct_answers')) ...[
+                const Text(
+                  'مراجعة الإجابات',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.midnight,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _AnswersReviewList(
+                  answers: asList(attempt['answers']),
+                  showExplanations: boolValue(quiz, 'show_correction_notes'),
+                ),
+                const SizedBox(height: 32),
+              ],
               FilledButton.icon(
                 onPressed: () => context.go(StudentQuizzesScreen.route),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.midnight,
                   padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                 ),
                 icon: const Icon(Icons.home_rounded),
-                label: const Text('العودة للقائمة الرئيسية', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                label: const Text(
+                  'العودة للقائمة الرئيسية',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                ),
               ),
             ],
           );
@@ -510,7 +745,12 @@ class StudentQuizResultScreen extends ConsumerWidget {
 }
 
 class _ResultStatTile extends StatelessWidget {
-  const _ResultStatTile({required this.label, required this.value, required this.icon, required this.color});
+  const _ResultStatTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
   final String label;
   final String value;
   final IconData icon;
@@ -533,14 +773,278 @@ class _ResultStatTile extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               value,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.midnight),
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                color: AppColors.midnight,
+              ),
             ),
             Text(
               label,
-              style: const TextStyle(color: AppColors.slate500, fontWeight: FontWeight.w700, fontSize: 11),
+              style: const TextStyle(
+                color: AppColors.slate500,
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AnswersReviewList extends StatelessWidget {
+  const _AnswersReviewList({
+    required this.answers,
+    required this.showExplanations,
+  });
+  final List<dynamic> answers;
+  final bool showExplanations;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: answers.asMap().entries.map((entry) {
+        return _AnswerReviewTile(
+          index: entry.key,
+          answer: asMap(entry.value),
+          showExplanations: showExplanations,
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _AnswerReviewTile extends StatelessWidget {
+  const _AnswerReviewTile({
+    required this.index,
+    required this.answer,
+    required this.showExplanations,
+  });
+  final int index;
+  final Map<String, dynamic> answer;
+  final bool showExplanations;
+
+  @override
+  Widget build(BuildContext context) {
+    final question = asMap(answer['question']);
+    final options = asList(question['options']);
+    final selectedOptionId = number(answer, 'selected_option_id').toInt();
+    final isCorrect = boolValue(answer, 'is_correct');
+    final score = number(answer, 'score_awarded').toDouble();
+    final maxScore = number(question, 'score').toDouble();
+    final correctionNote = text(question, 'correction_note');
+    final infoSource = text(question, 'info_source');
+
+    final color = isCorrect ? AppColors.success : AppColors.danger;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isCorrect ? Icons.check_rounded : Icons.close_rounded,
+                        size: 14,
+                        color: color,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'السؤال ${index + 1}',
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '${score.toStringAsFixed(0)} / ${maxScore.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    color: AppColors.slate500,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Question Text
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              text(question, 'question_text'),
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                color: AppColors.midnight,
+                height: 1.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Options
+          ...options.map((opt) {
+            final option = asMap(opt);
+            final optId = number(option, 'id').toInt();
+            final isCorrectOpt = boolValue(option, 'is_correct');
+            final isUserSelected = optId == selectedOptionId;
+
+            Color? optColor;
+            IconData? optIcon;
+
+            if (isUserSelected) {
+              optColor = isCorrectOpt ? AppColors.success : AppColors.danger;
+              optIcon = isCorrectOpt
+                  ? Icons.check_circle_rounded
+                  : Icons.cancel_rounded;
+            } else if (isCorrectOpt) {
+              optColor = AppColors.success.withValues(alpha: 0.5);
+              optIcon = Icons.check_circle_outline_rounded;
+            }
+
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: optColor?.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: optColor?.withValues(alpha: 0.2) ?? AppColors.slate50,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    optIcon ?? Icons.radio_button_unchecked_rounded,
+                    size: 18,
+                    color: optColor ?? AppColors.slate300,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      text(option, 'option_text'),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isUserSelected || isCorrectOpt
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: optColor ?? AppColors.slate700,
+                        decoration: (isUserSelected && !isCorrectOpt)
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 12),
+          // Correction Note
+          if (showExplanations &&
+              (correctionNote.isNotEmpty || infoSource.isNotEmpty))
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFFEF3C7)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (correctionNote.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.lightbulb_outline_rounded,
+                          size: 14,
+                          color: Color(0xFF92400E),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'الشرح:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 11,
+                            color: Color(0xFF92400E),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      correctionNote,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF92400E),
+                        height: 1.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  if (infoSource.isNotEmpty) ...[
+                    if (correctionNote.isNotEmpty) const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.book_outlined,
+                          size: 14,
+                          color: Color(0xFF92400E),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'المصدر:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 11,
+                            color: Color(0xFF92400E),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      infoSource,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: const Color(0xFF92400E).withValues(alpha: 0.7),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }

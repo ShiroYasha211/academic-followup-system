@@ -655,6 +655,7 @@ class _AssignmentTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             Icons.calendar_today_rounded,
@@ -664,21 +665,6 @@ class _AssignmentTile extends StatelessWidget {
                           const SizedBox(width: 4),
                           Text(
                             'الموعد: ${dateOnly(text(item, 'due_date'))}',
-                            style: const TextStyle(
-                              color: AppColors.slate500,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Icon(
-                            Icons.grade_rounded,
-                            size: 10,
-                            color: AppColors.gold,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'الدرجة: ${text(item, 'marks', fallback: '-')}',
                             style: const TextStyle(
                               color: AppColors.slate500,
                               fontSize: 11,
@@ -715,10 +701,33 @@ class _AttendanceTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final status = text(item, 'status');
+    final status = text(item, 'status').trim().toLowerCase();
     final color = _attendanceColor(status);
     final excuse = asMap(item['excuse']);
     final canSubmit = boolValue(item, 'can_submit_excuse');
+    final deadline = asMap(item['deadline_info']);
+    final isAbsent = status == 'absent';
+    final isExpired = boolValue(deadline, 'is_expired');
+    final maxDeadlineDays = number(deadline, 'max_deadline_days').toInt();
+    final daysSinceAbsence = number(deadline, 'days_since_absence').toInt();
+    final remainingDays = (maxDeadlineDays - daysSinceAbsence).clamp(0, 999);
+    final excuseMessage = isAbsent
+        ? (excuse.isNotEmpty
+              ? 'حالة العذر: ${_translateExcuseStatus(text(excuse, 'status'))}'
+              : (isExpired
+                    ? 'انتهت فترة تقديم العذر لهذا الغياب'
+                    : (canSubmit
+                          ? 'يمكنك تقديم عذر خلال ${remainingDays == 0 ? 'اليوم' : '$remainingDays يوم'}'
+                          : 'لا يمكن تقديم عذر لغرض تقديم عذر')))
+        : ''; // No message for present/late students
+
+    final excuseColor = excuse.isNotEmpty
+        ? AppColors.info
+        : (canSubmit
+              ? AppColors.warning
+              : (isAbsent && isExpired
+                    ? AppColors.danger
+                    : AppColors.slate400));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -771,13 +780,9 @@ class _AttendanceTile extends ConsumerWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    excuse.isEmpty
-                        ? 'لم يتم تقديم عذر لهذا اليوم'
-                        : 'العذر: ${text(excuse, 'status', fallback: '-')}',
+                    excuseMessage,
                     style: TextStyle(
-                      color: excuse.isEmpty
-                          ? AppColors.slate400
-                          : AppColors.info,
+                      color: excuseColor,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1069,7 +1074,19 @@ class _ResourceMiniTile extends StatelessWidget {
           Icons.download_for_offline_rounded,
           color: AppColors.slate300,
         ),
-        onTap: () {},
+        onTap: () async {
+          final path = text(item, 'file_path');
+          if (path.isEmpty) return;
+
+          final url = absoluteUrl(
+            path.startsWith('storage/') ? path : 'storage/$path',
+          );
+          await _downloadUrlToFile(
+            context,
+            url,
+            text(item, 'title', fallback: 'resource'),
+          );
+        },
       ),
     );
   }
@@ -1091,183 +1108,300 @@ class _StudyItemCard extends ConsumerWidget {
     final reference = asMap(item['reference']);
     final subject = asMap(reference['subject']);
     final scheduledDate = text(item, 'scheduled_date');
+    final sessionSummary = asMap(item['session_summary']);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.slate200.withValues(alpha: 0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.midnight.withValues(alpha: 0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+    return Material(
+      color: Colors.transparent,
       clipBehavior: Clip.antiAlias,
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: 6,
-              decoration: BoxDecoration(
-                color: priorityColor,
-                boxShadow: [
-                  BoxShadow(
-                    color: priorityColor.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
+      borderRadius: BorderRadius.circular(26),
+      child: InkWell(
+        onTap: id <= 0
+            ? null
+            : () => context.push(StudentStudySessionScreen.path(id)),
+        borderRadius: BorderRadius.circular(26),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(
+              color: completed
+                  ? AppColors.success.withValues(alpha: 0.24)
+                  : AppColors.slate200.withValues(alpha: 0.65),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: Checkbox(
-                            value: completed,
-                            activeColor: AppColors.success,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            onChanged: id <= 0
-                                ? null
-                                : (value) async {
-                                    await ref
-                                        .read(studentContentRepositoryProvider)
-                                        .updateStudyItem(id, {
-                                          'is_completed': value,
-                                        });
-                                    ref.invalidate(_studyProvider(tab));
-                                  },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            text(item, 'title', fallback: 'عنصر دراسي'),
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 16,
-                              decoration: completed
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                              color: completed
-                                  ? AppColors.slate400
-                                  : AppColors.midnight,
-                            ),
-                          ),
-                        ),
-                        _PriorityBadge(priority: priority),
+            boxShadow: [
+              BoxShadow(
+                color: priorityColor.withValues(alpha: 0.08),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 7,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        priorityColor,
+                        priorityColor.withValues(alpha: 0.55),
                       ],
                     ),
-                    if (text(item, 'note').isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(start: 36),
-                        child: Text(
-                          text(item, 'note'),
-                          style: TextStyle(
-                            color: AppColors.slate500,
-                            fontSize: 13,
-                            height: 1.4,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(start: 36),
-                      child: Row(
-                        children: [
-                          if (text(subject, 'name').isNotEmpty) ...[
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
+                              width: 44,
+                              height: 44,
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
+                                color: priorityColor.withValues(alpha: 0.11),
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                              child: Row(
+                              child: Icon(
+                                _studyItemIcon(text(item, 'item_type')),
+                                color: priorityColor,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(
-                                    Icons.auto_stories_rounded,
-                                    size: 12,
-                                    color: AppColors.primary,
-                                  ),
-                                  const SizedBox(width: 4),
                                   Text(
-                                    text(subject, 'name'),
-                                    style: const TextStyle(
-                                      fontSize: 10,
+                                    text(item, 'title', fallback: 'عنصر دراسي'),
+                                    style: TextStyle(
                                       fontWeight: FontWeight.w900,
-                                      color: AppColors.primary,
+                                      fontSize: 16,
+                                      decoration: completed
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                      color: completed
+                                          ? AppColors.slate400
+                                          : AppColors.midnight,
                                     ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: [
+                                      _PriorityBadge(priority: priority),
+                                      _StudyStatusPill(
+                                        completed: completed,
+                                        label: completed
+                                            ? 'مكتملة'
+                                            : text(
+                                                item,
+                                                'item_type_label',
+                                                fallback: 'تفاصيل',
+                                              ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.chevron_left_rounded,
+                              color: AppColors.slate400,
+                            ),
                           ],
-                          Icon(
-                            Icons.calendar_today_rounded,
-                            size: 14,
-                            color: AppColors.slate400,
-                          ),
-                          const SizedBox(width: 4),
+                        ),
+                        if (text(item, 'note').isNotEmpty) ...[
+                          const SizedBox(height: 12),
                           Text(
-                            dateOnly(scheduledDate),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                            text(item, 'note'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
                               color: AppColors.slate500,
+                              fontSize: 13,
+                              height: 1.45,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const Spacer(),
-                          _ActionIconButton(
-                            icon: Icons.edit_note_rounded,
-                            onPressed: id <= 0
-                                ? null
-                                : () => _showEditStudyItem(
-                                    context,
-                                    ref,
-                                    item,
-                                    tab,
-                                  ),
-                          ),
-                          const SizedBox(width: 8),
-                          _ActionIconButton(
-                            icon: Icons.delete_outline_rounded,
-                            color: AppColors.danger,
-                            onPressed: id <= 0
-                                ? null
-                                : () => _deleteStudyItem(context, ref, id, tab),
-                          ),
                         ],
-                      ),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (text(subject, 'name').isNotEmpty)
+                              _SessionMiniStat(
+                                icon: Icons.auto_stories_rounded,
+                                label: text(subject, 'name'),
+                                color: AppColors.primary,
+                              ),
+                            if (scheduledDate.isNotEmpty)
+                              _SessionMiniStat(
+                                icon: Icons.calendar_today_rounded,
+                                label: dateOnly(scheduledDate),
+                                color: AppColors.gold,
+                              ),
+                            _SessionMiniStat(
+                              icon: Icons.view_column_rounded,
+                              label:
+                                  '${text(sessionSummary, 'columns_count', fallback: '0')} أعمدة',
+                              color: AppColors.teal,
+                            ),
+                            _SessionMiniStat(
+                              icon: Icons.touch_app_rounded,
+                              label:
+                                  '${text(sessionSummary, 'total_actions', fallback: '0')} تنفيذ',
+                              color: AppColors.teal,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: id <= 0
+                                    ? null
+                                    : () => context.push(
+                                        StudentStudySessionScreen.path(id),
+                                      ),
+                                icon: const Icon(Icons.open_in_new_rounded),
+                                label: const Text(
+                                  'فتح التفاصيل',
+                                  style: TextStyle(fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _ActionIconButton(
+                              icon: Icons.edit_note_rounded,
+                              onPressed: id <= 0
+                                  ? null
+                                  : () => _showEditStudyItem(
+                                      context,
+                                      ref,
+                                      item,
+                                      tab,
+                                    ),
+                            ),
+                            const SizedBox(width: 8),
+                            _ActionIconButton(
+                              icon: Icons.delete_outline_rounded,
+                              color: AppColors.danger,
+                              onPressed: id <= 0
+                                  ? null
+                                  : () =>
+                                        _deleteStudyItem(context, ref, id, tab),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _SessionMiniStat extends StatelessWidget {
+  const _SessionMiniStat({
+    required this.icon,
+    required this.label,
+    this.color = AppColors.teal,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StudyStatusPill extends StatelessWidget {
+  const _StudyStatusPill({required this.completed, required this.label});
+
+  final bool completed;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = completed ? AppColors.success : AppColors.slate500;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            completed ? Icons.verified_rounded : Icons.open_in_new_rounded,
+            size: 12,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _studyItemIcon(String itemType) {
+  return switch (itemType) {
+    'reminder' => Icons.notifications_active_rounded,
+    'resource' => Icons.folder_copy_rounded,
+    'assignment' => Icons.assignment_turned_in_rounded,
+    _ => Icons.menu_book_rounded,
+  };
 }
 
 class _PriorityBadge extends StatelessWidget {
@@ -1443,9 +1577,17 @@ class _ScheduleCard extends StatelessWidget {
     final isLive = isTimeInRange(startTime, endTime);
 
     final subject = asMap(item['subject']);
-    final doctor = asMap(subject['doctor']).isNotEmpty
-        ? asMap(subject['doctor'])
-        : asMap(item['doctor']);
+    final doctorObj = asMap(item['doctor']).isNotEmpty
+        ? asMap(item['doctor'])
+        : asMap(subject['doctor']);
+
+    final doctorName = text(doctorObj, 'name').isNotEmpty
+        ? text(doctorObj, 'name')
+        : (item['doctor'] is String
+              ? item['doctor'].toString()
+              : (subject['doctor'] is String
+                    ? subject['doctor'].toString()
+                    : ''));
 
     final creator = asMap(item['creator']);
     final isOfficial = creator.isNotEmpty;
@@ -1569,15 +1711,17 @@ class _ScheduleCard extends StatelessWidget {
                     const SizedBox(height: 14),
                     _IconInfo(
                       icon: Icons.account_circle_rounded,
-                      text: text(
-                        doctor,
-                        'name',
-                        fallback: text(
-                          item,
-                          'doctor_name',
-                          fallback: 'دكتور غير محدد',
-                        ),
-                      ),
+                      text: doctorName.isNotEmpty
+                          ? doctorName
+                          : text(
+                              item,
+                              'doctor_name',
+                              fallback: text(
+                                subject,
+                                'doctor_name',
+                                fallback: 'دكتور غير محدد',
+                              ),
+                            ),
                       color: AppColors.slate600,
                     ),
                     const SizedBox(height: 6),
@@ -1797,13 +1941,7 @@ class _NewsCard extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  text(
-                                    item,
-                                    'created_at_human',
-                                    fallback: dateOnly(
-                                      text(item, 'created_at'),
-                                    ),
-                                  ),
+                                  timeAgo(text(item, 'created_at')),
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
                                         color: AppColors.slate500,
@@ -1843,13 +1981,7 @@ class _NewsCard extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  text(
-                                    item,
-                                    'created_at_human',
-                                    fallback: dateOnly(
-                                      text(item, 'created_at'),
-                                    ),
-                                  ),
+                                  timeAgo(text(item, 'created_at')),
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(color: AppColors.slate500),
                                 ),
@@ -1891,82 +2023,86 @@ class _NewsSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 32,
-            child: Column(
-              children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: AppColors.slate200,
-                    shape: BoxShape.circle,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 32,
+              child: Column(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: AppColors.slate200,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: Container(width: 2, color: AppColors.slate100),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Container(
+                height: 140,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppColors.slate100),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 60,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: AppColors.slate100,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            width: 80,
+                            height: 16,
+                            color: AppColors.ghostWhite,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: AppColors.slate100,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 200,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: AppColors.ghostWhite,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Expanded(child: Container(width: 2, color: AppColors.slate100)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Container(
-              height: 140,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.slate100),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: AppColors.slate100,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          width: 80,
-                          height: 16,
-                          color: AppColors.ghostWhite,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: AppColors.slate100,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: 200,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: AppColors.ghostWhite,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -2103,117 +2239,281 @@ class _QuizTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = const Color(0xFF7C3AED);
-    final subjectName = text(quiz, 'subject_name', fallback: 'مقرر دراسي');
+    final isCompetition = boolValue(quiz, 'is_competition');
+    final isAdmin = text(quiz, 'creator_type') == 'admin';
+    final isUpcoming = boolValue(quiz, 'is_upcoming');
+    final isAttempted = boolValue(quiz, 'is_attempted');
     final title = text(quiz, 'title', fallback: 'كويز');
+    final subjectName = text(
+      quiz,
+      'subject_name',
+      fallback: isAdmin ? 'الإدارة المركزية' : 'مقرر دراسي',
+    );
+    final creatorName = text(
+      quiz,
+      'creator_name',
+      fallback: isAdmin ? 'الإدارة' : 'دكتور',
+    );
     final questionsCount = number(quiz, 'questions_count').toInt();
+    final durationMin = number(quiz, 'duration_minutes').toInt();
+    final modelsCount = number(quiz, 'models_count').toInt();
+    final statusLabel = text(quiz, 'status_label', fallback: 'منشور');
+    final closesAt = text(quiz, 'closes_at');
+    final startsAt = text(quiz, 'starts_at');
+    final showCountdown = boolValue(quiz, 'show_countdown');
+    final attemptId = number(quiz, 'attempt_id').toInt();
+
+    final Color bannerColor = isAdmin
+        ? const Color(0xFF2563EB)
+        : isCompetition
+        ? const Color(0xFFF59E0B)
+        : const Color(0xFF059669);
+    final Color cardBg = isAdmin ? const Color(0xFFF0F9FF) : Colors.white;
+    final Color borderColor = isAdmin
+        ? const Color(0xFFBAE6FD)
+        : AppColors.slate100;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.slate100),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.04),
-            blurRadius: 10,
+            color: bannerColor.withValues(alpha: 0.06),
+            blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: InkWell(
-        onTap: () => _handleStart(context),
-        borderRadius: BorderRadius.circular(24),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(Icons.quiz_rounded, color: color, size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
-                            color: AppColors.midnight,
-                          ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(height: 5, color: bannerColor),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    if (isCompetition)
+                      _QuizBadge(
+                        label: 'مسابقة',
+                        icon: Icons.emoji_events_rounded,
+                        color: const Color(0xFF92400E),
+                        bg: const Color(0xFFFEF3C7),
+                      ),
+                    if (isAdmin)
+                      _QuizBadge(
+                        label: 'إدارة النظام',
+                        icon: Icons.shield_rounded,
+                        color: Colors.white,
+                        bg: const Color(0xFF0369A1),
+                      ),
+                    if (isUpcoming)
+                      _QuizBadge(
+                        label: 'قادماً',
+                        icon: Icons.schedule_rounded,
+                        color: const Color(0xFF92400E),
+                        bg: const Color(0xFFFFFBEB),
+                      ),
+                    if (isAttempted)
+                      _QuizBadge(
+                        label: 'مكتمل',
+                        icon: Icons.check_circle_rounded,
+                        color: const Color(0xFF3730A3),
+                        bg: const Color(0xFFE0E7FF),
+                      ),
+                    if (!isUpcoming && !isAttempted)
+                      _QuizBadge(
+                        label: statusLabel,
+                        icon: Icons.circle,
+                        color: Colors.white,
+                        bg: bannerColor,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                          color: AppColors.midnight,
                         ),
-                        Text(
-                          subjectName,
-                          style: TextStyle(
-                            color: AppColors.slate500,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
+                    if (isAdmin)
+                      const Icon(
+                        Icons.verified_rounded,
+                        color: Color(0xFF2563EB),
+                        size: 18,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isAdmin ? 'الإدارة المركزية' : '$creatorName — $subjectName',
+                  style: const TextStyle(
+                    color: AppColors.slate500,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
-                  const Icon(
-                    Icons.play_circle_filled_rounded,
-                    color: AppColors.royalBlue,
-                    size: 32,
+                ),
+                const SizedBox(height: 12),
+                if (showCountdown && isUpcoming && startsAt.isNotEmpty)
+                  _CardCountdown(targetDate: startsAt, label: 'يبدأ خلال:'),
+                if (showCountdown &&
+                    !isUpcoming &&
+                    !isAttempted &&
+                    closesAt.isNotEmpty)
+                  _CardCountdown(
+                    targetDate: closesAt,
+                    label: 'ينتهي خلال:',
+                    isDanger: true,
                   ),
-                ],
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 14),
-                child: Divider(height: 1),
-              ),
-              Row(
-                children: [
-                  _InfoTag(
-                    icon: Icons.help_outline_rounded,
-                    label: '$questionsCount سؤال',
-                  ),
-                  const SizedBox(width: 12),
-                  _InfoTag(
-                    icon: Icons.timer_outlined,
-                    label: '${number(quiz, 'duration_minutes').toInt()} دقيقة',
-                  ),
-                  const Spacer(),
-                  Text(
-                    dateOnly(text(quiz, 'starts_at')),
-                    style: const TextStyle(
-                      color: AppColors.slate400,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    if (questionsCount > 0)
+                      _InfoTag(
+                        icon: Icons.help_outline_rounded,
+                        label: '$questionsCount سؤال',
+                      ),
+                    if (durationMin > 0)
+                      _InfoTag(
+                        icon: Icons.timer_outlined,
+                        label: '$durationMin دقيقة',
+                      ),
+                    if (modelsCount > 0)
+                      _InfoTag(
+                        icon: Icons.layers_outlined,
+                        label: '$modelsCount نموذج',
+                      ),
+                    if (closesAt.isNotEmpty)
+                      _InfoTag(
+                        icon: Icons.event_busy_rounded,
+                        label: 'ينتهي ${dateTime(closesAt)}',
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.slate50,
+              border: Border(top: BorderSide(color: AppColors.slate100)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isUpcoming && startsAt.isNotEmpty
+                      ? 'يبدأ في ${timeOnly(startsAt)}'
+                      : timeAgo(text(quiz, 'created_at')),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.slate400,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                _buildActionBtn(
+                  context,
+                  isUpcoming,
+                  isAttempted,
+                  attemptId,
+                  bannerColor,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildActionBtn(
+    BuildContext context,
+    bool isUpcoming,
+    bool isAttempted,
+    int attemptId,
+    Color bannerColor,
+  ) {
+    if (isAttempted && attemptId > 0) {
+      return FilledButton.icon(
+        onPressed: () =>
+            context.push(StudentQuizzesScreen.resultPath(attemptId)),
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFF4338CA),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+        ),
+        icon: const Icon(Icons.visibility_rounded, size: 16),
+        label: const Text('النتيجة'),
+      );
+    }
+    if (isUpcoming) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.slate100,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_rounded, size: 14, color: AppColors.slate400),
+            SizedBox(width: 4),
+            Text(
+              'غير متاح',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.slate400,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return FilledButton.icon(
+      onPressed: () => _handleStart(context),
+      style: FilledButton.styleFrom(
+        backgroundColor: bannerColor,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+      ),
+      icon: const Icon(Icons.play_arrow_rounded, size: 16),
+      label: const Text('ابدأ'),
     );
   }
 
   Future<void> _handleStart(BuildContext context) async {
     final id = number(quiz, 'id').toInt();
     if (id <= 0) return;
+
     String? code;
-    if (boolValue(quiz, 'requires_access_code') ||
-        boolValue(quiz, 'has_access_code')) {
+    if (boolValue(quiz, 'requires_access_code')) {
       code = await _askAccessCode(context);
       if (code == null || code.isEmpty) return;
     }
+
     if (!context.mounted) return;
     final path = StudentQuizzesScreen.takePath(id);
     context.push(
@@ -2238,17 +2538,19 @@ class _QuizTile extends StatelessWidget {
           children: [
             const Text(
               'هذا الكويز يحتاج إلى كود دخول. أدخل الكود ثم تابع.',
-              style: TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 20),
             TextFormField(
               controller: controller,
+              autofocus: true,
               validator: (value) => value == null || value.trim().isEmpty
                   ? 'أدخل كود الكويز أولاً.'
                   : null,
               decoration: const InputDecoration(
                 labelText: 'كود الكويز',
                 prefixIcon: Icon(Icons.key_rounded),
+                hintText: 'مثال: 123456',
               ),
             ),
             const SizedBox(height: 24),
@@ -2259,11 +2561,14 @@ class _QuizTile extends StatelessWidget {
               },
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               icon: const Icon(Icons.play_arrow_rounded),
               label: const Text(
                 'بدء الاختبار الآن',
-                style: TextStyle(fontWeight: FontWeight.w900),
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
               ),
             ),
           ],
@@ -2279,9 +2584,22 @@ class _AttemptTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final quiz = asMap(attempt['quiz']);
+    final quizTitle = text(
+      attempt,
+      'quiz_title',
+      fallback: text(asMap(attempt['quiz']), 'title', fallback: 'كويز'),
+    );
+    final subjectName = text(attempt, 'subject_name', fallback: '');
+    final modelName = text(attempt, 'model_name', fallback: '');
     final score = number(attempt, 'score').toDouble();
-    final color = score >= 50 ? AppColors.success : AppColors.danger;
+    final maxScore = number(attempt, 'max_score').toDouble();
+    final pct = number(attempt, 'percentage').toDouble();
+    final Color barColor = pct >= 70
+        ? AppColors.success
+        : pct >= 50
+        ? const Color(0xFFF59E0B)
+        : AppColors.danger;
+    final id = number(attempt, 'id').toInt();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -2292,81 +2610,142 @@ class _AttemptTile extends StatelessWidget {
       ),
       child: InkWell(
         onTap: () {
-          final id = number(attempt, 'id').toInt();
           if (id > 0) context.push(StudentQuizzesScreen.resultPath(id));
         },
         borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  score >= 50
-                      ? Icons.check_circle_rounded
-                      : Icons.cancel_rounded,
-                  color: color,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      text(
-                        quiz,
-                        'title',
-                        fallback: text(attempt, 'quiz_title'),
-                      ),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14,
-                        color: AppColors.midnight,
-                      ),
-                    ),
-                    Text(
-                      dateOnly(text(attempt, 'submitted_at')),
-                      style: const TextStyle(
-                        color: AppColors.slate400,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              Row(
                 children: [
-                  Text(
-                    '${score.toInt()}%',
-                    style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: barColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      pct >= 50
+                          ? Icons.check_circle_rounded
+                          : Icons.cancel_rounded,
+                      color: barColor,
+                      size: 22,
                     ),
                   ),
-                  const Text(
-                    'النتيجة',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.slate400,
-                      fontWeight: FontWeight.w700,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          quizTitle,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14,
+                            color: AppColors.midnight,
+                          ),
+                        ),
+                        Text(
+                          [
+                            if (subjectName.isNotEmpty) subjectName,
+                            if (modelName.isNotEmpty) 'نموذج: $modelName',
+                          ].join(' — '),
+                          style: const TextStyle(
+                            color: AppColors.slate400,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${score.toStringAsFixed(0)}/${maxScore.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          color: barColor,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                        ),
+                      ),
+                      Text(
+                        '${pct.toStringAsFixed(0)}%',
+                        style: const TextStyle(
+                          color: AppColors.slate400,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: LinearProgressIndicator(
+                  value: pct / 100,
+                  minHeight: 6,
+                  backgroundColor: AppColors.slate100,
+                  valueColor: AlwaysStoppedAnimation(barColor),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                dateOnly(text(attempt, 'submitted_at')),
+                style: const TextStyle(
+                  color: AppColors.slate400,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _QuizBadge extends StatelessWidget {
+  const _QuizBadge({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.bg,
+  });
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Color bg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3907,4 +4286,98 @@ class _QuickFilterChip extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CardCountdown extends StatefulWidget {
+  const _CardCountdown({
+    required this.targetDate,
+    required this.label,
+    this.isDanger = false,
+  });
+  final String targetDate;
+  final String label;
+  final bool isDanger;
+
+  @override
+  State<_CardCountdown> createState() => _CardCountdownState();
+}
+
+class _CardCountdownState extends State<_CardCountdown> {
+  late DateTime _target;
+  late Stream<Duration> _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _target = DateTime.tryParse(widget.targetDate) ?? DateTime.now();
+    _ticker = Stream.periodic(const Duration(seconds: 1), (_) {
+      return _target.difference(DateTime.now());
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Duration>(
+      stream: _ticker,
+      builder: (context, snapshot) {
+        final diff = snapshot.data ?? _target.difference(DateTime.now());
+        if (diff.isNegative) return const SizedBox.shrink();
+
+        final hours = diff.inHours.toString().padLeft(2, '0');
+        final minutes = (diff.inMinutes % 60).toString().padLeft(2, '0');
+        final seconds = (diff.inSeconds % 60).toString().padLeft(2, '0');
+
+        final color = widget.isDanger
+            ? AppColors.danger
+            : const Color(0xFFF59E0B);
+        final bg = widget.isDanger
+            ? const Color(0xFFFEF2F2)
+            : const Color(0xFFFFF7ED);
+        final border = widget.isDanger
+            ? const Color(0xFFFEE2E2)
+            : const Color(0xFFFFEDD5);
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: border),
+          ),
+          child: Column(
+            children: [
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: color.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$hours:$minutes:$seconds',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: color,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+String _translateExcuseStatus(String status) {
+  return switch (status.toLowerCase()) {
+    'pending' => 'قيد المراجعة',
+    'accepted' || 'approved' => 'مقبول',
+    'rejected' => 'مرفوض',
+    _ => status,
+  };
 }

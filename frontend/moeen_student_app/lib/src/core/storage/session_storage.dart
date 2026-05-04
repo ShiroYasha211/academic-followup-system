@@ -13,6 +13,7 @@ class SessionStorage {
   static const _nameKey = 'name';
   static const _emailKey = 'email';
   static const _practicalKey = 'is_practical_delegate';
+  static const _clinicalKey = 'has_clinical';
 
   Future<void> save(AuthSession session) async {
     await Future.wait([
@@ -25,6 +26,7 @@ class SessionStorage {
         key: _practicalKey,
         value: session.isPracticalDelegate ? '1' : '0',
       ),
+      _storage.write(key: _clinicalKey, value: session.hasClinical ? '1' : '0'),
     ]);
   }
 
@@ -35,6 +37,7 @@ class SessionStorage {
     final name = await _storage.read(key: _nameKey);
     final email = await _storage.read(key: _emailKey);
     final isPractical = await _storage.read(key: _practicalKey);
+    final hasClinical = await _storage.read(key: _clinicalKey);
 
     if ([
       token,
@@ -55,6 +58,7 @@ class SessionStorage {
       name: name!,
       email: email,
       isPracticalDelegate: isPractical == '1',
+      hasClinical: hasClinical == '1',
     );
   }
 

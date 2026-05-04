@@ -58,11 +58,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/student/subjects/:id',
         builder: (context, state) => StudentSubjectDetailsScreen(
           subjectId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+          initialTabIndex: state.uri.queryParameters['tab'] == 'attendance'
+              ? 5
+              : 0,
         ),
       ),
       GoRoute(
         path: StudentStudyCenterScreen.route,
         builder: (context, state) => const StudentStudyCenterScreen(),
+      ),
+      GoRoute(
+        path: '/student/study-center/:id/session',
+        builder: (context, state) => StudentStudySessionScreen(
+          itemId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        ),
       ),
       GoRoute(
         path: StudentScheduleScreen.route,
@@ -128,6 +137,38 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: StudentProfileScreen.route,
         builder: (context, state) => const StudentProfileScreen(),
+      ),
+      GoRoute(
+        path: StudentClinicalScreen.route,
+        builder: (context, state) => const StudentClinicalScreen(),
+      ),
+      GoRoute(
+        path: StudentClinicalLogbookScreen.route,
+        builder: (context, state) => const StudentClinicalLogbookScreen(),
+      ),
+      GoRoute(
+        path: StudentClinicalEvaluationsScreen.route,
+        builder: (context, state) => const StudentClinicalEvaluationsScreen(),
+      ),
+      GoRoute(
+        path: StudentClinicalMockExamsScreen.route,
+        builder: (context, state) => const StudentClinicalMockExamsScreen(),
+      ),
+      GoRoute(
+        path: '/student/clinical/mock-exams/:id/take',
+        builder: (context, state) => StudentClinicalMockTakeScreen(
+          checklistId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: '/student/clinical/mock-exams/results/:id',
+        builder: (context, state) => StudentClinicalMockResultScreen(
+          evaluationId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: StudentClinicalRareCasesScreen.route,
+        builder: (context, state) => const StudentClinicalRareCasesScreen(),
       ),
       GoRoute(
         path: StudentAssignmentsScreen.route,

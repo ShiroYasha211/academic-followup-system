@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import '../../../../shared/widgets/moeen_logo.dart';
 import '../../../auth/data/auth_session.dart';
 import '../../../auth/logic/auth_controller.dart';
 import '../../../auth/presentation/login_screen.dart';
+import '../../../delegate/presentation/widgets/delegate_shell.dart';
 import '../../../practical_delegate/presentation/practical_delegate_screens.dart';
 import '../../data/student_repositories.dart';
 import '../../logic/student_controllers.dart';
@@ -32,7 +34,25 @@ final studentUnreadNotificationsCountProvider = FutureProvider.autoDispose<int>(
   },
 );
 
-class StudentShell extends ConsumerWidget {
+final studentUnreadMessagesCountProvider = FutureProvider.autoDispose<int>((
+  ref,
+) async {
+  final data = await ref.watch(studentContentRepositoryProvider).messages();
+  final value = data['unread_count'] ?? data['count'] ?? data['total'] ?? 0;
+  if (value is num) return value.toInt();
+  final parsed = int.tryParse(value.toString());
+  if (parsed != null) return parsed;
+  final conversations = data['conversations'];
+  if (conversations is! List) return 0;
+  return conversations.fold<int>(0, (sum, item) {
+    if (item is! Map) return sum;
+    final unread = item['unread_count'] ?? 0;
+    if (unread is num) return sum + unread.toInt();
+    return sum + (int.tryParse(unread.toString()) ?? 0);
+  });
+});
+
+class StudentShell extends ConsumerStatefulWidget {
   const StudentShell({
     super.key,
     required this.currentIndex,
@@ -47,7 +67,44 @@ class StudentShell extends ConsumerWidget {
   final Widget? floatingActionButton;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StudentShell> createState() => _StudentShellState();
+}
+
+class _StudentShellState extends ConsumerState<StudentShell>
+    with WidgetsBindingObserver {
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _refreshBadges(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshBadges();
+    }
+  }
+
+  void _refreshBadges() {
+    ref.invalidate(studentUnreadNotificationsCountProvider);
+    ref.invalidate(studentUnreadMessagesCountProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final session = ref.watch(authControllerProvider).valueOrNull;
     final unreadNotifications =
         ref.watch(studentUnreadNotificationsCountProvider).valueOrNull ?? 0;
@@ -60,7 +117,7 @@ class StudentShell extends ConsumerWidget {
           context.pop();
           return;
         }
-        if (currentIndex != 0) {
+        if (widget.currentIndex != 0) {
           context.go(StudentDashboardScreen.route);
           return;
         }
@@ -78,13 +135,13 @@ class StudentShell extends ConsumerWidget {
         extendBodyBehindAppBar: true,
         backgroundColor: AppColors.cream,
         appBar: _PremiumAppBar(
-          title: title,
+          title: widget.title,
           session: session,
           unreadNotifications: unreadNotifications,
         ),
-        body: SafeArea(bottom: false, child: child),
-        floatingActionButton: floatingActionButton,
-        drawer: _StudentDrawer(currentIndex: currentIndex),
+        body: SafeArea(bottom: false, child: widget.child),
+        floatingActionButton: widget.floatingActionButton,
+        drawer: _StudentDrawer(currentIndex: widget.currentIndex),
       ),
     );
   }
@@ -272,8 +329,16 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
     final session = ref.watch(authControllerProvider).valueOrNull;
     final subscription = ref.watch(subscriptionControllerProvider).valueOrNull;
     final isSubscribed = subscription?.isSubscribed == true;
+    final dashboardClinical = ref
+        .watch(studentDashboardControllerProvider)
+        .valueOrNull
+        ?.overview
+        .hasClinical;
+    final hasClinical = dashboardClinical ?? session?.hasClinical == true;
     final unreadNotifications =
         ref.watch(studentUnreadNotificationsCountProvider).valueOrNull ?? 0;
+    final unreadMessages =
+        ref.watch(studentUnreadMessagesCountProvider).valueOrNull ?? 0;
 
     final groups = [
       _DrawerGroup('القائمة الرئيسية', [
@@ -379,6 +444,14 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           StudentLibraryScreen.route,
           true,
         ),
+        if (hasClinical)
+          _DrawerItem(
+            'القسم العملي والسريري',
+            Icons.local_hospital_rounded,
+            34,
+            StudentClinicalScreen.route,
+            true,
+          ),
       ]),
       _DrawerGroup('التواصل والدعم', [
         _DrawerItem(
@@ -525,6 +598,16 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
                     vertical: 12,
                   ),
                   children: [
+                    if (session?.canAccessDelegateWorkspace == true) ...[
+                      _WorkspaceSwitchTile(
+                        label: 'الانتقال إلى لوحة المندوب',
+                        subtitle: 'إدارة الدفعة والمهام من نفس الحساب',
+                        icon: Icons.admin_panel_settings_rounded,
+                        color: AppColors.teal,
+                        onTap: () => _switchToDelegate(context, ref),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     for (final group in groups) ...[
                       _DrawerGroupHeader(group.label),
                       for (final item in group.items)
@@ -535,7 +618,9 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
                           badgeCount:
                               item.route == StudentNotificationsScreen.route
                               ? unreadNotifications
-                              : 0,
+                              : (item.route == StudentMessagesScreen.route
+                                    ? unreadMessages
+                                    : 0),
                           onTap: () => _go(item),
                         ),
                       const SizedBox(height: 12),
@@ -650,6 +735,76 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
       context.go(StudentPlaceholderScreen.path(item.route));
     }
   }
+
+  Future<void> _switchToDelegate(BuildContext context, WidgetRef ref) async {
+    final router = GoRouter.of(context);
+    await ref
+        .read(authControllerProvider.notifier)
+        .switchWorkspace(AuthWorkspace.delegate);
+    if (mounted) Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      router.go(DelegateRoutes.dashboard);
+    });
+  }
+}
+
+class _WorkspaceSwitchTile extends StatelessWidget {
+  const _WorkspaceSwitchTile({
+    required this.label,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color.withValues(alpha: 0.12), AppColors.gold.withValues(alpha: 0.12)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: ListTile(
+        onTap: onTap,
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.midnight,
+            fontWeight: FontWeight.w900,
+            fontSize: 14,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(
+            color: AppColors.slate500,
+            fontWeight: FontWeight.w700,
+            fontSize: 11,
+          ),
+        ),
+        trailing: const Icon(Icons.swap_horiz_rounded, color: AppColors.slate400),
+      ),
+    );
+  }
 }
 
 class _SubscriptionBadge extends StatelessWidget {
@@ -683,7 +838,7 @@ class _SubscriptionBadge extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            isSubscribed ? 'مميز' : 'أساسي',
+            isSubscribed ? 'مشترك' : 'أساسي',
             style: TextStyle(
               color: isSubscribed ? AppColors.gold : Colors.white,
               fontWeight: FontWeight.w900,

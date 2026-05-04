@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 
 abstract final class MoeenBrandAssets {
-  static const full = 'assets/brand/moeen_logo_full.png';
-  static const mark = 'assets/brand/moeen_logo_mark.png';
-  static const icon = 'assets/brand/moeen_logo_icon.png';
+  static const full = 'assets/brand/logo.jpeg';
+  static const mark = 'assets/brand/logo.jpeg';
+  static const icon = 'assets/brand/logo.jpeg';
 }
 
 class MoeenLogo extends StatelessWidget {

@@ -12,6 +12,7 @@ import '../../../../shared/widgets/moeen_logo.dart';
 import '../../../auth/data/auth_session.dart';
 import '../../../auth/logic/auth_controller.dart';
 import '../../../auth/presentation/login_screen.dart';
+import '../../../student/presentation/student_dashboard_screen.dart';
 import '../../data/delegate_repositories.dart';
 import '../../logic/delegate_controllers.dart';
 
@@ -232,17 +233,7 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
                   20,
                   24,
                 ),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                    colors: [
-                      AppColors.royalBlueDark,
-                      AppColors.royalBlue,
-                      AppColors.teal,
-                    ],
-                  ),
-                ),
+                decoration: BoxDecoration(gradient: AppColors.primaryGradient),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -251,8 +242,11 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.16),
+                            color: Colors.white.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.1),
+                            ),
                           ),
                           child: const MoeenLogo(compact: true, onDark: true),
                         ),
@@ -267,14 +261,15 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
                         color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
                       ),
                     ),
                     Text(
                       session?.email ?? 'إدارة الدفعة والتواصل الأكاديمي',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.72),
+                        color: Colors.white.withValues(alpha: 0.7),
                         fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -287,6 +282,16 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
                     vertical: 12,
                   ),
                   children: [
+                    if (session?.canAccessStudentWorkspace == true) ...[
+                      _WorkspaceSwitchTile(
+                        label: 'الانتقال إلى حساب الطالب',
+                        subtitle: 'عرض المقررات والدرجات ومركز الدراسة',
+                        icon: Icons.school_rounded,
+                        color: AppColors.royalBlue,
+                        onTap: () => _switchToStudent(context, ref),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     for (final group in groups) ...[
                       _DrawerGroupHeader(group.label),
                       for (final item in group.items)
@@ -302,21 +307,46 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
                       const SizedBox(height: 12),
                     ],
                     const Divider(height: 32, indent: 20, endIndent: 20),
+                    // Logout Item
                     ListTile(
                       onTap: () => _confirmLogout(context, ref),
-                      leading: const Icon(
-                        Icons.logout_rounded,
-                        color: AppColors.danger,
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.logout_rounded,
+                          color: AppColors.danger,
+                          size: 20,
+                        ),
                       ),
                       title: const Text(
                         'تسجيل الخروج',
                         style: TextStyle(
                           color: AppColors.danger,
                           fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_left_rounded,
+                        color: AppColors.slate300,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Center(
+                      child: Text(
+                        'نسخة التطبيق 1.2.0',
+                        style: TextStyle(
+                          color: AppColors.slate400,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 36),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -337,7 +367,7 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
   }
 
   List<_DrawerGroup> _groups() => const [
-    _DrawerGroup('عام', [
+    _DrawerGroup('القائمة الرئيسية', [
       _DrawerItem(
         'الرئيسية',
         Icons.dashboard_rounded,
@@ -345,22 +375,31 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
         DelegateRoutes.dashboard,
         false,
       ),
+    ]),
+    _DrawerGroup('إدارة الحساب', [
       _DrawerItem(
-        'أخبار الدفعة',
-        Icons.newspaper_rounded,
-        1,
-        DelegateRoutes.news,
-        true,
+        'الملف الشخصي',
+        Icons.person_rounded,
+        22,
+        DelegateRoutes.profile,
+        false,
       ),
       _DrawerItem(
-        'التنبيهات',
-        Icons.notifications_active_rounded,
-        2,
-        DelegateRoutes.notifications,
-        true,
+        'الاشتراك والرصيد',
+        Icons.workspace_premium_rounded,
+        20,
+        DelegateRoutes.subscription,
+        false,
+      ),
+      _DrawerItem(
+        'كشف الحساب',
+        Icons.receipt_long_rounded,
+        21,
+        DelegateRoutes.ledger,
+        false,
       ),
     ]),
-    _DrawerGroup('إدارة الدفعة', [
+    _DrawerGroup('إدارة الدفعة والمهام', [
       _DrawerItem(
         'الطلاب',
         Icons.groups_rounded,
@@ -389,10 +428,8 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
         DelegateRoutes.exams,
         true,
       ),
-    ]),
-    _DrawerGroup('الدراسة والمحتوى', [
       _DrawerItem(
-        'التكاليف',
+        'التكاليف والواجبات',
         Icons.assignment_turned_in_rounded,
         7,
         DelegateRoutes.assignments,
@@ -406,14 +443,14 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
         true,
       ),
       _DrawerItem(
-        'استيراد من المكتبة',
+        'المكتبة المشتركة',
         Icons.library_add_rounded,
         9,
         DelegateRoutes.libraryImport,
         true,
       ),
       _DrawerItem(
-        'التذكيرات',
+        'الجدول الزمني الذكي',
         Icons.event_note_rounded,
         10,
         DelegateRoutes.reminders,
@@ -464,7 +501,21 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
         true,
       ),
     ]),
-    _DrawerGroup('التواصل', [
+    _DrawerGroup('التواصل والتنبيهات', [
+      _DrawerItem(
+        'أخبار الدفعة',
+        Icons.newspaper_rounded,
+        1,
+        DelegateRoutes.news,
+        true,
+      ),
+      _DrawerItem(
+        'التنبيهات',
+        Icons.notifications_active_rounded,
+        2,
+        DelegateRoutes.notifications,
+        true,
+      ),
       _DrawerItem(
         'رسائل الطلاب',
         Icons.forum_rounded,
@@ -485,29 +536,6 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
         19,
         DelegateRoutes.inquiries,
         true,
-      ),
-    ]),
-    _DrawerGroup('الحساب', [
-      _DrawerItem(
-        'الاشتراك والرصيد',
-        Icons.workspace_premium_rounded,
-        20,
-        DelegateRoutes.subscription,
-        false,
-      ),
-      _DrawerItem(
-        'كشف الحساب',
-        Icons.receipt_long_rounded,
-        21,
-        DelegateRoutes.ledger,
-        false,
-      ),
-      _DrawerItem(
-        'صفحتي',
-        Icons.person_rounded,
-        22,
-        DelegateRoutes.profile,
-        false,
       ),
     ]),
   ];
@@ -553,6 +581,82 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
     } finally {
       if (mounted) setState(() => _checkingSubscription = false);
     }
+  }
+
+  Future<void> _switchToStudent(BuildContext context, WidgetRef ref) async {
+    final router = GoRouter.of(context);
+    await ref
+        .read(authControllerProvider.notifier)
+        .switchWorkspace(AuthWorkspace.student);
+    if (mounted) Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      router.go(StudentDashboardScreen.route);
+    });
+  }
+}
+
+class _WorkspaceSwitchTile extends StatelessWidget {
+  const _WorkspaceSwitchTile({
+    required this.label,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.12),
+            AppColors.gold.withValues(alpha: 0.12),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: ListTile(
+        onTap: onTap,
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.midnight,
+            fontWeight: FontWeight.w900,
+            fontSize: 14,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(
+            color: AppColors.slate500,
+            fontWeight: FontWeight.w700,
+            fontSize: 11,
+          ),
+        ),
+        trailing: const Icon(
+          Icons.swap_horiz_rounded,
+          color: AppColors.slate400,
+        ),
+      ),
+    );
   }
 }
 

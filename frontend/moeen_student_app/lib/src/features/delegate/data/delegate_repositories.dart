@@ -71,9 +71,32 @@ class DelegateRepository {
     return (response['message'] ?? 'تم تسجيل التصويت.').toString();
   }
 
-  Future<Map<String, dynamic>> students({int page = 1}) async => _data(
-    await _api.get('/delegate/students', queryParameters: {'page': page}),
+  Future<Map<String, dynamic>> students({
+    int page = 1,
+    String? query,
+    bool all = false,
+  }) async => _data(
+    await _api.get(
+      '/delegate/students',
+      queryParameters: {
+        'page': page,
+        if (query != null) 'query': query,
+        if (all) 'all': 1,
+      },
+    ),
   );
+
+  String get studentTemplateUrl => '${_api.baseUrl}/delegate/students/template';
+
+  Future<List<int>> downloadTemplate() async =>
+      await _api.getBytesFromUrl(studentTemplateUrl);
+
+  Future<Map<String, dynamic>> importStudents(String filePath) async {
+    final formData = FormData.fromMap({
+      'csv_file': await MultipartFile.fromFile(filePath, filename: 'students.csv'),
+    });
+    return _data(await _api.post('/delegate/students/import', data: formData));
+  }
 
   Future<String> createStudent(Map<String, dynamic> data) async {
     final response = await _api.post('/delegate/students', data: data);
@@ -227,15 +250,42 @@ class DelegateRepository {
     return (response['message'] ?? 'تم رفع الملف.').toString();
   }
 
+  Future<String> updateResource({
+    required int id,
+    required int subjectId,
+    required String title,
+    required String category,
+    String? description,
+  }) async {
+    final response = await _api.put(
+      '/delegate/resources/$id',
+      data: {
+        'subject_id': subjectId,
+        'title': title,
+        'category': category,
+        if (description != null) 'description': description,
+      },
+    );
+    return (response['message'] ?? 'تم تحديث بيانات الملف.').toString();
+  }
+
   Future<String> deleteResource(int id) async {
     final response = await _api.delete('/delegate/resources/$id');
     return (response['message'] ?? 'تم حذف الملف.').toString();
   }
 
-  Future<List<dynamic>> searchLibrary(String query) async {
+  Future<List<dynamic>> searchLibrary({
+    String? query,
+    String? category,
+    int? subjectId,
+  }) async {
     final response = await _api.get(
       '/delegate/resources/library/search',
-      queryParameters: {'q': query},
+      queryParameters: {
+        if (query != null && query.isNotEmpty) 'q': query,
+        if (category != null && category != 'all') 'category': category,
+        if (subjectId != null && subjectId > 0) 'subject_id': subjectId,
+      },
     );
     return _list(response);
   }

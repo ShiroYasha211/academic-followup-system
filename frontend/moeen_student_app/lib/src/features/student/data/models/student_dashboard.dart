@@ -130,17 +130,23 @@ class DeprivationWarning {
 
 class ExcuseDeadlineWarning {
   const ExcuseDeadlineWarning({
+    required this.attendanceId,
+    required this.subjectId,
     required this.date,
     required this.subject,
     required this.message,
   });
 
+  final int attendanceId;
+  final int subjectId;
   final String date;
   final String subject;
   final String message;
 
   factory ExcuseDeadlineWarning.fromJson(Map<String, dynamic> json) {
     return ExcuseDeadlineWarning(
+      attendanceId: _int(json['attendance_id']),
+      subjectId: _int(json['subject_id']),
       date: (json['date'] ?? '').toString(),
       subject: (json['subject'] ?? '').toString(),
       message: (json['message'] ?? '').toString(),

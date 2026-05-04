@@ -25,6 +25,7 @@ Future<void> _showEditStudyItem(
       ].contains(text(item, 'status'))
       ? text(item, 'status')
       : 'pending';
+  final reminderDraft = _ReminderScheduleDraft.fromItem(item);
 
   final ok = await showMoeenBottomSheet<bool>(
     context: context,
@@ -134,6 +135,13 @@ Future<void> _showEditStudyItem(
               ],
             ),
             const SizedBox(height: 12),
+            _ReminderScheduleFields(
+              draft: reminderDraft,
+              color: _studyTabColor(tab),
+              selectedDate: selectedDate,
+              setDialogState: setDialogState,
+            ),
+            const SizedBox(height: 12),
             TextFormField(
               controller: note,
               maxLines: 3,
@@ -180,6 +188,7 @@ Future<void> _showEditStudyItem(
           'note': note.text.trim(),
           'priority': priority,
           'status': status,
+          ...reminderDraft.toPayload(selectedDate),
         });
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -230,6 +239,313 @@ Future<void> _deleteStudyItem(
   }
 }
 
+class _ReminderScheduleDraft {
+  _ReminderScheduleDraft({
+    this.type = 'none',
+    TimeOfDay? time,
+    Set<int>? weekdays,
+    List<DateTime>? dates,
+  }) : time = time ?? const TimeOfDay(hour: 8, minute: 0),
+       weekdays = weekdays ?? <int>{},
+       dates = dates ?? <DateTime>[];
+
+  factory _ReminderScheduleDraft.fromItem(Map<String, dynamic> item) {
+    final schedule = asMap(item['reminder_schedule']);
+    var type = text(schedule, 'type', fallback: 'none');
+    var time = _parseReminderTime(text(schedule, 'time'));
+    final weekdays = asList(schedule['weekdays'])
+        .map((day) => int.tryParse(day.toString()))
+        .whereType<int>()
+        .where((day) => day >= 0 && day <= 6)
+        .toSet();
+    final dates = asList(schedule['dates'])
+        .map((date) => DateTime.tryParse(date.toString()))
+        .whereType<DateTime>()
+        .toList();
+
+    final legacyReminderAt = DateTime.tryParse(text(item, 'reminder_at'));
+    if ((type.isEmpty || type == 'none') && legacyReminderAt != null) {
+      type = 'dates';
+      time = TimeOfDay(hour: legacyReminderAt.hour, minute: legacyReminderAt.minute);
+      dates.add(legacyReminderAt);
+    }
+
+    return _ReminderScheduleDraft(
+      type: ['none', 'daily', 'weekly', 'weekdays', 'dates'].contains(type)
+          ? type
+          : 'none',
+      time: time,
+      weekdays: weekdays,
+      dates: dates,
+    );
+  }
+
+  String type;
+  TimeOfDay time;
+  Set<int> weekdays;
+  List<DateTime> dates;
+
+  Map<String, dynamic> toPayload(DateTime? selectedDate) {
+    final payload = <String, dynamic>{
+      'reminder_schedule_type': type,
+      'reminder_time': _formatReminderTime(time),
+    };
+
+    if (type == 'weekly') {
+      payload['reminder_weekdays'] = [
+        _apiWeekdayFromDate(selectedDate ?? DateTime.now()),
+      ];
+    } else if (type == 'weekdays') {
+      payload['reminder_weekdays'] = weekdays.toList()..sort();
+    } else if (type == 'dates') {
+      final chosenDates = dates.isEmpty && selectedDate != null
+          ? [selectedDate]
+          : dates;
+      payload['reminder_dates'] = chosenDates
+          .map((date) => date.toIso8601String().substring(0, 10))
+          .toSet()
+          .toList()
+        ..sort();
+    }
+
+    return payload;
+  }
+}
+
+class _ReminderScheduleFields extends StatelessWidget {
+  const _ReminderScheduleFields({
+    required this.draft,
+    required this.color,
+    required this.selectedDate,
+    required this.setDialogState,
+  });
+
+  final _ReminderScheduleDraft draft;
+  final Color color;
+  final DateTime? selectedDate;
+  final StateSetter setDialogState;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.notifications_active_rounded, color: color),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'جدولة التذكير',
+                  style: TextStyle(
+                    color: AppColors.midnight,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: draft.type,
+            decoration: const InputDecoration(
+              labelText: 'متى يتكرر الإشعار؟',
+              prefixIcon: Icon(Icons.repeat_rounded),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'none', child: Text('بدون تذكير')),
+              DropdownMenuItem(value: 'daily', child: Text('يوميًا')),
+              DropdownMenuItem(value: 'weekly', child: Text('أسبوعيًا')),
+              DropdownMenuItem(
+                value: 'weekdays',
+                child: Text('أيام محددة في الأسبوع'),
+              ),
+              DropdownMenuItem(
+                value: 'dates',
+                child: Text('تواريخ محددة من التقويم'),
+              ),
+            ],
+            onChanged: (value) =>
+                setDialogState(() => draft.type = value ?? 'none'),
+          ),
+          if (draft.type != 'none') ...[
+            const SizedBox(height: 12),
+            InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialTime: draft.time,
+                );
+                if (picked != null) {
+                  setDialogState(() => draft.time = picked);
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.slate200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.schedule_rounded, color: color),
+                    const SizedBox(width: 10),
+                    Text(
+                      'وقت وصول الإشعار: ${_formatTimeOfDayLabel(draft.time)}',
+                      style: const TextStyle(
+                        color: AppColors.midnight,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (draft.type == 'weekly') ...[
+            const SizedBox(height: 10),
+            Text(
+              'سيصل أسبوعيًا في يوم ${_weekdayName(_apiWeekdayFromDate(selectedDate ?? DateTime.now()))} حسب تاريخ العنصر.',
+              style: const TextStyle(
+                color: AppColors.slate500,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          if (draft.type == 'weekdays') ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _weekdayOptions.map((entry) {
+                final selected = draft.weekdays.contains(entry.$1);
+                return FilterChip(
+                  label: Text(entry.$2),
+                  selected: selected,
+                  selectedColor: color.withValues(alpha: 0.18),
+                  checkmarkColor: color,
+                  onSelected: (value) {
+                    setDialogState(() {
+                      if (value) {
+                        draft.weekdays.add(entry.$1);
+                      } else {
+                        draft.weekdays.remove(entry.$1);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ],
+          if (draft.type == 'dates') ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 730)),
+                );
+                if (date == null) return;
+                setDialogState(() {
+                  final exists = draft.dates.any(
+                    (item) =>
+                        item.year == date.year &&
+                        item.month == date.month &&
+                        item.day == date.day,
+                  );
+                  if (!exists) draft.dates.add(date);
+                  draft.dates.sort();
+                });
+              },
+              icon: const Icon(Icons.event_available_rounded),
+              label: const Text(
+                'إضافة تاريخ من التقويم',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+            if (draft.dates.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: draft.dates.map((date) {
+                  return InputChip(
+                    label: Text(dateOnly(date.toString())),
+                    deleteIcon: const Icon(Icons.close_rounded, size: 16),
+                    onDeleted: () =>
+                        setDialogState(() => draft.dates.remove(date)),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+const List<(int, String)> _weekdayOptions = [
+  (0, 'الأحد'),
+  (1, 'الاثنين'),
+  (2, 'الثلاثاء'),
+  (3, 'الأربعاء'),
+  (4, 'الخميس'),
+  (5, 'الجمعة'),
+  (6, 'السبت'),
+];
+
+int _apiWeekdayFromDate(DateTime date) => date.weekday % 7;
+
+String _weekdayName(int day) {
+  return _weekdayOptions
+      .firstWhere((entry) => entry.$1 == day, orElse: () => _weekdayOptions[0])
+      .$2;
+}
+
+String _formatReminderTime(TimeOfDay time) {
+  final hour = time.hour.toString().padLeft(2, '0');
+  final minute = time.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
+}
+
+String _formatTimeOfDayLabel(TimeOfDay time) {
+  final hour = time.hour;
+  final minute = time.minute.toString().padLeft(2, '0');
+  final period = hour >= 12 ? 'م' : 'ص';
+  final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+  return '$hour12:$minute $period';
+}
+
+
+TimeOfDay _parseReminderTime(String value) {
+  final parts = value.split(':');
+  if (parts.length >= 2) {
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour != null && minute != null) {
+      return TimeOfDay(hour: hour.clamp(0, 23), minute: minute.clamp(0, 59));
+    }
+  }
+
+  return const TimeOfDay(hour: 8, minute: 0);
+}
+
 void _showNewsDetails(BuildContext context, Map<String, dynamic> item) {
   final attachment = absoluteUrl(text(item, 'attachment_url'));
   final source = text(item, 'source');
@@ -271,11 +587,7 @@ void _showNewsDetails(BuildContext context, Map<String, dynamic> item) {
             _MiniBadge(label: _sourceLabel(source), color: color),
             const SizedBox(width: 8),
             _MiniBadge(
-              label: text(
-                item,
-                'created_at_human',
-                fallback: dateOnly(text(item, 'created_at')),
-              ),
+              label: timeAgo(text(item, 'created_at')),
               color: AppColors.slate500,
               textColor: AppColors.slate600,
             ),
@@ -414,30 +726,37 @@ String _assignmentStatus(String status) {
 }
 
 String _attendanceLabel(String status) {
-  return switch (status) {
+  final cleanStatus = status.trim().toLowerCase();
+  return switch (cleanStatus) {
     'present' => 'حاضر',
     'absent' => 'غائب',
     'late' => 'متأخر',
     'excused' => 'معذور',
+    'permitted' => 'مسموح',
+    'exempted' => 'معفى',
     _ => status.isEmpty ? '-' : status,
   };
 }
 
 IconData _attendanceIcon(String status) {
-  return switch (status) {
+  final cleanStatus = status.trim().toLowerCase();
+  return switch (cleanStatus) {
     'present' => Icons.check_circle_rounded,
     'absent' => Icons.cancel_rounded,
     'late' => Icons.timer_rounded,
-    _ => Icons.verified_rounded,
+    'excused' || 'permitted' || 'exempted' => Icons.verified_user_rounded,
+    _ => Icons.help_rounded,
   };
 }
 
 Color _attendanceColor(String status) {
-  return switch (status) {
+  final cleanStatus = status.trim().toLowerCase();
+  return switch (cleanStatus) {
     'present' => AppColors.success,
     'absent' => AppColors.danger,
     'late' => AppColors.warning,
-    _ => AppColors.info,
+    'excused' || 'permitted' || 'exempted' => AppColors.info,
+    _ => AppColors.slate400,
   };
 }
 
@@ -704,13 +1023,26 @@ bool boolValue(Map<String, dynamic> map, String key) {
 }
 
 String dateOnly(String value) {
+  if (value.contains('T')) {
+    final date = DateTime.tryParse(value)?.toLocal();
+    if (date != null) {
+      final month = date.month.toString().padLeft(2, '0');
+      final day = date.day.toString().padLeft(2, '0');
+      return '${date.year}-$month-$day';
+    }
+  }
   if (value.length >= 10) return value.substring(0, 10);
   return value.isEmpty ? '-' : value;
 }
 
+String dateTime(String value) {
+  if (value.isEmpty) return '-';
+  return '${dateOnly(value)} ${timeOnly(value)}';
+}
+
 String prettyDate(String value) {
   if (value.isEmpty) return '-';
-  final date = DateTime.tryParse(value);
+  final date = DateTime.tryParse(value)?.toLocal();
   if (date == null) return value;
   final months = [
     'يناير',
@@ -731,7 +1063,7 @@ String prettyDate(String value) {
 
 String timeAgo(String value) {
   if (value.isEmpty) return '';
-  final date = DateTime.tryParse(value);
+  final date = DateTime.tryParse(value)?.toLocal();
   if (date == null) return value;
   final now = DateTime.now();
   final diff = now.difference(date);
@@ -746,7 +1078,9 @@ String timeAgo(String value) {
 
 String timeOnly(String value) {
   if (value.isEmpty) return '-';
-  final date = DateTime.tryParse(value);
+  
+  // Try parsing as full DateTime first
+  final date = DateTime.tryParse(value)?.toLocal();
   if (date != null) {
     final hour = date.hour;
     final minute = date.minute.toString().padLeft(2, '0');
@@ -754,6 +1088,22 @@ String timeOnly(String value) {
     final hour12 = hour % 12 == 0 ? 12 : hour % 12;
     return '$hour12:$minute $period';
   }
+  
+  // Handle time-only strings (HH:mm or HH:mm:ss) from API
+  if (value.contains(':') && value.length <= 8) {
+    final parts = value.split(':');
+    if (parts.length >= 2) {
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+      if (hour != null && minute != null) {
+        final period = hour >= 12 ? 'م' : 'ص';
+        final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+        return '$hour12:${minute.toString().padLeft(2, '0')} $period';
+      }
+    }
+  }
+
+  // Fallbacks
   if (value.length >= 16) return value.substring(11, 16);
   if (value.length >= 5) return value.substring(0, 5);
   return value;

@@ -11,23 +11,48 @@ class StudentStudyCenterScreen extends ConsumerStatefulWidget {
 }
 
 class _StudentStudyCenterScreenState
-    extends ConsumerState<StudentStudyCenterScreen> {
-  String _tab = 'study';
+    extends ConsumerState<StudentStudyCenterScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final List<String> _tabOptions = [
+    'study',
+    'reminders',
+    'resources',
+    'assignments',
+  ];
   String? _filter;
 
   @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _tabOptions.length, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        if (_filter != null) setState(() => _filter = null);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  String get _currentTab => _tabOptions[_tabController.index];
+
+  @override
   Widget build(BuildContext context) {
-    final state = ref.watch(_studyProvider(_tab));
     final subjectsState = ref.watch(_subjectsProvider);
 
     return StudentShell(
       currentIndex: 4,
       title: 'مركز الدراسة',
-      floatingActionButton: _tab == 'assignments'
+      floatingActionButton: _currentTab == 'assignments'
           ? null
           : FloatingActionButton(
               onPressed: () => _showAddTask(subjectsState.asData?.value ?? []),
-              backgroundColor: _studyTabColor(_tab),
+              backgroundColor: _studyTabColor(_currentTab),
               foregroundColor: Colors.white,
               elevation: 8,
               shape: RoundedRectangleBorder(
@@ -35,97 +60,85 @@ class _StudentStudyCenterScreenState
               ),
               child: const Icon(Icons.add_rounded, size: 32),
             ),
-      child: _AsyncBody(
-        state: state,
-        onRetry: () => ref.invalidate(_studyProvider(_tab)),
-        builder: (data) {
-          final stats = asMap(data['stats']);
-          final allItems = asList(data['items']);
-          final items = _filter == null
-              ? allItems
-              : allItems.where((it) {
-                  final item = asMap(it);
-                  if (_filter == 'overdue')
-                    return text(item, 'status') == 'overdue';
-                  if (_filter == 'today')
-                    return dateOnly(text(item, 'scheduled_date')) ==
-                        dateOnly(DateTime.now().toString());
-                  if (_filter == 'high')
-                    return text(item, 'priority') == 'high';
-                  return true;
-                }).toList();
-
-          return NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) => [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-                  child: Column(
-                    children: [
-                      _StudyHero(
-                        tab: _tab,
-                        totalPending: text(
-                          stats,
-                          'total_pending',
-                          fallback: '0',
-                        ),
-                        completionRate: number(
-                          stats,
-                          'completion_percentage',
-                          fallback: 0,
-                        ).toDouble(),
-                      ),
-                      const SizedBox(height: 20),
-                      _StudyStats(
-                        stats: stats,
-                        activeFilter: _filter,
-                        onFilterChanged: (f) =>
-                            setState(() => _filter = (_filter == f ? null : f)),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
+      child: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+              child: Column(
+                children: [
+                  Consumer(
+                    builder: (context, ref, _) {
+                      return AnimatedBuilder(
+                        animation: _tabController,
+                        builder: (context, _) {
+                          final tab = _tabOptions[_tabController.index];
+                          final state = ref.watch(_studyProvider(tab));
+                          return state.maybeWhen(
+                            data: (data) {
+                              final stats = asMap(data['stats']);
+                              return Column(
+                                children: [
+                                  _StudyHero(
+                                    tab: tab,
+                                    totalPending: text(
+                                      stats,
+                                      'total_pending',
+                                      fallback: '0',
+                                    ),
+                                    completionRate: number(
+                                      stats,
+                                      'completion_percentage',
+                                      fallback: 0,
+                                    ).toDouble(),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _StudyStats(
+                                    stats: stats,
+                                    activeFilter: _filter,
+                                    onFilterChanged: (f) => setState(
+                                      () => _filter = (_filter == f ? null : f),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                            orElse: () => _StudyHeroPlaceholder(tab: tab),
+                          );
+                        },
+                      );
+                    },
                   ),
-                ),
+                  const SizedBox(height: 20),
+                ],
               ),
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _SliverAppBarDelegate(
-                  height: 80,
-                  child: Container(
-                    color: AppColors.cream,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: _StudyTabs(
-                      value: _tab,
-                      onChanged: (value) => setState(() {
-                        _tab = value;
-                        _filter = null;
-                      }),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            body: RefreshIndicator(
-              onRefresh: () async => ref.invalidate(_studyProvider(_tab)),
-              child: items.isEmpty
-                  ? EmptyState(
-                      message: _filter != null
-                          ? 'لا توجد نتائج مطابقة للفلتر.'
-                          : 'لا توجد عناصر في هذا التبويب حالياً.',
-                      icon: _filter != null
-                          ? Icons.filter_list_off_rounded
-                          : Icons.auto_awesome_motion_rounded,
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 100),
-                      itemCount: items.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 14),
-                      itemBuilder: (context, index) =>
-                          _StudyItemCard(asMap(items[index]), tab: _tab),
-                    ),
             ),
-          );
-        },
+          ),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _SliverAppBarDelegate(
+              height: 80,
+              child: Container(
+                color: AppColors.cream,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: _StudyTabs(
+                  controller: _tabController,
+                  options: _tabOptions,
+                ),
+              ),
+            ),
+          ),
+        ],
+        body: TabBarView(
+          controller: _tabController,
+          children: _tabOptions.map((opt) {
+            return _TabBody(
+              tab: opt,
+              filter: opt == _currentTab ? _filter : null,
+              onRefresh: () async => ref.invalidate(_studyProvider(opt)),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -137,16 +150,16 @@ class _StudentStudyCenterScreenState
     DateTime? selectedDate = DateTime.now();
     int? selectedSubjectId;
     String priority = 'medium';
-    String repeat = 'none';
-    final itemType = _tab == 'reminders'
+    final reminderDraft = _ReminderScheduleDraft();
+    final itemType = _currentTab == 'reminders'
         ? 'reminder'
-        : (_tab == 'resources' ? 'resource' : 'study');
+        : (_currentTab == 'resources' ? 'resource' : 'study');
 
     final ok = await showMoeenBottomSheet<bool>(
       context: context,
       title: 'إضافة عنصر إلى مركز الدراسة',
-      icon: _studyTabIcon(_tab),
-      color: _studyTabColor(_tab),
+      icon: _studyTabIcon(_currentTab),
+      color: _studyTabColor(_currentTab),
       child: StatefulBuilder(
         builder: (context, setDialogState) => Form(
           key: formKey,
@@ -244,23 +257,15 @@ class _StudentStudyCenterScreenState
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: repeat,
-                      decoration: const InputDecoration(labelText: 'التكرار'),
-                      items: const [
-                        DropdownMenuItem(value: 'none', child: Text('بدون')),
-                        DropdownMenuItem(value: 'daily', child: Text('يومي')),
-                        DropdownMenuItem(
-                          value: 'weekly',
-                          child: Text('أسبوعي'),
-                        ),
-                      ],
-                      onChanged: (value) =>
-                          setDialogState(() => repeat = value ?? 'none'),
-                    ),
-                  ),
+                  const Expanded(child: SizedBox.shrink()),
                 ],
+              ),
+              const SizedBox(height: 12),
+              _ReminderScheduleFields(
+                draft: reminderDraft,
+                color: _studyTabColor(_currentTab),
+                selectedDate: selectedDate,
+                setDialogState: setDialogState,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -286,7 +291,7 @@ class _StudentStudyCenterScreenState
                     style: TextStyle(fontWeight: FontWeight.w900),
                   ),
                   style: FilledButton.styleFrom(
-                    backgroundColor: _studyTabColor(_tab),
+                    backgroundColor: _studyTabColor(_currentTab),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -305,12 +310,12 @@ class _StudentStudyCenterScreenState
         'scheduled_date': selectedDate?.toIso8601String().substring(0, 10),
         'note': note.text.trim(),
         'priority': priority,
-        'repeat_type': repeat,
+        ...reminderDraft.toPayload(selectedDate),
         'item_type': itemType,
         if (selectedSubjectId != null) 'subject_id': selectedSubjectId,
       }),
     );
-    ref.invalidate(_studyProvider(_tab));
+    ref.invalidate(_studyProvider(_currentTab));
   }
 
   Future<void> _runAction(Future<String> Function() action) async {
@@ -475,72 +480,98 @@ class _CompletionRing extends StatelessWidget {
 }
 
 class _StudyTabs extends StatelessWidget {
-  const _StudyTabs({required this.value, required this.onChanged});
+  const _StudyTabs({required this.controller, required this.options});
 
-  final String value;
-  final ValueChanged<String> onChanged;
+  final TabController controller;
+  final List<String> options;
 
   @override
   Widget build(BuildContext context) {
-    const options = {
-      'study': ('مهام', Icons.local_library_rounded),
-      'reminders': ('تذكيرات', Icons.notifications_active_rounded),
-      'resources': ('موارد', Icons.folder_copy_rounded),
-      'assignments': ('تكليفات', Icons.assignment_rounded),
-    };
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.all(6),
-      margin: const EdgeInsets.symmetric(horizontal: 18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final animationValue =
+            controller.animation?.value ?? controller.index.toDouble();
+
+        return Container(
+          height: 64,
+          padding: const EdgeInsets.all(6),
+          margin: const EdgeInsets.symmetric(horizontal: 18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.05),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: options.entries.map((entry) {
-          final selected = entry.key == value;
-          final color = _studyTabColor(entry.key);
-          return GestureDetector(
-            onTap: () => onChanged(entry.key),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              margin: const EdgeInsetsDirectional.only(end: 6),
-              decoration: BoxDecoration(
-                color: selected ? color : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    entry.value.$2,
-                    color: selected ? Colors.white : AppColors.slate500,
-                    size: 20,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            children: options.map((opt) {
+              final index = options.indexOf(opt);
+              final isSelected = (animationValue - index).abs() < 0.5;
+              final color = _studyTabColor(opt);
+
+              return GestureDetector(
+                onTap: () => controller.animateTo(index),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  margin: const EdgeInsetsDirectional.only(end: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected ? color : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    entry.value.$1,
-                    style: TextStyle(
-                      color: selected ? Colors.white : AppColors.slate700,
-                      fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                      fontSize: 14,
-                    ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _studyTabIcon(opt),
+                        color: isSelected ? Colors.white : AppColors.slate500,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _studyTabTitle(opt),
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : AppColors.slate700,
+                          fontWeight: isSelected
+                              ? FontWeight.w900
+                              : FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StudyHeroPlaceholder extends StatelessWidget {
+  const _StudyHeroPlaceholder({required this.tab});
+  final String tab;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _studyTabColor(tab);
+    return Container(
+      height: 200, // Approximate height of hero
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(32),
       ),
+      child: const Center(child: CircularProgressIndicator()),
     );
   }
 }
@@ -574,6 +605,59 @@ class _GlassPill extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _TabBody extends ConsumerWidget {
+  const _TabBody({required this.tab, required this.onRefresh, this.filter});
+
+  final String tab;
+  final RefreshCallback onRefresh;
+  final String? filter;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(_studyProvider(tab));
+
+    return _AsyncBody(
+      state: state,
+      onRetry: () => ref.invalidate(_studyProvider(tab)),
+      builder: (data) {
+        final allItems = asList(data['items']);
+        final items = filter == null
+            ? allItems
+            : allItems.where((it) {
+                final item = asMap(it);
+                if (filter == 'overdue')
+                  return text(item, 'status') == 'overdue';
+                if (filter == 'today')
+                  return dateOnly(text(item, 'scheduled_date')) ==
+                      dateOnly(DateTime.now().toString());
+                if (filter == 'high') return text(item, 'priority') == 'high';
+                return true;
+              }).toList();
+
+        return RefreshIndicator(
+          onRefresh: onRefresh,
+          child: items.isEmpty
+              ? EmptyState(
+                  message: filter != null
+                      ? 'لا توجد نتائج مطابقة للفلتر.'
+                      : 'لا توجد عناصر في هذا التبويب حالياً.',
+                  icon: filter != null
+                      ? Icons.filter_list_off_rounded
+                      : Icons.auto_awesome_motion_rounded,
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 100),
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 14),
+                  itemBuilder: (context, index) =>
+                      _StudyItemCard(asMap(items[index]), tab: tab),
+                ),
+        );
+      },
     );
   }
 }
