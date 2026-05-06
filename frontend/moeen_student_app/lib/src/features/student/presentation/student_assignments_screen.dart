@@ -156,8 +156,13 @@ class _StudentAssignmentDetailsScreenState
         builder: (data) {
           final assignment = asMap(data['assignment']);
           final submission = asMap(data['submission']);
-          final status = text(submission, 'status', fallback: 'pending');
+          final status = submission.isNotEmpty
+              ? text(submission, 'status', fallback: 'submitted')
+              : text(assignment, 'status', fallback: 'available');
           final isGraded = text(submission, 'grade').isNotEmpty;
+          final canSubmit = assignment.containsKey('can_submit')
+              ? boolValue(assignment, 'can_submit')
+              : true;
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 40),
@@ -184,8 +189,38 @@ class _StudentAssignmentDetailsScreenState
                 ),
                 const SizedBox(height: 24),
               ],
+              if (!canSubmit) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.rose.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: AppColors.rose.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.lock_clock_rounded, color: AppColors.rose),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'انتهت مهلة تسليم هذا التكليف، وتم إغلاق الإرسال.',
+                          style: TextStyle(
+                            color: AppColors.midnight,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               FilledButton.icon(
-                onPressed: _submitting ? null : () => _submit(assignment),
+                onPressed: (!_submitting && canSubmit)
+                    ? () => _submit(assignment)
+                    : null,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -203,9 +238,11 @@ class _StudentAssignmentDetailsScreenState
                       )
                     : const Icon(Icons.upload_file_rounded),
                 label: Text(
-                  submission.isEmpty
-                      ? 'تسليم التكليف الآن'
-                      : 'تحديث التسليم السابق',
+                  !canSubmit
+                      ? 'انتهت المهلة'
+                      : submission.isEmpty
+                          ? 'تسليم التكليف الآن'
+                          : 'تحديث التسليم السابق',
                   style: const TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 16,
@@ -727,7 +764,8 @@ class _StatusBanner extends StatelessWidget {
       'accepted' || 'approved' || 'graded' => Icons.verified_rounded,
       'rejected' => Icons.cancel_rounded,
       'missing' => Icons.error_rounded,
-      'pending' || 'submitted' => Icons.pending_actions_rounded,
+      'pending' => Icons.pending_actions_rounded,
+      'submitted' => Icons.check_circle_rounded,
       _ => Icons.assignment_rounded,
     };
     final label = _submissionReviewLabel(normalized);
@@ -761,7 +799,8 @@ String _submissionReviewLabel(String status) {
   return switch (status) {
     'accepted' || 'approved' || 'graded' => 'مقبول',
     'rejected' => 'مرفوض',
-    'pending' || 'submitted' => 'قيد المراجعة',
+    'pending' => 'قيد المراجعة',
+    'submitted' => 'تم التسليم',
     'missing' => 'متأخر',
     _ => _assignmentStatus(status),
   };
@@ -771,7 +810,8 @@ Color _submissionReviewColor(String status) {
   return switch (status) {
     'accepted' || 'approved' || 'graded' => AppColors.success,
     'rejected' => AppColors.danger,
-    'pending' || 'submitted' => AppColors.warning,
+    'pending' => AppColors.warning,
+    'submitted' => AppColors.success,
     'missing' => AppColors.rose,
     _ => AppColors.royalBlue,
   };

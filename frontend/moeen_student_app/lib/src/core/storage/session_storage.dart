@@ -14,6 +14,7 @@ class SessionStorage {
   static const _emailKey = 'email';
   static const _practicalKey = 'is_practical_delegate';
   static const _clinicalKey = 'has_clinical';
+  static const _permissionsKey = 'permissions';
 
   Future<void> save(AuthSession session) async {
     await Future.wait([
@@ -27,6 +28,7 @@ class SessionStorage {
         value: session.isPracticalDelegate ? '1' : '0',
       ),
       _storage.write(key: _clinicalKey, value: session.hasClinical ? '1' : '0'),
+      _storage.write(key: _permissionsKey, value: session.permissions.join(',')),
     ]);
   }
 
@@ -38,6 +40,7 @@ class SessionStorage {
     final email = await _storage.read(key: _emailKey);
     final isPractical = await _storage.read(key: _practicalKey);
     final hasClinical = await _storage.read(key: _clinicalKey);
+    final permissionsStr = await _storage.read(key: _permissionsKey);
 
     if ([
       token,
@@ -59,6 +62,7 @@ class SessionStorage {
       email: email,
       isPracticalDelegate: isPractical == '1',
       hasClinical: hasClinical == '1',
+      permissions: permissionsStr?.split(',').where((s) => s.isNotEmpty).toList() ?? [],
     );
   }
 

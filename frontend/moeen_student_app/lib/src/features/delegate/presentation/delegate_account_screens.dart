@@ -24,7 +24,7 @@ class _DelegateSubscriptionScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(delegateSubscriptionProvider);
     return DelegateShell(
-      currentIndex: 20,
+      currentIndex: 18,
       title: 'الاشتراك والرصيد',
       child: _AsyncBody<SubscriptionOverview>(
         state: state,
@@ -154,7 +154,7 @@ class _DelegateLedgerScreenState extends ConsumerState<DelegateLedgerScreen> {
     final state = ref.watch(delegateLedgerProvider);
 
     return DelegateShell(
-      currentIndex: 21,
+      currentIndex: 19,
       title: 'كشف الحساب المالي',
       child: _AsyncBody<FinancialLedger>(
         state: state,
@@ -240,7 +240,7 @@ class DelegateProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(_delegateProfileProvider);
     return DelegateShell(
-      currentIndex: 22,
+      currentIndex: 20,
       title: 'ملفي الشخصي',
       child: _AsyncBody(
         state: state,

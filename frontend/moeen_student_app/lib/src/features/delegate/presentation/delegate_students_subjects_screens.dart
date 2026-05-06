@@ -23,12 +23,18 @@ class _DelegateStudentsScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(delegateStudentsProvider);
+    final session = ref.watch(authControllerProvider).valueOrNull;
+    final canCreate = session?.hasPermission('students', 'create') ?? false;
+    final canUpdate = session?.hasPermission('students', 'update') ?? false;
+    final canDelete = session?.hasPermission('students', 'delete') ?? false;
 
     return DelegateShell(
       currentIndex: 3,
       title: 'إدارة الطلاب',
       floatingActionButton: _PremiumAddButton(
         onPressed: () => _studentSheet(context, ref),
+        isEnabled: canCreate,
+        onUnauthorized: () => _showNoPermissionSnackBar(context),
       ),
       child: _AsyncBody(
         state: state,
@@ -55,6 +61,8 @@ class _DelegateStudentsScreenState
                   active: number(data, 'active_count').toInt(),
                   male: number(data, 'male_count').toInt(),
                   onImport: () => _importOptionsDialog(context, ref),
+                  isEnabled: canCreate,
+                  onUnauthorized: () => _showNoPermissionSnackBar(context),
                 ),
                 const SizedBox(height: 24),
                 _SearchField(
@@ -77,6 +85,9 @@ class _DelegateStudentsScreenState
                   ...items.map(
                     (raw) => _StudentCard(
                       student: asMap(raw),
+                      canUpdate: canUpdate,
+                      canDelete: canDelete,
+                      onUnauthorized: () => _showNoPermissionSnackBar(context),
                       onEdit: () =>
                           _studentSheet(context, ref, item: asMap(raw)),
                       onPermissions: () =>
@@ -104,7 +115,7 @@ Future<void> _importOptionsDialog(BuildContext context, WidgetRef ref) async {
   await showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
-    builder: (context) => Container(
+    builder: (sheetContext) => Container(
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
@@ -149,7 +160,7 @@ Future<void> _importOptionsDialog(BuildContext context, WidgetRef ref) async {
                 icon: Icons.file_download_rounded,
                 color: AppColors.royalBlue,
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   _downloadTemplate(context, ref);
                 },
               ),
@@ -160,7 +171,7 @@ Future<void> _importOptionsDialog(BuildContext context, WidgetRef ref) async {
                 icon: Icons.upload_file_rounded,
                 color: AppColors.success,
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   _importCsv(context, ref);
                 },
               ),
@@ -263,14 +274,66 @@ Future<void> _importCsv(BuildContext context, WidgetRef ref) async {
 }
 
 Future<void> _downloadTemplate(BuildContext context, WidgetRef ref) async {
+  var loadingShown = false;
   try {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _TemplateDownloadDialog(),
+    );
+    loadingShown = true;
+
     final bytes = await ref.read(delegateRepositoryProvider).downloadTemplate();
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/students_template.csv');
-    await file.writeAsBytes(bytes);
-    await OpenFilex.open(file.path);
+    final path = await FilePicker.platform.saveFile(
+      dialogTitle: 'اختر مكان حفظ قالب بيانات الطلاب',
+      fileName: 'students_template.csv',
+      type: FileType.custom,
+      allowedExtensions: ['csv'],
+      bytes: Uint8List.fromList(bytes),
+      lockParentWindow: true,
+    );
+    if (loadingShown && context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+      loadingShown = false;
+    }
+    if (path == null || path.isEmpty) return;
+
+    await OpenFilex.open(path);
   } catch (e) {
+    if (loadingShown && context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
     if (context.mounted) _showError(context, e);
+  }
+}
+
+class _TemplateDownloadDialog extends StatelessWidget {
+  const _TemplateDownloadDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: const Padding(
+        padding: EdgeInsets.all(24),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+            SizedBox(width: 18),
+            Expanded(
+              child: Text(
+                'جاري تجهيز قالب بيانات الطلاب...',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -297,6 +360,10 @@ class _DelegateSubjectsScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(_delegateSubjectsProvider);
+    final session = ref.watch(authControllerProvider).valueOrNull;
+    final canCreate = session?.hasPermission('subjects', 'create') ?? false;
+    final canUpdate = session?.hasPermission('subjects', 'update') ?? false;
+    final canDelete = session?.hasPermission('subjects', 'delete') ?? false;
 
     return DelegateShell(
       currentIndex: 4,
@@ -305,6 +372,8 @@ class _DelegateSubjectsScreenState
         onPressed: () => _subjectSheet(context, ref),
         label: 'إضافة مادة جديدة',
         icon: Icons.library_add_rounded,
+        isEnabled: canCreate,
+        onUnauthorized: () => _showNoPermissionSnackBar(context),
       ),
       child: _AsyncBody(
         state: state,
@@ -362,6 +431,9 @@ class _DelegateSubjectsScreenState
                   ...items.map(
                     (item) => _SubjectCard(
                       subject: asMap(item),
+                      canUpdate: canUpdate,
+                      canDelete: canDelete,
+                      onUnauthorized: () => _showNoPermissionSnackBar(context),
                       onEdit: () =>
                           _subjectSheet(context, ref, item: asMap(item)),
                       onDelete: () => _delete(

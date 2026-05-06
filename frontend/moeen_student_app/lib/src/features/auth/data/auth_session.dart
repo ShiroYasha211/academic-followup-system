@@ -8,6 +8,7 @@ class AuthSession {
     required this.name,
     required this.isPracticalDelegate,
     required this.hasClinical,
+    this.permissions = const [],
     this.email,
   });
 
@@ -18,8 +19,12 @@ class AuthSession {
   final String? email;
   final bool isPracticalDelegate;
   final bool hasClinical;
+  final List<String> permissions;
 
   bool get isDelegate => workspace == AuthWorkspace.delegate;
+
+  bool hasPermission(String resource, String action) =>
+      permissions.contains('$resource.$action');
 
   bool get canAccessDelegateWorkspace =>
       role == 'delegate' || role == 'practical_delegate' || isPracticalDelegate;
@@ -38,6 +43,7 @@ class AuthSession {
     String? email,
     bool? isPracticalDelegate,
     bool? hasClinical,
+    List<String>? permissions,
   }) {
     return AuthSession(
       token: token ?? this.token,
@@ -47,6 +53,7 @@ class AuthSession {
       email: email ?? this.email,
       isPracticalDelegate: isPracticalDelegate ?? this.isPracticalDelegate,
       hasClinical: hasClinical ?? this.hasClinical,
+      permissions: permissions ?? this.permissions,
     );
   }
 }

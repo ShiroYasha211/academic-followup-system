@@ -399,11 +399,27 @@ class _DeprivationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final warning = text(info, 'warning_level').isNotEmpty;
-    final color = warning ? AppColors.danger : AppColors.success;
+    final warningLevel = text(info, 'warning_level');
+    final isBanned = warningLevel == 'danger';
+    final isWarning = warningLevel == 'warning';
+    final color = isBanned
+        ? AppColors.danger
+        : isWarning
+        ? AppColors.warning
+        : AppColors.success;
+    final icon = isBanned
+        ? Icons.gpp_bad_rounded
+        : isWarning
+        ? Icons.warning_amber_rounded
+        : Icons.verified_user_rounded;
+    final statusLabel = isBanned
+        ? 'حرمان فعلي'
+        : isWarning
+        ? 'إنذار مبكر'
+        : 'ضمن النطاق الآمن';
     return _ColorSection(
       title: 'حالة الحرمان',
-      icon: warning ? Icons.warning_amber_rounded : Icons.verified_user_rounded,
+      icon: icon,
       color: color,
       child: Column(
         children: [
@@ -416,9 +432,15 @@ class _DeprivationCard extends StatelessWidget {
             value: text(info, 'max_absences_allowed', fallback: '-'),
           ),
           _InfoRow(
-            label: 'الحالة',
-            value: warning ? 'يوجد تنبيه حرمان' : 'ضمن النطاق الآمن',
+            label: 'المتبقي قبل الحد',
+            value: text(info, 'remaining_absences', fallback: '-'),
           ),
+          _InfoRow(
+            label: 'نسبة الحرمان المعتمدة',
+            value:
+                '${text(info, 'deprivation_threshold_percent', fallback: '0')}%',
+          ),
+          _InfoRow(label: 'الحالة', value: statusLabel),
         ],
       ),
     );
@@ -1901,25 +1923,46 @@ class _NewsCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (hasImage)
-                      Stack(
-                        children: [
-                          Image.network(
-                            attachment,
-                            height: 160,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                          ),
-                          Positioned(
-                            top: 12,
-                            right: 12,
-                            child: _MiniBadge(
-                              label: _sourceLabel(source),
-                              color: color,
-                              blur: true,
+                      SizedBox(
+                        height: 160,
+                        width: double.infinity,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.network(
+                              attachment,
+                              fit: BoxFit.cover,
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Container(
+                                      color: AppColors.slate50,
+                                      child: const Center(
+                                        child: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: AppColors.slate200,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                              errorBuilder: (_, __, ___) =>
+                                  const _NewsImageFallback(height: 160),
                             ),
-                          ),
-                        ],
+                            Positioned(
+                              top: 12,
+                              right: 12,
+                              child: _MiniBadge(
+                                label: _sourceLabel(source),
+                                color: color,
+                                blur: true,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     Padding(
                       padding: const EdgeInsets.all(16),
@@ -2000,6 +2043,73 @@ class _NewsCard extends StatelessWidget {
                                   color: color,
                                 ),
                               ],
+                            ),
+                          ] else if (attachment.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            InkWell(
+                              onTap: () => _downloadUrlToFile(
+                                context,
+                                attachment,
+                                text(item, 'title', fallback: 'مرفق الإعلان'),
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: color.withValues(alpha: 0.2),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: color.withValues(alpha: 0.15),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.attach_file_rounded,
+                                        size: 16,
+                                        color: color,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'مرفق مع الإعلان',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                          Text(
+                                            'اضغط للتحميل والعرض',
+                                            style: TextStyle(
+                                              color: AppColors.slate500,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.file_download_rounded,
+                                      size: 20,
+                                      color: color,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ],
@@ -3757,6 +3867,11 @@ void _showPreview(
           ),
           const SizedBox(height: 20),
         ],
+        _PreviewInfoTile(
+          icon: Icons.category_rounded,
+          label: 'تصنيف الملف',
+          value: _categoryLabel(text(item, 'category')),
+        ),
         _PreviewInfoTile(
           icon: Icons.person_rounded,
           label: 'المرفوع بواسطة',

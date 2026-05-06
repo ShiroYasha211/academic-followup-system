@@ -12,6 +12,7 @@ Future<void> _studentSheet(
   );
   final password = TextEditingController();
   var gender = text(item, 'gender', fallback: 'male');
+  final showLegacyCredentials = _showLegacyStudentCredentials();
 
   await _formSheet(
     context,
@@ -23,7 +24,7 @@ Future<void> _studentSheet(
         validator: (v) =>
             (v == null || v.isEmpty) ? 'يرجى إدخال اسم الطالب' : null,
       ),
-      TextFormField(
+      if (showLegacyCredentials) TextFormField(
         controller: email,
         decoration: const InputDecoration(labelText: 'البريد الإلكتروني'),
         keyboardType: TextInputType.emailAddress,
@@ -49,7 +50,7 @@ Future<void> _studentSheet(
         onChanged: (value) => gender = value ?? 'male',
         decoration: const InputDecoration(labelText: 'الجنس'),
       ),
-      TextFormField(
+      if (showLegacyCredentials) TextFormField(
         controller: password,
         obscureText: true,
         decoration: InputDecoration(
@@ -67,12 +68,10 @@ Future<void> _studentSheet(
     onSave: () async {
       final data = {
         'name': name.text.trim(),
-        'email': email.text.trim(),
         'student_number': numberController.text.trim(),
         'gender': gender,
-        if (password.text.isNotEmpty) 'password': password.text,
-        if (password.text.isNotEmpty) 'password_confirmation': password.text,
       };
+      password.text = numberController.text.trim();
       if (item == null) {
         if (password.text.isEmpty)
           throw const ApiException('يجب إدخال كلمة المرور للطالب الجديد.');
@@ -85,6 +84,8 @@ Future<void> _studentSheet(
     after: () => ref.invalidate(delegateStudentsProvider),
   );
 }
+
+bool _showLegacyStudentCredentials() => false;
 
 Future<void> _studentPermissionSheet(
   BuildContext context,

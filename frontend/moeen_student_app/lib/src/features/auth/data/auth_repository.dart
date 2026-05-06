@@ -107,6 +107,10 @@ class AuthRepository {
       email: user['email']?.toString(),
       isPracticalDelegate: isPracticalDelegate,
       hasClinical: major is Map && major['has_clinical'] == true,
+      permissions: (user['permissions'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
     );
   }
 
@@ -121,6 +125,10 @@ class AuthRepository {
       email: user['email']?.toString(),
       isPracticalDelegate: user['is_practical_delegate'] == true,
       hasClinical: user['is_clinical_delegate'] == true,
+      permissions: (user['permissions'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
     );
   }
 

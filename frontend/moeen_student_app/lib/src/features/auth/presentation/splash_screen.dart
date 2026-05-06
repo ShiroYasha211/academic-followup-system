@@ -58,7 +58,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     return Scaffold(
       body: Container(
         width: double.infinity,
-        decoration: const BoxDecoration(gradient: AppColors.authGradient),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFFFFBF2),
+              Color(0xFFFFF7E6),
+              Color(0xFFF8FAFC),
+            ],
+          ),
+        ),
         child: Stack(
           children: [
             Positioned(
@@ -66,7 +76,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               right: -90,
               child: _Orb(
                 size: 280,
-                color: AppColors.gold.withValues(alpha: 0.22),
+                color: AppColors.gold.withValues(alpha: 0.16),
               ),
             ),
             Positioned(
@@ -74,7 +84,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               left: -80,
               child: _Orb(
                 size: 250,
-                color: AppColors.royalBlue.withValues(alpha: 0.12),
+                color: AppColors.royalBlue.withValues(alpha: 0.08),
               ),
             ),
             Center(
@@ -85,7 +95,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const MoeenLogo(centered: true),
+                      Container(
+                        padding: const EdgeInsets.all(22),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFCF5),
+                          borderRadius: BorderRadius.circular(36),
+                          border: Border.all(
+                            color: AppColors.gold.withValues(alpha: 0.16),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.royalBlue.withValues(alpha: 0.08),
+                              blurRadius: 34,
+                              offset: const Offset(0, 18),
+                            ),
+                          ],
+                        ),
+                        child: const MoeenLogo(centered: true),
+                      ),
                       const SizedBox(height: 24),
                       Text(
                         'مساحتك التعليمية في مكان واحد',

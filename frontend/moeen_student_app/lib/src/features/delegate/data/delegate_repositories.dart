@@ -54,6 +54,16 @@ class DelegateRepository {
   Future<Map<String, dynamic>> notifications() async =>
       _data(await _api.get('/delegate/notifications'));
 
+  Future<String> markNotificationRead(int id) async {
+    final response = await _api.post('/delegate/notifications/$id/read');
+    return (response['message'] ?? 'تم تحديد التنبيه كمقروء.').toString();
+  }
+
+  Future<String> markAllNotificationsRead() async {
+    final response = await _api.post('/delegate/notifications/mark-all-read');
+    return (response['message'] ?? 'تم تحديد جميع التنبيهات كمقروءة.').toString();
+  }
+
   Future<Map<String, dynamic>> news() async =>
       _data(await _api.get('/delegate/news'));
 
@@ -71,6 +81,11 @@ class DelegateRepository {
     return (response['message'] ?? 'تم تسجيل التصويت.').toString();
   }
 
+  Future<String> markAllNewsAsRead() async {
+    final response = await _api.post('/delegate/news/mark-all-as-read');
+    return (response['message'] ?? 'تم تحديد الكل كمقروء.').toString();
+  }
+
   Future<Map<String, dynamic>> students({
     int page = 1,
     String? query,
@@ -86,10 +101,8 @@ class DelegateRepository {
     ),
   );
 
-  String get studentTemplateUrl => '${_api.baseUrl}/delegate/students/template';
-
   Future<List<int>> downloadTemplate() async =>
-      await _api.getBytesFromUrl(studentTemplateUrl);
+      await _api.getBytes('/delegate/students/template');
 
   Future<Map<String, dynamic>> importStudents(String filePath) async {
     final formData = FormData.fromMap({
@@ -309,6 +322,20 @@ class DelegateRepository {
         ),
       );
 
+  Future<Map<String, dynamic>> announcements({
+    String? query,
+    String? category,
+  }) async =>
+      _data(
+        await _api.get(
+          '/delegate/announcements',
+          queryParameters: {
+            if (query != null && query.isNotEmpty) 'q': query,
+            if (category != null && category != 'all') 'category': category,
+          },
+        ),
+      );
+
   Future<String> saveReminder({
     int? id,
     required Map<String, dynamic> data,
@@ -324,17 +351,32 @@ class DelegateRepository {
     return (response['message'] ?? 'تم حذف التذكير.').toString();
   }
 
-  Future<List<dynamic>> announcements() async =>
-      _list(await _api.get('/delegate/announcements'));
-
   Future<String> saveAnnouncement({
     int? id,
     required Map<String, dynamic> data,
   }) async {
+    Object? finalData = data;
+    
+    // Check if we have a file (attachment)
+    if (data['attachment'] != null) {
+      finalData = FormData.fromMap({
+        ...data,
+        if (id != null) '_method': 'PUT',
+      });
+    }
+
     final response = id == null
-        ? await _api.post('/delegate/announcements', data: data)
-        : await _api.put('/delegate/announcements/$id', data: data);
-    return (response['message'] ?? 'تم حفظ الإعلان.').toString();
+        ? await _api.post('/delegate/announcements', data: finalData)
+        : (data['attachment'] != null 
+            ? await _api.post('/delegate/announcements/$id', data: finalData)
+            : await _api.put('/delegate/announcements/$id', data: finalData));
+            
+    return (response['message'] ?? 'تم نشر الإعلان.').toString();
+  }
+
+  Future<String> toggleAnnouncementPin(int id) async {
+    final response = await _api.patch('/delegate/announcements/$id/toggle-pin');
+    return (response['message'] ?? 'تم تحديث حالة التثبيت.').toString();
   }
 
   Future<String> deleteAnnouncement(int id) async {

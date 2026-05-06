@@ -29,6 +29,10 @@ class _DelegateSchedulesScreenState
 
   @override
   Widget build(BuildContext context) {
+    final session = ref.watch(authControllerProvider).valueOrNull;
+    final canCreate = session?.hasPermission('schedules', 'create') ?? false;
+    final canUpdate = session?.hasPermission('schedules', 'update') ?? false;
+    final canDelete = session?.hasPermission('schedules', 'delete') ?? false;
     final state = ref.watch(_delegateSchedulesProvider);
 
     return DelegateShell(
@@ -36,6 +40,8 @@ class _DelegateSchedulesScreenState
       title: 'الجدول الدراسي',
       floatingActionButton: _AddScheduleFAB(
         onPressed: () => _scheduleSheet(context, ref),
+        isEnabled: canCreate,
+        onUnauthorized: () => _showNoPermissionSnackBar(context),
       ),
       child: _AsyncBody<List<dynamic>>(
         state: state,
@@ -111,6 +117,9 @@ class _DelegateSchedulesScreenState
                     final item = asMap(dayItems[index]);
                     return _DelegateScheduleCard(
                       item: item,
+                      canUpdate: canUpdate,
+                      canDelete: canDelete,
+                      onUnauthorized: () => _showNoPermissionSnackBar(context),
                       onEdit: () => _scheduleSheet(context, ref, item: item),
                       onDelete: () => _delete(
                         context,
@@ -277,10 +286,16 @@ class _DelegateScheduleCard extends StatelessWidget {
     required this.item,
     required this.onEdit,
     required this.onDelete,
+    this.canUpdate = true,
+    this.canDelete = true,
+    this.onUnauthorized,
   });
   final Map<String, dynamic> item;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final bool canUpdate;
+  final bool canDelete;
+  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
@@ -396,7 +411,13 @@ class _DelegateScheduleCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        _ActionMenu(onEdit: onEdit, onDelete: onDelete),
+                        _ActionMenu(
+                          onEdit: onEdit,
+                          onDelete: onDelete,
+                          canUpdate: canUpdate,
+                          canDelete: canDelete,
+                          onUnauthorized: onUnauthorized,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -437,10 +458,16 @@ class _ActionMenu extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     this.iconColor = AppColors.slate400,
+    this.canUpdate = true,
+    this.canDelete = true,
+    this.onUnauthorized,
   });
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final Color iconColor;
+  final bool canUpdate;
+  final bool canDelete;
+  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
@@ -449,27 +476,33 @@ class _ActionMenu extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       itemBuilder: (context) => [
         PopupMenuItem(
-          onTap: onEdit,
-          child: const Row(
-            children: [
-              Icon(Icons.edit_rounded, size: 18, color: AppColors.primary),
-              SizedBox(width: 10),
-              Text('تعديل'),
-            ],
+          onTap: canUpdate ? onEdit : onUnauthorized,
+          child: Opacity(
+            opacity: canUpdate ? 1.0 : 0.5,
+            child: const Row(
+              children: [
+                Icon(Icons.edit_rounded, size: 18, color: AppColors.primary),
+                SizedBox(width: 10),
+                Text('تعديل'),
+              ],
+            ),
           ),
         ),
         PopupMenuItem(
-          onTap: onDelete,
-          child: const Row(
-            children: [
-              Icon(
-                Icons.delete_outline_rounded,
-                size: 18,
-                color: AppColors.danger,
-              ),
-              SizedBox(width: 10),
-              Text('حذف', style: TextStyle(color: AppColors.danger)),
-            ],
+          onTap: canDelete ? onDelete : onUnauthorized,
+          child: Opacity(
+            opacity: canDelete ? 1.0 : 0.5,
+            child: const Row(
+              children: [
+                Icon(
+                  Icons.delete_outline_rounded,
+                  size: 18,
+                  color: AppColors.danger,
+                ),
+                SizedBox(width: 10),
+                Text('حذف', style: TextStyle(color: AppColors.danger)),
+              ],
+            ),
           ),
         ),
       ],
@@ -478,12 +511,20 @@ class _ActionMenu extends StatelessWidget {
 }
 
 class _AddScheduleFAB extends StatelessWidget {
-  const _AddScheduleFAB({required this.onPressed});
+  const _AddScheduleFAB({
+    required this.onPressed,
+    this.isEnabled = true,
+    this.onUnauthorized,
+  });
   final VoidCallback onPressed;
+  final bool isEnabled;
+  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Opacity(
+      opacity: isEnabled ? 1.0 : 0.5,
+      child: Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
@@ -495,7 +536,7 @@ class _AddScheduleFAB extends StatelessWidget {
         ],
       ),
       child: FloatingActionButton.extended(
-        onPressed: onPressed,
+        onPressed: isEnabled ? onPressed : onUnauthorized,
         backgroundColor: AppColors.primary,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -510,8 +551,9 @@ class _AddScheduleFAB extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _IconInfo extends StatelessWidget {
@@ -552,12 +594,19 @@ class DelegateExamSchedulesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(authControllerProvider).valueOrNull;
+    final canCreate = session?.hasPermission('exams', 'create') ?? false;
+    final canUpdate = session?.hasPermission('exams', 'update') ?? false;
+    final canDelete = session?.hasPermission('exams', 'delete') ?? false;
     final state = ref.watch(_delegateExamsProvider);
+
     return DelegateShell(
       currentIndex: 6,
       title: 'جداول الاختبارات',
       floatingActionButton: _AddExamFAB(
         onPressed: () => _examSheet(context, ref),
+        isEnabled: canCreate,
+        onUnauthorized: () => _showNoPermissionSnackBar(context),
       ),
       child: _AsyncBody<List<dynamic>>(
         state: state,
@@ -618,6 +667,9 @@ class DelegateExamSchedulesScreen extends ConsumerWidget {
                   final schedule = schedules[index];
                   return _DelegateExamScheduleCard(
                     schedule: schedule,
+                    canUpdate: canUpdate,
+                    canDelete: canDelete,
+                    onUnauthorized: () => _showNoPermissionSnackBar(context),
                     onEdit: () =>
                         _examSheet(context, ref, item: schedule),
                     onDelete: () => _delete(
@@ -639,35 +691,45 @@ class DelegateExamSchedulesScreen extends ConsumerWidget {
 }
 
 class _AddExamFAB extends StatelessWidget {
-  const _AddExamFAB({required this.onPressed});
+  const _AddExamFAB({
+    required this.onPressed,
+    this.isEnabled = true,
+    this.onUnauthorized,
+  });
   final VoidCallback onPressed;
+  final bool isEnabled;
+  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.danger.withValues(alpha: 0.35),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: FloatingActionButton.extended(
-        onPressed: onPressed,
-        backgroundColor: AppColors.danger,
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
-        label: const Text(
-          'جدول اختبار',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-            fontSize: 15,
-            letterSpacing: 0.5,
+    return Opacity(
+      opacity: isEnabled ? 1.0 : 0.5,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.danger.withValues(alpha: isEnabled ? 0.35 : 0.1),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: isEnabled ? onPressed : onUnauthorized,
+          backgroundColor: AppColors.danger,
+          elevation: 0,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          icon: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
+          label: const Text(
+            'جدول اختبار',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 15,
+              letterSpacing: 0.5,
+            ),
           ),
         ),
       ),
@@ -828,15 +890,18 @@ class _DelegateAssignmentsScreenState
     return DelegateShell(
       currentIndex: 7,
       title: 'التكاليف الدراسية',
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _assignmentSheet(context, ref),
-        icon: const Icon(Icons.add_task_rounded),
-        label: const Text(
-          'تكليف جديد',
-          style: TextStyle(fontWeight: FontWeight.bold),
+      floatingActionButton: Opacity(
+        opacity: 1.0,
+        child: FloatingActionButton.extended(
+          onPressed: () => _assignmentSheet(context, ref),
+          icon: const Icon(Icons.add_task_rounded),
+          label: const Text(
+            'تكليف جديد',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
         ),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
       ),
       child: _AsyncBody<List<dynamic>>(
         state: state,
@@ -1007,6 +1072,9 @@ class _AssignmentListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const canUpdate = true;
+    const canDelete = true;
+
     if (items.isEmpty) {
       return const Center(
         child: Column(
@@ -1033,15 +1101,30 @@ class _AssignmentListView extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 100),
       itemCount: items.length,
       itemBuilder: (context, i) =>
-          _DelegateAssignmentCard(item: items[i], ref: ref),
+          _DelegateAssignmentCard(
+            item: items[i],
+            ref: ref,
+            canUpdate: canUpdate,
+            canDelete: canDelete,
+            onUnauthorized: () => _showNoPermissionSnackBar(context),
+          ),
     );
   }
 }
 
 class _DelegateAssignmentCard extends StatelessWidget {
-  const _DelegateAssignmentCard({required this.item, required this.ref});
+  const _DelegateAssignmentCard({
+    required this.item,
+    required this.ref,
+    this.canUpdate = true,
+    this.canDelete = true,
+    this.onUnauthorized,
+  });
   final Map<String, dynamic> item;
   final WidgetRef ref;
+  final bool canUpdate;
+  final bool canDelete;
+  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
@@ -1137,6 +1220,9 @@ class _DelegateAssignmentCard extends StatelessWidget {
                           .deleteAssignment(number(item, 'id').toInt()),
                       () => ref.invalidate(_delegateAssignmentsProvider),
                     ),
+                    canUpdate: canUpdate,
+                    canDelete: canDelete,
+                    onUnauthorized: onUnauthorized,
                   ),
                 ],
               ),
@@ -1299,15 +1385,21 @@ class _DelegateResourcesScreenState extends ConsumerState<DelegateResourcesScree
   Widget build(BuildContext context) {
     final state = ref.watch(_delegateResourcesProvider);
 
+    const canUpdate = true;
+    const canDelete = true;
+
     return DelegateShell(
       currentIndex: 8,
       title: 'مصادر المقرر',
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _resourceSheet(context, ref),
-        icon: const Icon(Icons.cloud_upload_rounded),
-        label: const Text('رفع ملف', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF0D9488),
-        foregroundColor: Colors.white,
+      floatingActionButton: Opacity(
+        opacity: 1.0,
+        child: FloatingActionButton.extended(
+          onPressed: () => _resourceSheet(context, ref),
+          icon: const Icon(Icons.cloud_upload_rounded),
+          label: const Text('رفع ملف', style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: const Color(0xFF0D9488),
+          foregroundColor: Colors.white,
+        ),
       ),
       child: _AsyncBody<Map<String, dynamic>>(
         state: state,
@@ -1421,7 +1513,13 @@ class _DelegateResourcesScreenState extends ConsumerState<DelegateResourcesScree
                       childAspectRatio: 0.8,
                     ),
                     itemCount: filtered.length,
-                    itemBuilder: (ctx, i) => _DelegateResourceGridCard(resource: filtered[i], ref: ref),
+                    itemBuilder: (ctx, i) => _DelegateResourceGridCard(
+                      resource: filtered[i],
+                      ref: ref,
+                      canUpdate: canUpdate,
+                      canDelete: canDelete,
+                      onUnauthorized: () => _showNoPermissionSnackBar(context),
+                    ),
                   );
                 }
 
@@ -1429,7 +1527,13 @@ class _DelegateResourcesScreenState extends ConsumerState<DelegateResourcesScree
                   padding: const EdgeInsets.fromLTRB(18, 16, 18, 100),
                   itemCount: filtered.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (ctx, i) => _DelegateResourceCard(resource: filtered[i], ref: ref),
+                  itemBuilder: (ctx, i) => _DelegateResourceCard(
+                    resource: filtered[i],
+                    ref: ref,
+                    canUpdate: canUpdate,
+                    canDelete: canDelete,
+                    onUnauthorized: () => _showNoPermissionSnackBar(context),
+                  ),
                 );
               }).toList(),
             ),
@@ -1585,9 +1689,18 @@ class _ResourceIconButton extends StatelessWidget {
 }
 
 class _DelegateResourceCard extends StatelessWidget {
-  const _DelegateResourceCard({required this.resource, required this.ref});
+  const _DelegateResourceCard({
+    required this.resource,
+    required this.ref,
+    this.canUpdate = true,
+    this.canDelete = true,
+    this.onUnauthorized,
+  });
   final Map<String, dynamic> resource;
   final WidgetRef ref;
+  final bool canUpdate;
+  final bool canDelete;
+  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
@@ -1631,6 +1744,9 @@ class _DelegateResourceCard extends StatelessWidget {
                   () => ref.read(delegateRepositoryProvider).deleteResource(number(resource, 'id').toInt()),
                   () => ref.invalidate(_delegateResourcesProvider),
                 ),
+                canUpdate: canUpdate,
+                canDelete: canDelete,
+                onUnauthorized: onUnauthorized,
               ),
             ],
           ),
@@ -1641,9 +1757,18 @@ class _DelegateResourceCard extends StatelessWidget {
 }
 
 class _DelegateResourceGridCard extends StatelessWidget {
-  const _DelegateResourceGridCard({required this.resource, required this.ref});
+  const _DelegateResourceGridCard({
+    required this.resource,
+    required this.ref,
+    this.canUpdate = true,
+    this.canDelete = true,
+    this.onUnauthorized,
+  });
   final Map<String, dynamic> resource;
   final WidgetRef ref;
+  final bool canUpdate;
+  final bool canDelete;
+  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
@@ -1698,6 +1823,9 @@ class _DelegateResourceGridCard extends StatelessWidget {
                 () => ref.read(delegateRepositoryProvider).deleteResource(number(resource, 'id').toInt()),
                 () => ref.invalidate(_delegateResourcesProvider),
               ),
+              canUpdate: canUpdate,
+              canDelete: canDelete,
+              onUnauthorized: onUnauthorized,
             ),
           ),
         ],
@@ -1731,11 +1859,17 @@ class _DelegateExamScheduleCard extends StatefulWidget {
     required this.schedule,
     required this.onEdit,
     required this.onDelete,
+    this.canUpdate = true,
+    this.canDelete = true,
+    this.onUnauthorized,
   });
 
   final Map<String, dynamic> schedule;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final bool canUpdate;
+  final bool canDelete;
+  final VoidCallback? onUnauthorized;
 
   @override
   State<_DelegateExamScheduleCard> createState() =>
@@ -1799,6 +1933,9 @@ class _DelegateExamScheduleCardState extends State<_DelegateExamScheduleCard> {
                         onEdit: widget.onEdit,
                         onDelete: widget.onDelete,
                         iconColor: Colors.white,
+                        canUpdate: widget.canUpdate,
+                        canDelete: widget.canDelete,
+                        onUnauthorized: widget.onUnauthorized,
                       ),
                       Container(
                         width: 32,

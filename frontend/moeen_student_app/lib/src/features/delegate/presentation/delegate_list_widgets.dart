@@ -21,58 +21,7 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
 }
 
-class _SimpleListScreen<T> extends StatelessWidget {
-  const _SimpleListScreen({
-    required this.title,
-    required this.index,
-    required this.state,
-    required this.onRetry,
-    required this.icon,
-    required this.colors,
-    required this.extractor,
-    required this.itemBuilder,
-    this.floatingActionButton,
-  });
 
-  final String title;
-  final int index;
-  final AsyncValue<T> state;
-  final VoidCallback onRetry;
-  final IconData icon;
-  final List<Color> colors;
-  final List<dynamic> Function(T data) extractor;
-  final Widget Function(dynamic item) itemBuilder;
-  final Widget? floatingActionButton;
-
-  @override
-  Widget build(BuildContext context) {
-    return DelegateShell(
-      currentIndex: index,
-      title: title,
-      floatingActionButton: floatingActionButton,
-      child: _AsyncBody<T>(
-        state: state,
-        onRetry: onRetry,
-        builder: (data) {
-          final items = extractor(data);
-          return RefreshIndicator(
-            onRefresh: () async => onRetry(),
-            child: _ListScaffold(
-              title: '$title (${items.length})',
-              subtitle: 'إدارة وعرض بيانات $title بتنسيق واضح وسريع.',
-              icon: icon,
-              colors: colors,
-              children: [
-                if (items.isEmpty) const _EmptyState('لا توجد بيانات حالية.'),
-                for (final item in items) itemBuilder(item),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
 
 class _ListScaffold extends StatelessWidget {
   const _ListScaffold({
@@ -208,7 +157,7 @@ class _HeroPanel extends StatelessWidget {
   }
 }
 
-class _ActionGrid extends StatelessWidget {
+class _ActionGrid extends ConsumerWidget {
   const _ActionGrid({
     required this.onQrTap,
     required this.onStudentsTap,
@@ -226,7 +175,11 @@ class _ActionGrid extends StatelessWidget {
   final VoidCallback onMessagesTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    const canDoQr = true;
+    // For others, we assume view permission is enough for navigation, 
+    // but we can gate based on the resource name if needed.
+
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -240,6 +193,8 @@ class _ActionGrid extends StatelessWidget {
           icon: Icons.qr_code_scanner_rounded,
           color: AppColors.success,
           onTap: onQrTap,
+          isEnabled: canDoQr,
+          onUnauthorized: () => _showNoPermissionSnackBar(context),
         ),
         _ActionItem(
           label: 'الطلاب',
@@ -299,32 +254,39 @@ class _ActionItem extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
+    this.isEnabled = true,
+    this.onUnauthorized,
   });
 
   final String label;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+  final bool isEnabled;
+  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: color.withValues(alpha: 0.15)),
+        Opacity(
+          opacity: isEnabled ? 1.0 : 0.5,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: isEnabled ? onTap : onUnauthorized,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: color.withValues(alpha: 0.15)),
+                ),
+                child: Icon(icon, color: color, size: 28),
               ),
-              child: Icon(icon, color: color, size: 28),
             ),
           ),
         ),
@@ -468,77 +430,242 @@ class _DataCard extends StatelessWidget {
   }
 }
 
-class _NewsCard extends StatelessWidget {
+class _NewsCard extends ConsumerWidget {
   const _NewsCard({required this.item});
   final Object? item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final map = asMap(item);
     final sender = asMap(map['sender']);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.orange.withValues(alpha: 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(height: 6, color: _typeColor(text(map, 'type'))),
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final type = text(map, 'type');
+    final isUnread = map['read_at'] == null;
+    final color = _typeColor(type);
+
+    return _GlassCard(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: () => _showNewsDetails(context, ref, text(map, 'batch_id')),
+        borderRadius: BorderRadius.circular(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.campaign_rounded,
-                      color: _typeColor(text(map, 'type')),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(_typeIcon(type), color: color, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
                         text(map, 'title', fallback: 'خبر جديد'),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 17,
-                        ),
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  text(map, 'message', fallback: text(map, 'content')),
-                  style: const TextStyle(
-                    height: 1.6,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.slate700,
+                      Text(
+                        'من: ${text(sender, 'name', fallback: 'الإدارة')}',
+                        style: const TextStyle(color: AppColors.slate500, fontWeight: FontWeight.w700, fontSize: 11),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  'المصدر: ${text(sender, 'name', fallback: 'الإدارة')} | ${timeText(map)}',
-                  style: const TextStyle(
-                    color: AppColors.slate500,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                if (isUnread)
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(color: AppColors.rose, shape: BoxShape.circle),
                   ),
+              ],
+            ),
+            const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
+            Text(
+              text(map, 'message', fallback: text(map, 'content')),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(height: 1.5, fontWeight: FontWeight.w600, color: AppColors.slate700, fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  timeText(map),
+                  style: const TextStyle(color: AppColors.slate400, fontSize: 11, fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  'قراءة المزيد ←',
+                  style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11),
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _typeIcon(String type) {
+    switch (type) {
+      case 'poll': return Icons.poll_rounded;
+      case 'exam': return Icons.fact_check_rounded;
+      case 'assignment': return Icons.assignment_rounded;
+      case 'attendance': return Icons.how_to_reg_rounded;
+      default: return Icons.campaign_rounded;
+    }
+  }
+
+  Color _typeColor(String type) {
+    switch (type) {
+      case 'poll': return AppColors.violet;
+      case 'exam': return AppColors.danger;
+      case 'assignment': return AppColors.warning;
+      case 'attendance': return AppColors.success;
+      default: return AppColors.orange;
+    }
+  }
+}
+
+Future<void> _showNewsDetails(BuildContext context, WidgetRef ref, String batchId) async {
+  if (batchId.isEmpty) return;
+
+  final messenger = ScaffoldMessenger.of(context);
+  
+  try {
+    final data = await ref.read(delegateRepositoryProvider).newsDetails(batchId);
+    if (!context.mounted) return;
+    
+    final notification = asMap(data['notification']);
+    final sender = asMap(notification['sender']);
+    final type = text(notification, 'type');
+    final pollOptions = asList(data['poll_options']);
+    final hasVoted = data['has_voted'] == true;
+    final userVote = asMap(data['user_vote']);
+
+    showMoeenBottomSheet(
+      context: context,
+      title: 'تفاصيل الخبر',
+      icon: Icons.newspaper_rounded,
+      color: AppColors.orange,
+      child: StatefulBuilder(
+        builder: (context, setModalState) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppColors.slate100,
+                  child: const Icon(Icons.person_rounded, color: AppColors.slate400),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(text(sender, 'name'), style: const TextStyle(fontWeight: FontWeight.w900)),
+                    Text(text(sender, 'role'), style: const TextStyle(fontSize: 11, color: AppColors.slate500)),
+                  ],
+                ),
+                const Spacer(),
+                Text(timeText(notification), style: const TextStyle(fontSize: 11, color: AppColors.slate400)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              text(notification, 'title'),
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.midnight),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              text(notification, 'message'),
+              style: const TextStyle(height: 1.6, fontSize: 14, color: AppColors.slate700, fontWeight: FontWeight.w600),
+            ),
+            if (type == 'poll') ...[
+              const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider()),
+              const Text('شاركنا برأيك:', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.violet)),
+              const SizedBox(height: 12),
+              for (final opt in pollOptions)
+                _PollOptionTile(
+                  option: asMap(opt),
+                  isSelected: number(userVote, 'poll_option_id').toInt() == number(opt, 'id').toInt(),
+                  hasVoted: hasVoted,
+                  onTap: () async {
+                    if (hasVoted) return;
+                    await _run(
+                      context,
+                      () => ref.read(delegateRepositoryProvider).voteNews(
+                            batchId: batchId,
+                            optionId: number(opt, 'id').toInt(),
+                          ),
+                      after: () => ref.invalidate(_delegateNewsProvider),
+                    );
+                    Navigator.pop(context);
+                    ref.invalidate(_delegateNewsProvider);
+                  },
+                ),
+            ],
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+    // Mark as read locally after showing
+    ref.invalidate(_delegateNewsProvider);
+  } catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: AppColors.danger));
+  }
+}
+
+class _PollOptionTile extends StatelessWidget {
+  const _PollOptionTile({
+    required this.option,
+    required this.isSelected,
+    required this.hasVoted,
+    required this.onTap,
+  });
+
+  final Map<String, dynamic> option;
+  final bool isSelected;
+  final bool hasVoted;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isSelected ? AppColors.violet : AppColors.slate200;
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: color, width: 2),
+            borderRadius: BorderRadius.circular(12),
+            color: isSelected ? color.withValues(alpha: 0.05) : Colors.transparent,
           ),
-        ],
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  text(option, 'option_text'),
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                    color: isSelected ? AppColors.violet : AppColors.slate700,
+                  ),
+                ),
+              ),
+              if (isSelected) const Icon(Icons.check_circle_rounded, color: AppColors.violet, size: 20),
+            ],
+          ),
+        ),
       ),
     );
   }

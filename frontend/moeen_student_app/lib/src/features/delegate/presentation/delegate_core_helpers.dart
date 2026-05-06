@@ -133,7 +133,10 @@ String _formatReminderTime(TimeOfDay time) {
   return '$hour:$minute';
 }
 
-Future<void> pickDate(BuildContext context, TextEditingController controller) async {
+Future<void> pickDate(
+  BuildContext context,
+  TextEditingController controller,
+) async {
   final picked = await showDatePicker(
     context: context,
     initialDate: DateTime.now(),
@@ -145,7 +148,10 @@ Future<void> pickDate(BuildContext context, TextEditingController controller) as
   }
 }
 
-Future<void> pickTime(BuildContext context, TextEditingController controller) async {
+Future<void> pickTime(
+  BuildContext context,
+  TextEditingController controller,
+) async {
   final picked = await showTimePicker(
     context: context,
     initialTime: TimeOfDay.now(),
@@ -197,14 +203,6 @@ TimeOfDay _parseReminderTime(String value) {
   return const TimeOfDay(hour: 8, minute: 0);
 }
 
-Color _typeColor(String type) => switch (type) {
-  'exam' => AppColors.danger,
-  'assignment' => AppColors.orange,
-  'poll' => AppColors.violet,
-  'attendance' => AppColors.warning,
-  _ => AppColors.royalBlue,
-};
-
 void _toast(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }
@@ -216,8 +214,35 @@ void _showError(BuildContext context, Object error) {
   );
 }
 
+void _showNoPermissionSnackBar(BuildContext context) {
+  showMoeenInfoDialog(
+    context: context,
+    title: 'ليس لديك صلاحيات',
+    message:
+        'ليس لديك صلاحيات لهذه العملية. راجع المسؤول الخاص بكليتك لمنحك الصلاحيات.',
+    buttonLabel: 'موافق',
+    icon: Icons.lock_outline_rounded,
+    color: AppColors.warning,
+  );
+}
+
+
 String _monthName(int month) {
-  const names = ['', 'يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  const names = [
+    '',
+    'يناير',
+    'فبراير',
+    'مارس',
+    'إبريل',
+    'مايو',
+    'يونيو',
+    'يوليو',
+    'أغسطس',
+    'سبتمبر',
+    'أكتوبر',
+    'نوفمبر',
+    'ديسمبر',
+  ];
   return month > 0 && month <= 12 ? names[month] : '';
 }
 
@@ -232,4 +257,46 @@ String _dayLabel(String key) {
     '6' || 'saturday' => 'السبت',
     _ => key,
   };
+}
+
+String timeAgo(String value) {
+  if (value.isEmpty) return '';
+  final date = DateTime.tryParse(value)?.toLocal();
+  if (date == null) return value;
+  final now = DateTime.now();
+  final diff = now.difference(date);
+
+  if (diff.inSeconds < 60) return 'الآن';
+  if (diff.inMinutes < 60) return 'منذ ${diff.inMinutes} دقيقة';
+  if (diff.inHours < 24) return 'منذ ${diff.inHours} ساعة';
+  if (diff.inDays == 1) return 'أمس';
+  if (diff.inDays < 7) return 'منذ ${diff.inDays} أيام';
+  return dateOnly(value);
+}
+
+String prettyDate(String value) {
+  if (value.isEmpty) return '-';
+  final date = DateTime.tryParse(value)?.toLocal();
+  if (date == null) return value;
+  const months = [
+    'يناير',
+    'فبراير',
+    'مارس',
+    'أبريل',
+    'مايو',
+    'يونيو',
+    'يوليو',
+    'أغسطس',
+    'سبتمبر',
+    'أكتوبر',
+    'نوفمبر',
+    'ديسمبر',
+  ];
+  return '${date.day} ${months[date.month - 1]} ${date.year}';
+}
+
+Color _hexColor(String value, Color fallback) {
+  final clean = value.replaceAll('#', '');
+  if (clean.length != 6) return fallback;
+  return Color(int.tryParse('FF$clean', radix: 16) ?? fallback.toARGB32());
 }

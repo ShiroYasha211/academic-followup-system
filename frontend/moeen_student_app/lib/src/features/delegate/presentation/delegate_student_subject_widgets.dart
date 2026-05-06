@@ -6,11 +6,15 @@ class _StudentsHeader extends StatelessWidget {
     required this.active,
     required this.male,
     required this.onImport,
+    this.isEnabled = true,
+    this.onUnauthorized,
   });
   final int total;
   final int active;
   final int male;
   final VoidCallback onImport;
+  final bool isEnabled;
+  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
@@ -62,18 +66,21 @@ class _StudentsHeader extends StatelessWidget {
                   ],
                 ),
                 InkWell(
-                  onTap: onImport,
+                  onTap: isEnabled ? onImport : onUnauthorized,
                   borderRadius: BorderRadius.circular(18),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: const Icon(
-                      Icons.table_view_rounded,
-                      color: Colors.white,
-                      size: 32,
+                  child: Opacity(
+                    opacity: isEnabled ? 1.0 : 0.5,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Icon(
+                        Icons.table_view_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
                     ),
                   ),
                 ),
@@ -103,56 +110,64 @@ class _PremiumAddButton extends StatelessWidget {
     required this.onPressed,
     this.label = 'إضافة طالب جديد',
     this.icon = Icons.person_add_rounded,
+    this.isEnabled = true,
+    this.onUnauthorized,
   });
   final VoidCallback onPressed;
   final String label;
   final IconData icon;
+  final bool isEnabled;
+  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 64,
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.royalBlue.withValues(alpha: 0.4),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onPressed,
+    return Opacity(
+      opacity: isEnabled ? 1.0 : 0.5,
+      child: Container(
+        height: 64,
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
           borderRadius: BorderRadius.circular(24),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color:
+                  AppColors.royalBlue.withValues(alpha: isEnabled ? 0.4 : 0.1),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: isEnabled ? onPressed : onUnauthorized,
+            borderRadius: BorderRadius.circular(24),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 22),
                   ),
-                  child: Icon(icon, color: Colors.white, size: 22),
-                ),
-                const SizedBox(width: 16),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                    letterSpacing: 0.5,
+                  const SizedBox(width: 16),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -203,16 +218,26 @@ class _StudentCard extends StatelessWidget {
     required this.onEdit,
     required this.onPermissions,
     required this.onDelete,
+    this.canUpdate = true,
+    this.canDelete = true,
+    this.onUnauthorized,
   });
   final Map<String, dynamic> student;
   final VoidCallback onEdit;
   final VoidCallback onPermissions;
   final VoidCallback onDelete;
+  final bool canUpdate;
+  final bool canDelete;
+  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
     final status = text(student, 'status');
     final gender = text(student, 'gender');
+    final email = text(student, 'email');
+    final displayEmail = email.endsWith('@students.moeen.local')
+        ? 'البريد غير مضاف'
+        : email;
     final isActive = status == 'active';
 
     return Container(
@@ -286,7 +311,7 @@ class _StudentCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  text(student, 'email'),
+                  displayEmail,
                   style: const TextStyle(
                     color: AppColors.slate300,
                     fontSize: 10,
@@ -304,18 +329,23 @@ class _StudentCard extends StatelessWidget {
                 icon: Icons.edit_rounded,
                 color: AppColors.midnight,
                 onTap: onEdit,
+                isEnabled: canUpdate,
+                onUnauthorized: onUnauthorized,
               ),
               const SizedBox(width: 8),
               _ActionBtn(
                 icon: Icons.security_rounded,
                 color: AppColors.royalBlue,
                 onTap: onPermissions,
+                isEnabled: true,
               ),
               const SizedBox(width: 8),
               _ActionBtn(
                 icon: Icons.delete_rounded,
                 color: AppColors.danger,
                 onTap: onDelete,
+                isEnabled: canDelete,
+                onUnauthorized: onUnauthorized,
               ),
             ],
           ),
@@ -330,22 +360,29 @@ class _ActionBtn extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
+    this.isEnabled = true,
+    this.onUnauthorized,
   });
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+  final bool isEnabled;
+  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
+      onTap: isEnabled ? onTap : onUnauthorized,
+      child: Opacity(
+        opacity: isEnabled ? 1.0 : 0.4,
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color, size: 18),
         ),
-        child: Icon(icon, color: color, size: 18),
       ),
     );
   }
@@ -455,10 +492,16 @@ class _SubjectCard extends StatelessWidget {
     required this.subject,
     required this.onEdit,
     required this.onDelete,
+    this.canUpdate = true,
+    this.canDelete = true,
+    this.onUnauthorized,
   });
   final Map<String, dynamic> subject;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final bool canUpdate;
+  final bool canDelete;
+  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
@@ -488,12 +531,16 @@ class _SubjectCard extends StatelessWidget {
                     icon: Icons.edit_rounded,
                     color: AppColors.royalBlue,
                     onTap: onEdit,
+                    isEnabled: canUpdate,
+                    onUnauthorized: onUnauthorized,
                   ),
                   const SizedBox(width: 8),
                   _ActionBtn(
                     icon: Icons.delete_outline_rounded,
                     color: AppColors.danger,
                     onTap: onDelete,
+                    isEnabled: canDelete,
+                    onUnauthorized: onUnauthorized,
                   ),
                 ],
               ),

@@ -12,7 +12,11 @@ import '../network/api_exception.dart';
 enum DownloadEventType { started, progress, completed, failed }
 
 class DownloadEvent {
-  const DownloadEvent({required this.type, required this.fileName, this.progress});
+  const DownloadEvent({
+    required this.type,
+    required this.fileName,
+    this.progress,
+  });
   final DownloadEventType type;
   final String fileName;
   final int? progress;
@@ -44,6 +48,11 @@ class DownloadService {
     _initialized = true;
   }
 
+  static Future<void> previewFile(String? url, String? fileName) async {
+    if (url == null || url.isEmpty) return;
+    await downloadUrl(url: url, fileName: fileName ?? 'file');
+  }
+
   static Future<String?> downloadUrl({
     required String url,
     required String fileName,
@@ -57,7 +66,9 @@ class DownloadService {
     try {
       _activeDownloads.add(id);
       // Emit in-app "started" event
-      _eventController.add(DownloadEvent(type: DownloadEventType.started, fileName: safeName));
+      _eventController.add(
+        DownloadEvent(type: DownloadEventType.started, fileName: safeName),
+      );
       await _showProgress(id, safeName, null);
 
       final response = await dio.get<List<int>>(
@@ -108,14 +119,18 @@ class DownloadService {
       await _showProgress(id, safeName, 100);
       await _showCompleted(id, safeName);
       // Emit in-app "completed" event
-      _eventController.add(DownloadEvent(type: DownloadEventType.completed, fileName: safeName));
+      _eventController.add(
+        DownloadEvent(type: DownloadEventType.completed, fileName: safeName),
+      );
       await OpenFilex.open(savedPath);
       return savedPath;
     } on DioException catch (error) {
       _activeDownloads.remove(id);
       await _showFailed(id, safeName);
       // Emit in-app "failed" event
-      _eventController.add(DownloadEvent(type: DownloadEventType.failed, fileName: safeName));
+      _eventController.add(
+        DownloadEvent(type: DownloadEventType.failed, fileName: safeName),
+      );
       throw ApiException(
         error.type == DioExceptionType.connectionError
             ? 'تعذر الاتصال أثناء تحميل الملف.'
@@ -126,7 +141,9 @@ class DownloadService {
       _activeDownloads.remove(id);
       await _showFailed(id, safeName);
       // Emit in-app "failed" event
-      _eventController.add(DownloadEvent(type: DownloadEventType.failed, fileName: safeName));
+      _eventController.add(
+        DownloadEvent(type: DownloadEventType.failed, fileName: safeName),
+      );
       throw const ApiException('تعذر حفظ الملف في المسار المختار.');
     }
   }

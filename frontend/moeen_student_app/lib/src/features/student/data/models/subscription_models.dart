@@ -35,6 +35,7 @@ class SubscriptionPackage {
     required this.priceStudent,
     required this.priceDelegate,
     required this.description,
+    this.effectivePrice,
   });
 
   final int id;
@@ -43,8 +44,10 @@ class SubscriptionPackage {
   final double priceStudent;
   final double priceDelegate;
   final String description;
+  final double? effectivePrice;
 
-  double get displayPrice => priceStudent > 0 ? priceStudent : priceDelegate;
+  double get displayPrice =>
+      effectivePrice ?? (priceStudent > 0 ? priceStudent : priceDelegate);
 
   factory SubscriptionPackage.fromJson(Map<String, dynamic> json) {
     return SubscriptionPackage(
@@ -53,6 +56,9 @@ class SubscriptionPackage {
       durationDays: _int(json['duration_days']),
       priceStudent: _double(json['price_student']),
       priceDelegate: _double(json['price_delegate']),
+      effectivePrice: json['effective_price'] == null
+          ? null
+          : _double(json['effective_price']),
       description: (json['description'] ?? 'استكشف مزايا النظام التعليمية.')
           .toString(),
     );

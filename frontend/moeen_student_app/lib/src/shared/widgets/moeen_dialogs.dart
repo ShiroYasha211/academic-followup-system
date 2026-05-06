@@ -292,4 +292,47 @@ class MoeenDialogs {
   static void showError(BuildContext context, {required String message, String title = 'خطأ'}) {
     showMoeenInfoDialog(context: context, title: title, message: message, icon: Icons.error_outline_rounded, color: AppColors.danger);
   }
+
+  static void showImage(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(color: Colors.black.withValues(alpha: 0.85)),
+              ),
+            ),
+          ),
+          Center(
+            child: InteractiveViewer(
+              maxScale: 5.0,
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Center(
+                  child: Icon(Icons.broken_image_rounded, color: Colors.white, size: 64),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 10,
+            right: 20,
+            child: Material(
+              color: Colors.black26,
+              shape: const CircleBorder(),
+              child: IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

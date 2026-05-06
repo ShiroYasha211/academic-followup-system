@@ -7,7 +7,7 @@ import '../../auth/logic/auth_controller.dart';
 import '../data/models/student_dashboard.dart';
 import '../logic/student_controllers.dart';
 import 'student_content_screens.dart';
-import 'student_placeholder_screen.dart';
+import 'student_support_screen.dart';
 import 'widgets/student_shell.dart';
 import 'widgets/student_widgets.dart';
 
@@ -700,7 +700,6 @@ class _QuickActions extends StatelessWidget {
         'attendance',
         AppColors.success,
       ),
-      _ActionData('الدرجات', Icons.grade_rounded, 'grades', AppColors.gold),
       _ActionData(
         'الأخبار',
         Icons.campaign_rounded,
@@ -716,7 +715,7 @@ class _QuickActions extends StatelessWidget {
       _ActionData(
         'المساعدة',
         Icons.support_agent_rounded,
-        'support',
+        StudentSupportScreen.route,
         AppColors.info,
       ),
     ];
@@ -752,9 +751,7 @@ class _QuickActions extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 borderRadius: BorderRadius.circular(24),
-                onTap: () => action.key.startsWith('/student/')
-                    ? context.go(action.key)
-                    : context.go(StudentPlaceholderScreen.path(action.key)),
+                onTap: () => context.go(action.key),
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white,

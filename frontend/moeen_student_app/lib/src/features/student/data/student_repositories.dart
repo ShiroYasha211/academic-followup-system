@@ -142,6 +142,12 @@ class StudentContentRepository {
   }
 
   Future<Map<String, dynamic>> studyCenter({String? tab}) async {
+    try {
+      await _api.get('/student/study-center/check-reminders');
+    } catch (_) {
+      // Reminder checks should not block opening the study center.
+    }
+
     final response = await _api.get(
       '/student/study-center',
       queryParameters: {if (tab != null) 'tab': tab},

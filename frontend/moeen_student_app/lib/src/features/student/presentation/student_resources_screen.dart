@@ -10,16 +10,18 @@ class StudentResourcesScreen extends ConsumerStatefulWidget {
       _StudentResourcesScreenState();
 }
 
-class _StudentResourcesScreenState
-    extends ConsumerState<StudentResourcesScreen> with SingleTickerProviderStateMixin {
+class _StudentResourcesScreenState extends ConsumerState<StudentResourcesScreen>
+    with SingleTickerProviderStateMixin {
   final _search = TextEditingController();
   late TabController _tabController;
-  
+
   final List<Map<String, String>> _categories = [
     {'value': 'all', 'label': 'الكل'},
-    {'value': 'book', 'label': 'الكتب'},
-    {'value': 'lecture', 'label': 'المحاضرات'},
-    {'value': 'summary', 'label': 'الملخصات'},
+    {'value': 'lectures', 'label': 'المحاضرات'},
+    {'value': 'summaries', 'label': 'الملخصات'},
+    {'value': 'quizzes', 'label': 'كويزات'},
+    {'value': 'exams', 'label': 'نماذج اختبارات'},
+    {'value': 'references', 'label': 'مراجع'},
     {'value': 'other', 'label': 'أخرى'},
   ];
 
@@ -74,7 +76,9 @@ class _StudentResourcesScreenState
   Widget _buildLayout(BuildContext context, dynamic data) {
     final stats = asMap(data['stats']);
     final subjects = asList(data['subjects']).map(asMap).toList();
-    final resources = asList(asMap(data['resources'])['data']).map(asMap).toList();
+    final resources = asList(
+      asMap(data['resources'])['data'],
+    ).map(asMap).toList();
 
     return NestedScrollView(
       headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -85,7 +89,8 @@ class _StudentResourcesScreenState
               children: [
                 _CompactHeader(
                   title: 'المكتبة الرقمية',
-                  subtitle: '${text(stats, 'total_files', fallback: resources.length.toString())} ملف متاح للدراسة',
+                  subtitle:
+                      '${text(stats, 'total_files', fallback: resources.length.toString())} ملف متاح للدراسة',
                   icon: Icons.auto_stories_rounded,
                   color: const Color(0xFF0D9488),
                 ),
@@ -134,8 +139,14 @@ class _StudentResourcesScreenState
                       ),
                     ],
                   ),
-                  labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
-                  unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
                   tabs: _categories.map((c) => Tab(text: c['label'])).toList(),
                 ),
               ),
@@ -149,7 +160,16 @@ class _StudentResourcesScreenState
           final catValue = cat['value'];
           final filtered = catValue == 'all'
               ? resources
-              : resources.where((r) => text(r, 'category') == catValue).toList();
+              : resources.where((r) {
+                  final c = text(r, 'category');
+                  if (catValue == 'lectures' &&
+                      (c == 'lectures' || c == 'lecture'))
+                    return true;
+                  if (catValue == 'summaries' &&
+                      (c == 'summaries' || c == 'summary'))
+                    return true;
+                  return c == catValue;
+                }).toList();
 
           if (filtered.isEmpty) {
             return const EmptyState(
@@ -189,15 +209,27 @@ class _StudentResourcesScreenState
     );
   }
 
-  Future<void> _downloadDirect(BuildContext context, Map<String, dynamic> item) async {
+  Future<void> _downloadDirect(
+    BuildContext context,
+    Map<String, dynamic> item,
+  ) async {
     final path = text(item, 'file_path');
     if (path.isEmpty) return;
-    
-    final url = absoluteUrl(path.startsWith('storage/') ? path : 'storage/$path');
-    await _downloadUrlToFile(context, url, text(item, 'title', fallback: 'resource'));
+
+    final url = absoluteUrl(
+      path.startsWith('storage/') ? path : 'storage/$path',
+    );
+    await _downloadUrlToFile(
+      context,
+      url,
+      text(item, 'title', fallback: 'resource'),
+    );
   }
 
-  Future<void> _showAdvancedFilters(BuildContext context, List<Map<String, dynamic>> subjects) async {
+  Future<void> _showAdvancedFilters(
+    BuildContext context,
+    List<Map<String, dynamic>> subjects,
+  ) async {
     int? subject = _subjectId;
     String selectedSort = _sort;
 
@@ -215,7 +247,12 @@ class _StudentResourcesScreenState
               decoration: const InputDecoration(labelText: 'المادة الدراسية'),
               items: [
                 const DropdownMenuItem(value: null, child: Text('كل المواد')),
-                ...subjects.map((s) => DropdownMenuItem(value: number(s, 'id').toInt(), child: Text(text(s, 'name')))),
+                ...subjects.map(
+                  (s) => DropdownMenuItem(
+                    value: number(s, 'id').toInt(),
+                    child: Text(text(s, 'name')),
+                  ),
+                ),
               ],
               onChanged: (val) => setLocal(() => subject = val),
             ),
@@ -228,12 +265,15 @@ class _StudentResourcesScreenState
                 DropdownMenuItem(value: 'oldest', child: Text('الأقدم أولاً')),
                 DropdownMenuItem(value: 'title', child: Text('العنوان (أ-ي)')),
               ],
-              onChanged: (val) => setLocal(() => selectedSort = val ?? 'newest'),
+              onChanged: (val) =>
+                  setLocal(() => selectedSort = val ?? 'newest'),
             ),
             const SizedBox(height: 24),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0D9488)),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF0D9488),
+              ),
               child: const Text('تطبيق الفلترة'),
             ),
           ],
@@ -279,7 +319,7 @@ class _ResourceActionRow extends StatelessWidget {
                   color: AppColors.midnight.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
-                )
+                ),
               ],
             ),
             child: TextField(
@@ -287,7 +327,10 @@ class _ResourceActionRow extends StatelessWidget {
               onSubmitted: (_) => onSearch(),
               decoration: const InputDecoration(
                 hintText: 'ابحث عن اسم الملف أو المادة...',
-                prefixIcon: Icon(Icons.search_rounded, color: AppColors.slate400),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: AppColors.slate400,
+                ),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(vertical: 15),
               ),
@@ -296,14 +339,13 @@ class _ResourceActionRow extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         _IconButton(
-          icon: isGrid ? Icons.format_list_bulleted_rounded : Icons.grid_view_rounded,
+          icon: isGrid
+              ? Icons.format_list_bulleted_rounded
+              : Icons.grid_view_rounded,
           onTap: onToggleView,
         ),
         const SizedBox(width: 8),
-        _IconButton(
-          icon: Icons.tune_rounded,
-          onTap: onFilter,
-        ),
+        _IconButton(icon: Icons.tune_rounded, onTap: onFilter),
       ],
     );
   }

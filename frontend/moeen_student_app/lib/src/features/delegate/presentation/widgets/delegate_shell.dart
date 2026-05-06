@@ -49,12 +49,16 @@ class DelegateShell extends ConsumerWidget {
     required this.title,
     required this.child,
     this.floatingActionButton,
+    this.bottom,
+    this.actions,
   });
 
   final int currentIndex;
   final String title;
   final Widget child;
   final Widget? floatingActionButton;
+  final PreferredSizeWidget? bottom;
+  final List<Widget>? actions;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -85,8 +89,13 @@ class DelegateShell extends ConsumerWidget {
       child: Scaffold(
         extendBodyBehindAppBar: true,
         backgroundColor: AppColors.cream,
-        appBar: _DelegateAppBar(title: title, session: session),
-        body: SafeArea(bottom: false, child: child),
+        appBar: _DelegateAppBar(
+          title: title,
+          session: session,
+          bottom: bottom,
+          actions: actions,
+        ),
+        body: SafeArea(child: child),
         floatingActionButton: floatingActionButton,
         drawer: _DelegateDrawer(currentIndex: currentIndex),
       ),
@@ -95,13 +104,21 @@ class DelegateShell extends ConsumerWidget {
 }
 
 class _DelegateAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _DelegateAppBar({required this.title, required this.session});
+  const _DelegateAppBar({
+    required this.title,
+    this.session,
+    this.bottom,
+    this.actions,
+  });
 
   final String title;
   final AuthSession? session;
+  final PreferredSizeWidget? bottom;
+  final List<Widget>? actions;
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 8);
+  Size get preferredSize =>
+      Size.fromHeight(kToolbarHeight + 8 + (bottom?.preferredSize.height ?? 0));
 
   @override
   Widget build(BuildContext context) {
@@ -158,12 +175,13 @@ class _DelegateAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
             ],
           ),
-          actions: const [
+          actions: actions ?? const [
             Padding(
               padding: EdgeInsetsDirectional.only(end: 12),
               child: _DelegateBadge(),
             ),
           ],
+          bottom: bottom,
         ),
       ),
     );
@@ -380,21 +398,21 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
       _DrawerItem(
         'الملف الشخصي',
         Icons.person_rounded,
-        22,
+        20,
         DelegateRoutes.profile,
         false,
       ),
       _DrawerItem(
         'الاشتراك والرصيد',
         Icons.workspace_premium_rounded,
-        20,
+        18,
         DelegateRoutes.subscription,
         false,
       ),
       _DrawerItem(
         'كشف الحساب',
         Icons.receipt_long_rounded,
-        21,
+        19,
         DelegateRoutes.ledger,
         false,
       ),
@@ -450,7 +468,7 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
         true,
       ),
       _DrawerItem(
-        'الجدول الزمني الذكي',
+        'التذكيرات',
         Icons.event_note_rounded,
         10,
         DelegateRoutes.reminders,
@@ -473,31 +491,17 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
         true,
       ),
       _DrawerItem(
-        'QR حضور',
-        Icons.qr_code_2_rounded,
-        13,
-        DelegateRoutes.qrAttendance,
-        true,
-      ),
-      _DrawerItem(
         'إنذارات الغياب',
         Icons.warning_rounded,
-        14,
+        13,
         DelegateRoutes.absenceAlerts,
         true,
       ),
       _DrawerItem(
         'الدرجات المفوضة',
         Icons.grade_rounded,
-        15,
+        14,
         DelegateRoutes.authorizedGrades,
-        true,
-      ),
-      _DrawerItem(
-        'تفويض مساعدين',
-        Icons.manage_accounts_rounded,
-        16,
-        DelegateRoutes.gradeDelegations,
         true,
       ),
     ]),
@@ -519,21 +523,21 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
       _DrawerItem(
         'رسائل الطلاب',
         Icons.forum_rounded,
-        17,
+        15,
         DelegateRoutes.messages,
         true,
       ),
       _DrawerItem(
         'محادثات الدكاترة',
         Icons.medical_services_rounded,
-        18,
+        16,
         DelegateRoutes.doctorChats,
         true,
       ),
       _DrawerItem(
         'استفسارات الدكتور',
         Icons.contact_support_rounded,
-        19,
+        17,
         DelegateRoutes.inquiries,
         true,
       ),

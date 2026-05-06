@@ -14,6 +14,7 @@ import '../../features/student/presentation/student_content_screens.dart';
 import '../../features/student/presentation/student_ledger_screen.dart';
 import '../../features/student/presentation/student_placeholder_screen.dart';
 import '../../features/student/presentation/student_subscription_screen.dart';
+import '../../features/student/presentation/student_support_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -49,6 +50,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: StudentLedgerScreen.route,
         builder: (context, state) => const StudentLedgerScreen(),
+      ),
+      GoRoute(
+        path: StudentSupportScreen.route,
+        builder: (context, state) => const StudentSupportScreen(),
       ),
       GoRoute(
         path: StudentSubjectsScreen.route,
@@ -272,7 +277,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: DelegateRoutes.libraryImport,
-        builder: (context, state) => const DelegateLibraryImportScreen(),
+        builder: (context, state) => const DelegateSharedLibraryScreen(),
       ),
       GoRoute(
         path: DelegateRoutes.reminders,
@@ -288,7 +293,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: DelegateRoutes.qrAttendance,
-        builder: (context, state) => const DelegateQrAttendanceScreen(),
+        builder: (context, state) => const DelegateAttendanceScreen(),
       ),
       GoRoute(
         path: DelegateRoutes.absenceAlerts,
@@ -300,8 +305,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: DelegateRoutes.gradeDelegations,
-        builder: (context, state) =>
-            const DelegateGradeHelperDelegationsScreen(),
+        builder: (context, state) => const DelegateAuthorizedGradesScreen(),
       ),
       GoRoute(
         path: DelegateRoutes.messages,

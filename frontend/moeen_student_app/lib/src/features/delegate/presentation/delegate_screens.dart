@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -8,9 +9,11 @@ import 'package:go_router/go_router.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:dio/dio.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/downloads/download_service.dart';
 import '../../../shared/widgets/moeen_dialogs.dart';
 import '../../auth/logic/auth_controller.dart';
 import '../../student/data/models/financial_ledger.dart';
@@ -62,14 +65,25 @@ final _delegateAssignmentsProvider = FutureProvider.autoDispose<List<dynamic>>(
 final _delegateResourcesProvider = FutureProvider.autoDispose<Map<String, dynamic>>(
   (ref) => ref.watch(delegateRepositoryProvider).resources(),
 );
+final _delegateSharedLibraryProvider = FutureProvider.autoDispose
+    .family<List<dynamic>, ({String? query, String? category, int? subjectId})>(
+      (ref, q) => ref.watch(delegateRepositoryProvider).searchLibrary(
+            query: q.query,
+            category: q.category,
+            subjectId: q.subjectId,
+          ),
+    );
 final _delegateRemindersProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, String>(
       (ref, filter) =>
           ref.watch(delegateRepositoryProvider).reminders(filter: filter),
     );
-final _delegateAnnouncementsProvider =
-    FutureProvider.autoDispose<List<dynamic>>(
-      (ref) => ref.watch(delegateRepositoryProvider).announcements(),
+final _delegateAnnouncementsProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, ({String? query, String? category})>(
+      (ref, q) => ref.watch(delegateRepositoryProvider).announcements(
+            query: q.query,
+            category: q.category,
+          ),
     );
 final _delegateAttendanceProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>(

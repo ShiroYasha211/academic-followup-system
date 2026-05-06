@@ -561,25 +561,53 @@ void _showNewsDetails(BuildContext context, Map<String, dynamic> item) {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (attachment.isNotEmpty && isImageUrl(attachment))
-          Container(
-            width: double.infinity,
-            height: 250,
-            margin: const EdgeInsets.only(bottom: 20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Image.network(
-              attachment,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => const _NewsImageFallback(height: 200),
+          GestureDetector(
+            onTap: () => MoeenDialogs.showImage(context, attachment),
+            child: Container(
+              width: double.infinity,
+              height: 250,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    attachment,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const _NewsImageFallback(height: 200),
+                  ),
+                  Positioned(
+                    right: 12,
+                    bottom: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.zoom_out_map_rounded, color: Colors.white, size: 16),
+                          SizedBox(width: 8),
+                          Text('تكبير وعرض', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         Row(
@@ -653,7 +681,7 @@ void _showNewsDetails(BuildContext context, Map<String, dynamic> item) {
             fontWeight: FontWeight.w500,
           ),
         ),
-        if (attachment.isNotEmpty && !isImageUrl(attachment)) ...[
+        if (attachment.isNotEmpty) ...[
           const SizedBox(height: 30),
           Container(
             padding: const EdgeInsets.all(16),
@@ -1110,20 +1138,21 @@ String timeOnly(String value) {
 }
 
 bool isImageUrl(String url) {
-  final lower = url.toLowerCase();
-  return lower.endsWith('.png') ||
-      lower.endsWith('.jpg') ||
-      lower.endsWith('.jpeg') ||
-      lower.endsWith('.webp') ||
-      lower.endsWith('.gif');
+  final clean = url.split('?').first.toLowerCase();
+  return clean.endsWith('.png') ||
+      clean.endsWith('.jpg') ||
+      clean.endsWith('.jpeg') ||
+      clean.endsWith('.webp') ||
+      clean.endsWith('.gif');
 }
 
 String absoluteUrl(String url) {
-  if (url.isEmpty) return '';
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  final trimmed = url.trim();
+  if (trimmed.isEmpty) return '';
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
   final base = AppConfig.apiBaseUrl.replaceFirst(RegExp(r'/api/?$'), '');
-  if (url.startsWith('/')) return '$base$url';
-  return '$base/$url';
+  if (trimmed.startsWith('/')) return '$base$trimmed';
+  return '$base/$trimmed';
 }
 
 bool isTimeInRange(String startStr, String endStr) {

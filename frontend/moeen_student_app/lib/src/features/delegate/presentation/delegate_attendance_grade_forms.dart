@@ -27,71 +27,82 @@ Future<void> _attendanceSheet(
     isScrollControlled: true,
     showDragHandle: true,
     builder: (context) => StatefulBuilder(
-      builder: (context, setState) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.85,
-        builder: (context, controller) => ListView(
-          controller: controller,
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text('رصد حضور ${text(subject, 'name')}', style: _titleStyle),
-            TextField(
-              controller: title,
-              decoration: const InputDecoration(labelText: 'عنوان المحاضرة'),
-            ),
-            TextField(
-              controller: date,
-              decoration: const InputDecoration(labelText: 'التاريخ'),
-            ),
-            const SizedBox(height: 14),
-            for (final raw in students)
-              _GlassCard(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        text(raw, 'name'),
-                        style: const TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                    DropdownButton<String>(
-                      value: statuses[number(raw, 'id').toInt()],
-                      items: const [
-                        DropdownMenuItem(value: 'present', child: Text('حاضر')),
-                        DropdownMenuItem(value: 'absent', child: Text('غائب')),
-                        DropdownMenuItem(value: 'late', child: Text('متأخر')),
-                        DropdownMenuItem(value: 'excused', child: Text('بعذر')),
-                      ],
-                      onChanged: (value) => setState(
-                        () => statuses[number(raw, 'id').toInt()] =
-                            value ?? 'present',
-                      ),
-                    ),
-                  ],
-                ),
+      builder: (context, setState) => SafeArea(
+        child: DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.85,
+          builder: (context, controller) => ListView(
+            controller: controller,
+            padding: const EdgeInsets.all(20),
+            children: [
+              Text('رصد حضور ${text(subject, 'name')}', style: _titleStyle),
+              TextField(
+                controller: title,
+                decoration: const InputDecoration(labelText: 'عنوان المحاضرة'),
               ),
-            ElevatedButton(
-              onPressed: () async {
-                await _run(
-                  context,
-                  () => ref.read(delegateRepositoryProvider).saveAttendance({
-                    'subject_id': number(subject, 'id').toInt(),
-                    'title': title.text.trim(),
-                    'date': date.text.trim(),
-                    'students': statuses.entries
-                        .map(
-                          (entry) => {'id': entry.key, 'status': entry.value},
-                        )
-                        .toList(),
-                  }),
-                  after: () => ref.invalidate(_delegateAttendanceProvider),
-                );
-                if (context.mounted) Navigator.pop(context);
-              },
-              child: const Text('حفظ الحضور'),
-            ),
-          ],
+              TextField(
+                controller: date,
+                decoration: const InputDecoration(labelText: 'التاريخ'),
+              ),
+              const SizedBox(height: 14),
+              for (final raw in students)
+                _GlassCard(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          text(raw, 'name'),
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      DropdownButton<String>(
+                        value: statuses[number(raw, 'id').toInt()],
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'present',
+                            child: Text('حاضر'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'absent',
+                            child: Text('غائب'),
+                          ),
+                          DropdownMenuItem(value: 'late', child: Text('متأخر')),
+                          DropdownMenuItem(
+                            value: 'excused',
+                            child: Text('بعذر'),
+                          ),
+                        ],
+                        onChanged: (value) => setState(
+                          () => statuses[number(raw, 'id').toInt()] =
+                              value ?? 'present',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ElevatedButton(
+                onPressed: () async {
+                  await _run(
+                    context,
+                    () => ref.read(delegateRepositoryProvider).saveAttendance({
+                      'subject_id': number(subject, 'id').toInt(),
+                      'title': title.text.trim(),
+                      'date': date.text.trim(),
+                      'students': statuses.entries
+                          .map(
+                            (entry) => {'id': entry.key, 'status': entry.value},
+                          )
+                          .toList(),
+                    }),
+                    after: () => ref.invalidate(_delegateAttendanceProvider),
+                  );
+                  if (context.mounted) Navigator.pop(context);
+                },
+                child: const Text('حفظ الحضور'),
+              ),
+            ],
+          ),
         ),
       ),
     ),
@@ -176,53 +187,56 @@ Future<void> _gradesEntrySheet(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (context) => DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.85,
-      builder: (context, controller) => ListView(
-        controller: controller,
-        padding: const EdgeInsets.all(20),
-        children: [
-          const Text('رصد الدرجات', style: _titleStyle),
-          const SizedBox(height: 12),
-          for (final raw in students)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: TextField(
-                controller: controllers[number(raw, 'id').toInt()],
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText:
-                      '${text(raw, 'name')} - ${text(raw, 'student_number', fallback: '-')}',
+    builder: (context) => SafeArea(
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.85,
+        builder: (context, controller) => ListView(
+          controller: controller,
+          padding: const EdgeInsets.all(20),
+          children: [
+            const Text('رصد الدرجات', style: _titleStyle),
+            const SizedBox(height: 12),
+            for (final raw in students)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: TextField(
+                  controller: controllers[number(raw, 'id').toInt()],
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText:
+                        '${text(raw, 'name')} - ${text(raw, 'student_number', fallback: '-')}',
+                  ),
                 ),
               ),
+            ElevatedButton(
+              onPressed: () async {
+                final grades = controllers.entries
+                    .where((entry) => entry.value.text.trim().isNotEmpty)
+                    .map(
+                      (entry) => {
+                        'student_id': entry.key,
+                        'score': entry.value.text.trim(),
+                      },
+                    )
+                    .toList();
+                await _run(
+                  context,
+                  () => ref
+                      .read(delegateRepositoryProvider)
+                      .saveAuthorizedGrades(
+                        categoryId: categoryId,
+                        grades: grades,
+                      ),
+                  after: () =>
+                      ref.invalidate(_delegateAuthorizedGradesProvider),
+                );
+                if (context.mounted) Navigator.pop(context);
+              },
+              child: const Text('إرسال للمراجعة'),
             ),
-          ElevatedButton(
-            onPressed: () async {
-              final grades = controllers.entries
-                  .where((entry) => entry.value.text.trim().isNotEmpty)
-                  .map(
-                    (entry) => {
-                      'student_id': entry.key,
-                      'score': entry.value.text.trim(),
-                    },
-                  )
-                  .toList();
-              await _run(
-                context,
-                () => ref
-                    .read(delegateRepositoryProvider)
-                    .saveAuthorizedGrades(
-                      categoryId: categoryId,
-                      grades: grades,
-                    ),
-                after: () => ref.invalidate(_delegateAuthorizedGradesProvider),
-              );
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: const Text('إرسال للمراجعة'),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );
