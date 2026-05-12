@@ -1839,10 +1839,11 @@ class _IconInfo extends StatelessWidget {
 }
 
 class _NewsCard extends StatelessWidget {
-  const _NewsCard(this.item, {this.isLast = false});
+  const _NewsCard(this.item, {this.isLast = false, this.isPinned = false});
 
   final Map<String, dynamic> item;
   final bool isLast;
+  final bool isPinned;
 
   @override
   Widget build(BuildContext context) {
@@ -1861,20 +1862,24 @@ class _NewsCard extends StatelessWidget {
             child: Column(
               children: [
                 Container(
-                  width: 12,
-                  height: 12,
+                  width: isPinned ? 16 : 12,
+                  height: isPinned ? 16 : 12,
                   decoration: BoxDecoration(
-                    color: color,
+                    color: isPinned ? AppColors.royalBlue : color,
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                     boxShadow: [
                       BoxShadow(
-                        color: color.withValues(alpha: 0.3),
-                        blurRadius: 6,
-                        spreadRadius: 1,
+                        color: (isPinned ? AppColors.royalBlue : color)
+                            .withValues(alpha: 0.3),
+                        blurRadius: isPinned ? 10 : 6,
+                        spreadRadius: isPinned ? 2 : 1,
                       ),
                     ],
                   ),
+                  child: isPinned
+                      ? const Icon(Icons.push_pin_rounded, size: 8, color: Colors.white)
+                      : null,
                 ),
                 if (!isLast)
                   Expanded(
@@ -1900,18 +1905,27 @@ class _NewsCard extends StatelessWidget {
             child: Container(
               margin: const EdgeInsets.only(bottom: 24),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isPinned
+                    ? AppColors.royalBlue.withValues(alpha: 0.03)
+                    : Colors.white,
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(24),
                   bottomLeft: Radius.circular(24),
                   bottomRight: Radius.circular(24),
                   topRight: Radius.circular(4),
                 ),
-                border: Border.all(color: color.withValues(alpha: 0.08)),
+                border: Border.all(
+                  color: isPinned
+                      ? AppColors.royalBlue.withValues(alpha: 0.25)
+                      : color.withValues(alpha: 0.08),
+                  width: isPinned ? 1.5 : 1,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.midnight.withValues(alpha: 0.04),
-                    blurRadius: 16,
+                    color: isPinned
+                        ? AppColors.royalBlue.withValues(alpha: 0.08)
+                        : AppColors.midnight.withValues(alpha: 0.04),
+                    blurRadius: isPinned ? 20 : 16,
                     offset: const Offset(0, 8),
                   ),
                 ],
@@ -1922,6 +1936,34 @@ class _NewsCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Pin banner for pinned items
+                    if (isPinned)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.royalBlue.withValues(alpha: 0.08),
+                              AppColors.royalBlue.withValues(alpha: 0.03),
+                            ],
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.push_pin_rounded, size: 14, color: AppColors.royalBlue),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'إعلان مثبت',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.royalBlue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     if (hasImage)
                       SizedBox(
                         height: 160,

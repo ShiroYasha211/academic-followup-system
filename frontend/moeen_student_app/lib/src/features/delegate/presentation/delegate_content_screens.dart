@@ -43,10 +43,10 @@ class _DelegateSharedLibraryScreenState
   }
 
   ({String? query, String? category, int? subjectId}) get _query => (
-        query: _search.text.trim(),
-        category: _categories[_tabController.index]['value'],
-        subjectId: _subjectId,
-      );
+    query: _search.text.trim(),
+    category: 'all', // Fetch all categories once
+    subjectId: _subjectId,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +61,8 @@ class _DelegateSharedLibraryScreenState
         children: [
           _AsyncBody<List<dynamic>>(
             state: state,
-            onRetry: () => ref.invalidate(_delegateSharedLibraryProvider(query)),
+            onRetry: () =>
+                ref.invalidate(_delegateSharedLibraryProvider(query)),
             builder: (items) {
               final subjects = asList(subjectsState.value).map(asMap).toList();
               return NestedScrollView(
@@ -73,7 +74,8 @@ class _DelegateSharedLibraryScreenState
                         children: [
                           const _HeroPanel(
                             title: 'المكتبة المشتركة',
-                            subtitle: 'استكشف الموارد التعليمية من مختلف الدفعات واستوردها لمقرراتك.',
+                            subtitle:
+                                'استكشف الموارد التعليمية من مختلف الدفعات واستوردها لمقرراتك.',
                             icon: Icons.library_add_rounded,
                             colors: [Color(0xFF0F172A), Color(0xFF334155)],
                           ),
@@ -82,8 +84,10 @@ class _DelegateSharedLibraryScreenState
                             controller: _search,
                             isGrid: _isGrid,
                             onSearch: () => setState(() {}),
-                            onToggleView: () => setState(() => _isGrid = !_isGrid),
-                            onFilter: () => _showFilterDialog(context, subjects),
+                            onToggleView: () =>
+                                setState(() => _isGrid = !_isGrid),
+                            onFilter: () =>
+                                _showFilterDialog(context, subjects),
                           ),
                         ],
                       ),
@@ -115,8 +119,13 @@ class _DelegateSharedLibraryScreenState
                               color: AppColors.primary,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
-                            tabs: _categories.map((c) => Tab(text: c['label'])).toList(),
+                            labelStyle: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                            ),
+                            tabs: _categories
+                                .map((c) => Tab(text: c['label']))
+                                .toList(),
                           ),
                         ),
                       ),
@@ -126,14 +135,32 @@ class _DelegateSharedLibraryScreenState
                 body: TabBarView(
                   controller: _tabController,
                   children: _categories.map((cat) {
-                    if (items.isEmpty) {
+                    final catValue = cat['value']!;
+                    // Local filtering by category
+                    final tabItems = catValue == 'all'
+                        ? items
+                        : items
+                              .where((i) => text(i, 'category') == catValue)
+                              .toList();
+
+                    if (tabItems.isEmpty) {
                       return const Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.search_off_rounded, size: 64, color: AppColors.slate300),
+                            Icon(
+                              Icons.search_off_rounded,
+                              size: 64,
+                              color: AppColors.slate300,
+                            ),
                             SizedBox(height: 16),
-                            Text('لا توجد نتائج تطابق بحثك', style: TextStyle(color: AppColors.slate500, fontWeight: FontWeight.bold)),
+                            Text(
+                              'لا توجد نتائج في هذا القسم',
+                              style: TextStyle(
+                                color: AppColors.slate500,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                       );
@@ -142,33 +169,40 @@ class _DelegateSharedLibraryScreenState
                     if (_isGrid) {
                       return GridView.builder(
                         padding: const EdgeInsets.all(18),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 0.8,
-                        ),
-                        itemCount: items.length,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                              childAspectRatio: 0.7,
+                            ),
+                        itemCount: tabItems.length,
                         itemBuilder: (ctx, i) => _SharedResourceGridCard(
-                          resource: asMap(items[i]),
+                          resource: asMap(tabItems[i]),
                           canImport: true,
-                          onImport: () =>
-                              _showImportSheet(context, asMap(items[i]), subjects),
-                          onPreview: () => _preview(asMap(items[i])),
+                          onImport: () => _showImportSheet(
+                            context,
+                            asMap(tabItems[i]),
+                            subjects,
+                          ),
+                          onPreview: () => _preview(asMap(tabItems[i])),
                         ),
                       );
                     }
 
                     return ListView.separated(
                       padding: const EdgeInsets.fromLTRB(18, 16, 18, 100),
-                      itemCount: items.length,
+                      itemCount: tabItems.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 12),
                       itemBuilder: (ctx, i) => _SharedResourceCard(
-                        resource: asMap(items[i]),
+                        resource: asMap(tabItems[i]),
                         canImport: true,
-                        onImport: () =>
-                            _showImportSheet(context, asMap(items[i]), subjects),
-                        onPreview: () => _preview(asMap(items[i])),
+                        onImport: () => _showImportSheet(
+                          context,
+                          asMap(tabItems[i]),
+                          subjects,
+                        ),
+                        onPreview: () => _preview(asMap(tabItems[i])),
                       ),
                     );
                   }).toList(),
@@ -188,7 +222,10 @@ class _DelegateSharedLibraryScreenState
     );
   }
 
-  Future<void> _showFilterDialog(BuildContext context, List<Map<String, dynamic>> subjects) async {
+  Future<void> _showFilterDialog(
+    BuildContext context,
+    List<Map<String, dynamic>> subjects,
+  ) async {
     int? selected = _subjectId;
     final ok = await showMoeenBottomSheet<bool>(
       context: context,
@@ -204,7 +241,12 @@ class _DelegateSharedLibraryScreenState
               decoration: const InputDecoration(labelText: 'اختر المادة'),
               items: [
                 const DropdownMenuItem(value: null, child: Text('جميع المواد')),
-                ...subjects.map((s) => DropdownMenuItem(value: number(s, 'id').toInt(), child: Text(text(s, 'name')))),
+                ...subjects.map(
+                  (s) => DropdownMenuItem(
+                    value: number(s, 'id').toInt(),
+                    child: Text(text(s, 'name')),
+                  ),
+                ),
               ],
               onChanged: (v) => setLocal(() => selected = v),
             ),
@@ -223,8 +265,14 @@ class _DelegateSharedLibraryScreenState
     }
   }
 
-  Future<void> _showImportSheet(BuildContext context, Map<String, dynamic> resource, List<Map<String, dynamic>> subjects) async {
-    int? targetSubjectId = subjects.isNotEmpty ? number(subjects.first, 'id').toInt() : null;
+  Future<void> _showImportSheet(
+    BuildContext context,
+    Map<String, dynamic> resource,
+    List<Map<String, dynamic>> subjects,
+  ) async {
+    int? targetSubjectId = subjects.isNotEmpty
+        ? number(subjects.first, 'id').toInt()
+        : null;
 
     final ok = await showMoeenBottomSheet<bool>(
       context: context,
@@ -235,19 +283,30 @@ class _DelegateSharedLibraryScreenState
         builder: (ctx, setLocal) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('أنت على وشك استيراد "${text(resource, 'title')}" إلى مقرراتك الدراسية.',
-                style: const TextStyle(color: AppColors.slate600, fontSize: 13)),
+            Text(
+              'أنت على وشك استيراد "${text(resource, 'title')}" إلى مقرراتك الدراسية.',
+              style: const TextStyle(color: AppColors.slate600, fontSize: 13),
+            ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int?>(
               value: targetSubjectId,
               decoration: const InputDecoration(labelText: 'استيراد إلى مادة:'),
-              items: subjects.map((s) => DropdownMenuItem(value: number(s, 'id').toInt(), child: Text(text(s, 'name')))).toList(),
+              items: subjects
+                  .map(
+                    (s) => DropdownMenuItem(
+                      value: number(s, 'id').toInt(),
+                      child: Text(text(s, 'name')),
+                    ),
+                  )
+                  .toList(),
               onChanged: (v) => setLocal(() => targetSubjectId = v),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
               child: const Text('تأكيد الاستيراد'),
             ),
           ],
@@ -258,12 +317,16 @@ class _DelegateSharedLibraryScreenState
     if (ok == true && targetSubjectId != null) {
       setState(() => _busy = true);
       try {
-        final msg = await ref.read(delegateRepositoryProvider).importResource(
+        final msg = await ref
+            .read(delegateRepositoryProvider)
+            .importResource(
               resourceId: number(resource, 'id').toInt(),
               subjectId: targetSubjectId!,
             );
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppColors.success));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg), backgroundColor: AppColors.success),
+          );
         }
         ref.invalidate(_delegateResourcesProvider);
       } catch (e) {
@@ -279,10 +342,13 @@ class _DelegateSharedLibraryScreenState
     final id = number(resource, 'id').toInt();
     setState(() => _busy = true);
     try {
-      final url = await ref.read(studentContentRepositoryProvider).libraryDownloadUrl(id);
+      final url = await ref
+          .read(studentContentRepositoryProvider)
+          .libraryDownloadUrl(id);
       final savedPath = await DownloadService.downloadUrl(
         url: url,
-        fileName: '${text(resource, 'title')}.${text(resource, 'file_type', fallback: 'pdf')}',
+        fileName:
+            '${text(resource, 'title')}.${text(resource, 'file_type', fallback: 'pdf')}',
       );
       if (mounted && savedPath != null) {
         _toast(context, 'تم تحميل الملف بنجاح');
@@ -333,7 +399,10 @@ class _LibraryActionRow extends StatelessWidget {
               onSubmitted: (_) => onSearch(),
               decoration: const InputDecoration(
                 hintText: 'ابحث في المكتبة المشتركة...',
-                prefixIcon: Icon(Icons.search_rounded, color: AppColors.slate400),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: AppColors.slate400,
+                ),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(vertical: 15),
               ),
@@ -342,7 +411,9 @@ class _LibraryActionRow extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         _IconButton(
-          icon: isGrid ? Icons.format_list_bulleted_rounded : Icons.grid_view_rounded,
+          icon: isGrid
+              ? Icons.format_list_bulleted_rounded
+              : Icons.grid_view_rounded,
           onTap: onToggleView,
         ),
         const SizedBox(width: 8),
@@ -413,13 +484,24 @@ class _SharedResourceCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(text(resource, 'title'),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                Text(
+                  text(resource, 'title'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 2),
-                Text(text(asMap(resource['subject']), 'name', fallback: 'مورد مكتبة'),
-                    style: TextStyle(color: AppColors.slate500, fontSize: 12)),
+                Text(
+                  text(
+                    asMap(resource['subject']),
+                    'name',
+                    fallback: 'مورد مكتبة',
+                  ),
+                  style: TextStyle(color: AppColors.slate500, fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -427,13 +509,21 @@ class _SharedResourceCard extends StatelessWidget {
             children: [
               IconButton(
                 onPressed: onPreview,
-                icon: const Icon(Icons.visibility_outlined, size: 20, color: AppColors.slate500),
+                icon: const Icon(
+                  Icons.visibility_outlined,
+                  size: 20,
+                  color: AppColors.slate500,
+                ),
               ),
               IconButton(
                 onPressed: onImport,
                 icon: Opacity(
                   opacity: canImport ? 1.0 : 0.5,
-                  child: const Icon(Icons.library_add_rounded, size: 20, color: AppColors.primary),
+                  child: const Icon(
+                    Icons.library_add_rounded,
+                    size: 20,
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
             ],
@@ -472,7 +562,7 @@ class _SharedResourceGridCard extends StatelessWidget {
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(18),
@@ -484,19 +574,26 @@ class _SharedResourceGridCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(text(resource, 'title'),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis),
+                Text(
+                  text(resource, 'title'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 4),
-                Text(text(asMap(resource['subject']), 'name', fallback: 'مادة'),
-                    style: TextStyle(color: AppColors.slate500, fontSize: 11),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                Text(
+                  text(asMap(resource['subject']), 'name', fallback: 'مادة'),
+                  style: TextStyle(color: AppColors.slate500, fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
-          const Divider(height: 20),
+          const Divider(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -514,7 +611,11 @@ class _SharedResourceGridCard extends StatelessWidget {
                 onPressed: onImport,
                 icon: Opacity(
                   opacity: canImport ? 1.0 : 0.5,
-                  child: const Icon(Icons.library_add_rounded, size: 18, color: AppColors.primary),
+                  child: const Icon(
+                    Icons.library_add_rounded,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
                 ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -596,11 +697,13 @@ class DelegateRemindersScreen extends ConsumerWidget {
             final dayAfterTomorrow = now.add(const Duration(days: 2));
             return date != null &&
                 date.isAfter(
-                    dayAfterTomorrow.subtract(const Duration(seconds: 1)));
+                  dayAfterTomorrow.subtract(const Duration(seconds: 1)),
+                );
           }).toList();
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(_delegateRemindersProvider('all')),
+            onRefresh: () async =>
+                ref.invalidate(_delegateRemindersProvider('all')),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 100),
               children: [
@@ -611,34 +714,45 @@ class DelegateRemindersScreen extends ConsumerWidget {
                 else ...[
                   if (today.isNotEmpty) ...[
                     const _TimelineSection(
-                        title: 'اليوم', icon: Icons.today_rounded, color: AppColors.rose),
+                      title: 'اليوم',
+                      icon: Icons.today_rounded,
+                      color: AppColors.rose,
+                    ),
                     ...today.map((r) => _DelegateReminderCard(item: r)),
                     const SizedBox(height: 16),
                   ],
                   if (tomorrow.isNotEmpty) ...[
                     const _TimelineSection(
-                        title: 'غداً',
-                        icon: Icons.event_available_rounded,
-                        color: AppColors.orange),
-                    ...tomorrow.map((r) => _DelegateReminderCard(
-                          item: r,
-                          canUpdate: canUpdate,
-                          canDelete: canDelete,
-                          onUnauthorized: () => _showNoPermissionSnackBar(context),
-                        )),
+                      title: 'غداً',
+                      icon: Icons.event_available_rounded,
+                      color: AppColors.orange,
+                    ),
+                    ...tomorrow.map(
+                      (r) => _DelegateReminderCard(
+                        item: r,
+                        canUpdate: canUpdate,
+                        canDelete: canDelete,
+                        onUnauthorized: () =>
+                            _showNoPermissionSnackBar(context),
+                      ),
+                    ),
                     const SizedBox(height: 16),
                   ],
                   if (upcoming.isNotEmpty) ...[
                     const _TimelineSection(
-                        title: 'قريباً',
-                        icon: Icons.upcoming_rounded,
-                        color: AppColors.royalBlue),
-                    ...upcoming.map((r) => _DelegateReminderCard(
-                          item: r,
-                          canUpdate: canUpdate,
-                          canDelete: canDelete,
-                          onUnauthorized: () => _showNoPermissionSnackBar(context),
-                        )),
+                      title: 'قريباً',
+                      icon: Icons.upcoming_rounded,
+                      color: AppColors.royalBlue,
+                    ),
+                    ...upcoming.map(
+                      (r) => _DelegateReminderCard(
+                        item: r,
+                        canUpdate: canUpdate,
+                        canDelete: canDelete,
+                        onUnauthorized: () =>
+                            _showNoPermissionSnackBar(context),
+                      ),
+                    ),
                   ],
                 ],
               ],
@@ -660,7 +774,10 @@ class _RemindersHero extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.royalBlue, AppColors.royalBlue.withValues(alpha: 0.8)],
+          colors: [
+            AppColors.royalBlue,
+            AppColors.royalBlue.withValues(alpha: 0.8),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -682,7 +799,10 @@ class _RemindersHero extends StatelessWidget {
                 Text(
                   'لديك $count تذكيرات مجدولة',
                   style: const TextStyle(
-                      color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 const Text(
@@ -692,7 +812,11 @@ class _RemindersHero extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.auto_awesome_rounded, color: AppColors.gold, size: 32),
+          const Icon(
+            Icons.auto_awesome_rounded,
+            color: AppColors.gold,
+            size: 32,
+          ),
         ],
       ),
     );
@@ -700,8 +824,11 @@ class _RemindersHero extends StatelessWidget {
 }
 
 class _TimelineSection extends StatelessWidget {
-  const _TimelineSection(
-      {required this.title, required this.icon, required this.color});
+  const _TimelineSection({
+    required this.title,
+    required this.icon,
+    required this.color,
+  });
   final String title;
   final IconData icon;
   final Color color;
@@ -717,11 +844,15 @@ class _TimelineSection extends StatelessWidget {
           Text(
             title,
             style: const TextStyle(
-                color: AppColors.midnight, fontSize: 15, fontWeight: FontWeight.w900),
+              color: AppColors.midnight,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
-              child: Divider(color: color.withValues(alpha: 0.1), thickness: 1.5)),
+            child: Divider(color: color.withValues(alpha: 0.1), thickness: 1.5),
+          ),
         ],
       ),
     );
@@ -786,32 +917,43 @@ class _DelegateReminderCard extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(title,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 15,
-                                    color: AppColors.midnight)),
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                                color: AppColors.midnight,
+                              ),
+                            ),
                             if (desc.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 2),
-                                child: Text(desc,
-                                    style: const TextStyle(
-                                        color: AppColors.slate500, fontSize: 12),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
+                                child: Text(
+                                  desc,
+                                  style: const TextStyle(
+                                    color: AppColors.slate500,
+                                    fontSize: 12,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                const Icon(Icons.access_time_rounded,
-                                    size: 14, color: AppColors.slate400),
+                                const Icon(
+                                  Icons.access_time_rounded,
+                                  size: 14,
+                                  color: AppColors.slate400,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   _formatTime(text(item, 'event_date')),
                                   style: const TextStyle(
-                                      color: AppColors.slate500,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold),
+                                    color: AppColors.slate500,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ],
                             ),
@@ -826,24 +968,34 @@ class _DelegateReminderCard extends ConsumerWidget {
                                 : onUnauthorized,
                             icon: Opacity(
                               opacity: canUpdate ? 1.0 : 0.5,
-                              child: const Icon(Icons.edit_rounded,
-                                  size: 18, color: AppColors.slate400),
+                              child: const Icon(
+                                Icons.edit_rounded,
+                                size: 18,
+                                color: AppColors.slate400,
+                              ),
                             ),
                           ),
                           IconButton(
                             onPressed: canDelete
                                 ? () => _delete(
-                                      context,
-                                      () => ref
-                                          .read(delegateRepositoryProvider)
-                                          .deleteReminder(number(item, 'id').toInt()),
-                                      () => ref.invalidate(_delegateRemindersProvider('all')),
-                                    )
+                                    context,
+                                    () => ref
+                                        .read(delegateRepositoryProvider)
+                                        .deleteReminder(
+                                          number(item, 'id').toInt(),
+                                        ),
+                                    () => ref.invalidate(
+                                      _delegateRemindersProvider('all'),
+                                    ),
+                                  )
                                 : onUnauthorized,
                             icon: Opacity(
                               opacity: canDelete ? 1.0 : 0.5,
-                              child: const Icon(Icons.delete_outline_rounded,
-                                  size: 18, color: AppColors.danger),
+                              child: const Icon(
+                                Icons.delete_outline_rounded,
+                                size: 18,
+                                color: AppColors.danger,
+                              ),
                             ),
                           ),
                         ],
@@ -860,15 +1012,17 @@ class _DelegateReminderCard extends ConsumerWidget {
   }
 
   Color _getPriorityColor(String p) => switch (p) {
-        'high' => AppColors.danger,
-        'medium' => AppColors.orange,
-        _ => AppColors.success,
-      };
+    'high' => AppColors.danger,
+    'medium' => AppColors.orange,
+    _ => AppColors.success,
+  };
 
   IconData _getReminderIcon(String title) {
     final t = title.toLowerCase();
-    if (t.contains('اختبار') || t.contains('امتحان')) return Icons.menu_book_rounded;
-    if (t.contains('تكليف') || t.contains('واجب')) return Icons.assignment_rounded;
+    if (t.contains('اختبار') || t.contains('امتحان'))
+      return Icons.menu_book_rounded;
+    if (t.contains('تكليف') || t.contains('واجب'))
+      return Icons.assignment_rounded;
     if (t.contains('محاضرة') || t.contains('درس')) return Icons.school_rounded;
     return Icons.notifications_active_rounded;
   }
@@ -899,7 +1053,9 @@ class _AddReminderFAB extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: AppColors.royalBlue.withValues(alpha: isEnabled ? 0.35 : 0.1),
+              color: AppColors.royalBlue.withValues(
+                alpha: isEnabled ? 0.35 : 0.1,
+              ),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -908,9 +1064,15 @@ class _AddReminderFAB extends StatelessWidget {
         child: FloatingActionButton.extended(
           onPressed: isEnabled ? onPressed : onUnauthorized,
           backgroundColor: AppColors.royalBlue,
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: const Icon(Icons.add_alert_rounded, color: Colors.white, size: 24),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          icon: const Icon(
+            Icons.add_alert_rounded,
+            color: Colors.white,
+            size: 24,
+          ),
           label: const Text(
             'تذكير جديد',
             style: TextStyle(
@@ -956,9 +1118,9 @@ class _DelegateAnnouncementsScreenState
   }
 
   ({String? query, String? category}) get _query => (
-        query: _search.text.trim(),
-        category: _tabs[_tabController.index]['value'],
-      );
+    query: _search.text.trim(),
+    category: _tabs[_tabController.index]['value'],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -985,81 +1147,87 @@ class _DelegateAnnouncementsScreenState
 
           return SafeArea(
             child: NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) => [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    children: [
-                      _AnnouncementsHero(stats: stats),
-                      const SizedBox(height: 20),
-                      _AnnouncementsSearchRow(
-                        controller: _search,
-                        onChanged: (v) => setState(() {}),
-                        onClear: () {
-                          _search.clear();
-                          setState(() {});
+              headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      children: [
+                        _AnnouncementsHero(stats: stats),
+                        const SizedBox(height: 20),
+                        _AnnouncementsSearchRow(
+                          controller: _search,
+                          onChanged: (v) => setState(() {}),
+                          onClear: () {
+                            _search.clear();
+                            setState(() {});
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _SliverAppBarDelegate(
+                    child: Container(
+                      color: AppColors.ghostWhite,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: TabBar(
+                        controller: _tabController,
+                        isScrollable: true,
+                        tabAlignment: TabAlignment.start,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        indicatorColor: Colors.transparent,
+                        dividerColor: Colors.transparent,
+                        labelPadding: const EdgeInsets.only(right: 8),
+                        tabs: _tabs.map((t) {
+                          final isSelected =
+                              _tabs[_tabController.index]['value'] ==
+                              t['value'];
+                          return Tab(
+                            child: _CategoryChip(
+                              label: t['label']!,
+                              icon: t['icon']!,
+                              isSelected: isSelected,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              body: list.isEmpty
+                  ? const _EmptyState('لا توجد إعلانات حالياً في هذا القسم.')
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 8,
+                      ),
+                      itemCount: list.length,
+                      itemBuilder: (context, index) => _AnnouncementFeedCard(
+                        item: list[index],
+                        canUpdate: canUpdate,
+                        canDelete: canDelete,
+                        onUnauthorized: () =>
+                            _showNoPermissionSnackBar(context),
+                        onEdit: () =>
+                            _newsSheet(context, ref, item: list[index]),
+                        onDelete: () => _delete(
+                          context,
+                          () => ref
+                              .read(delegateRepositoryProvider)
+                              .deleteAnnouncement(
+                                number(list[index], 'id').toInt(),
+                              ),
+                          () => ref.invalidate(_delegateAnnouncementsProvider),
+                        ),
+                        onPin: () {
+                          _togglePin(context, ref, list[index]);
                         },
                       ),
-                    ],
-                  ),
-                ),
-              ),
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _SliverAppBarDelegate(
-                  child: Container(
-                    color: AppColors.ghostWhite,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: TabBar(
-                      controller: _tabController,
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.start,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      indicatorColor: Colors.transparent,
-                      dividerColor: Colors.transparent,
-                      labelPadding: const EdgeInsets.only(right: 8),
-                      tabs: _tabs.map((t) {
-                        final isSelected =
-                            _tabs[_tabController.index]['value'] == t['value'];
-                        return Tab(
-                          child: _CategoryChip(
-                            label: t['label']!,
-                            icon: t['icon']!,
-                            isSelected: isSelected,
-                          ),
-                        );
-                      }).toList(),
                     ),
-                  ),
-                ),
-              ),
-            ],
-            body: list.isEmpty
-                ? const _EmptyState('لا توجد إعلانات حالياً في هذا القسم.')
-                : ListView.builder(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                    itemCount: list.length,
-                    itemBuilder: (context, index) => _AnnouncementFeedCard(
-                      item: list[index],
-                      canUpdate: canUpdate,
-                      canDelete: canDelete,
-                      onUnauthorized: () => _showNoPermissionSnackBar(context),
-                      onEdit: () =>
-                          _newsSheet(context, ref, item: list[index]),
-                      onDelete: () => _delete(
-                        context,
-                        () => ref
-                            .read(delegateRepositoryProvider)
-                            .deleteAnnouncement(number(list[index], 'id').toInt()),
-                        () => ref.invalidate(_delegateAnnouncementsProvider),
-                      ),
-                      onPin: () {
-                        _togglePin(context, ref, list[index]);
-                      },
-                    ),
-                  ),
             ),
           );
         },
@@ -1068,7 +1236,10 @@ class _DelegateAnnouncementsScreenState
   }
 
   Future<void> _togglePin(
-      BuildContext context, WidgetRef ref, Map<String, dynamic> item) async {
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> item,
+  ) async {
     try {
       await ref
           .read(delegateRepositoryProvider)
@@ -1076,8 +1247,9 @@ class _DelegateAnnouncementsScreenState
       ref.invalidate(_delegateAnnouncementsProvider);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     }
   }
@@ -1117,9 +1289,10 @@ class _AnnouncementsHero extends StatelessWidget {
                     Text(
                       'لديك ${number(stats, 'total')} إعلانات',
                       style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900),
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                     const Text(
                       'ابقَ دفعتك على اطلاع دائم بآخر المستجدات.',
@@ -1134,8 +1307,11 @@ class _AnnouncementsHero extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.campaign_rounded,
-                    color: Colors.white, size: 32),
+                child: const Icon(
+                  Icons.campaign_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
               ),
             ],
           ),
@@ -1144,17 +1320,20 @@ class _AnnouncementsHero extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _HeroStatItem(
-                  label: 'عاجل',
-                  value: number(stats, 'urgent').toString(),
-                  icon: Icons.local_fire_department_rounded),
+                label: 'عاجل',
+                value: number(stats, 'urgent').toString(),
+                icon: Icons.local_fire_department_rounded,
+              ),
               _HeroStatItem(
-                  label: 'مثبت',
-                  value: number(stats, 'pinned').toString(),
-                  icon: Icons.push_pin_rounded),
+                label: 'مثبت',
+                value: number(stats, 'pinned').toString(),
+                icon: Icons.push_pin_rounded,
+              ),
               _HeroStatItem(
-                  label: 'أكاديمي',
-                  value: number(stats, 'academic').toString(),
-                  icon: Icons.school_rounded),
+                label: 'أكاديمي',
+                value: number(stats, 'academic').toString(),
+                icon: Icons.school_rounded,
+              ),
             ],
           ),
         ],
@@ -1192,106 +1371,115 @@ class _AnnouncementFeedCard extends StatelessWidget {
       onTap: () {
         final url = item['attachment_url'];
         if (url != null && url.isNotEmpty) {
-          DownloadService.previewFile(
-            url,
-            item['title'] ?? 'المرفق',
-          );
+          DownloadService.previewFile(url, item['title'] ?? 'المرفق');
         }
       },
       borderRadius: BorderRadius.circular(20),
       child: Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
-              offset: const Offset(0, 4))
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _getCategoryLabel(category),
-                    style: TextStyle(
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _getCategoryLabel(category),
+                      style: TextStyle(
                         color: color,
                         fontSize: 11,
-                        fontWeight: FontWeight.w800),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                ),
-                if (isPinned) ...[
+                  if (isPinned) ...[
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.push_pin_rounded,
+                      color: AppColors.royalBlue,
+                      size: 14,
+                    ),
+                  ],
+                  const Spacer(),
+                  Text(
+                    _formatRelativeTime(text(item, 'created_at')),
+                    style: const TextStyle(
+                      color: AppColors.slate400,
+                      fontSize: 11,
+                    ),
+                  ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.push_pin_rounded,
-                      color: AppColors.royalBlue, size: 14),
+                  _NewsActionMenu(
+                    onEdit: onEdit,
+                    onDelete: onDelete,
+                    onPin: onPin,
+                    isPinned: isPinned,
+                    canUpdate: canUpdate,
+                    canDelete: canDelete,
+                    onUnauthorized: onUnauthorized,
+                  ),
                 ],
-                const Spacer(),
-                Text(
-                  _formatRelativeTime(text(item, 'created_at')),
-                  style: const TextStyle(color: AppColors.slate400, fontSize: 11),
-                ),
-                const SizedBox(width: 8),
-                _NewsActionMenu(
-                  onEdit: onEdit,
-                  onDelete: onDelete,
-                  onPin: onPin,
-                  isPinned: isPinned,
-                  canUpdate: canUpdate,
-                  canDelete: canDelete,
-                  onUnauthorized: onUnauthorized,
-                ),
-              ],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  text(item, 'title'),
-                  style: const TextStyle(
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    text(item, 'title'),
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
-                      color: AppColors.midnight),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  text(item, 'content'),
-                  style: const TextStyle(
+                      color: AppColors.midnight,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    text(item, 'content'),
+                    style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.slate600,
-                      height: 1.5),
-                ),
-                if (hasAttachment) ...[
-                  const SizedBox(height: 12),
-                  _AttachmentPreview(
-                    path: text(item, 'attachment_path'),
-                    type: text(item, 'attachment_type'),
+                      height: 1.5,
+                    ),
                   ),
+                  if (hasAttachment) ...[
+                    const SizedBox(height: 12),
+                    _AttachmentPreview(
+                      path: text(item, 'attachment_path'),
+                      type: text(item, 'attachment_type'),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
                 ],
-                const SizedBox(height: 16),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Color _getNewsColor(String cat) {
     switch (cat) {
@@ -1353,13 +1541,17 @@ class _AttachmentPreview extends StatelessWidget {
             child: Text(
               'عرض المرفق',
               style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.slate700),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.slate700,
+              ),
             ),
           ),
-          const Icon(Icons.arrow_forward_ios_rounded,
-              size: 14, color: AppColors.slate400),
+          const Icon(
+            Icons.arrow_forward_ios_rounded,
+            size: 14,
+            color: AppColors.slate400,
+          ),
         ],
       ),
     );
@@ -1387,7 +1579,11 @@ class _NewsActionMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert_rounded, color: AppColors.slate400, size: 20),
+      icon: const Icon(
+        Icons.more_vert_rounded,
+        color: AppColors.slate400,
+        size: 20,
+      ),
       onSelected: (v) {
         if (v == 'edit') {
           if (canUpdate) {
@@ -1418,7 +1614,10 @@ class _NewsActionMenu extends StatelessWidget {
             opacity: canUpdate ? 1.0 : 0.5,
             child: Row(
               children: [
-                Icon(isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, size: 18),
+                Icon(
+                  isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+                  size: 18,
+                ),
                 const SizedBox(width: 12),
                 Text(isPinned ? 'إلغاء التثبيت' : 'تثبيت الإعلان'),
               ],
@@ -1474,9 +1673,10 @@ class _AnnouncementsSearchRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4))
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: TextField(
@@ -1485,7 +1685,10 @@ class _AnnouncementsSearchRow extends StatelessWidget {
         decoration: InputDecoration(
           hintText: 'ابحث في الإعلانات...',
           hintStyle: const TextStyle(color: AppColors.slate400, fontSize: 14),
-          prefixIcon: const Icon(Icons.search_rounded, color: AppColors.slate400),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: AppColors.slate400,
+          ),
           suffixIcon: controller.text.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear_rounded, size: 20),
@@ -1528,9 +1731,15 @@ class _AddAnnouncementFAB extends StatelessWidget {
         child: FloatingActionButton.extended(
           onPressed: isEnabled ? onPressed : onUnauthorized,
           backgroundColor: AppColors.orange,
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: const Icon(Icons.campaign_rounded, color: Colors.white, size: 26),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          icon: const Icon(
+            Icons.campaign_rounded,
+            color: Colors.white,
+            size: 26,
+          ),
           label: const Text(
             'نشر إعلان',
             style: TextStyle(
@@ -1544,6 +1753,7 @@ class _AddAnnouncementFAB extends StatelessWidget {
     );
   }
 }
+
 class _HeroStatItem extends StatelessWidget {
   const _HeroStatItem({
     required this.label,
@@ -1570,7 +1780,10 @@ class _HeroStatItem extends StatelessWidget {
         Text(
           value,
           style: const TextStyle(
-              color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
         ),
         Text(
           label,
@@ -1601,15 +1814,17 @@ class _CategoryChip extends StatelessWidget {
         boxShadow: isSelected
             ? [
                 BoxShadow(
-                    color: AppColors.orange.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4))
+                  color: AppColors.orange.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
               ]
             : [
                 BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2))
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
               ],
         border: Border.all(
           color: isSelected ? Colors.transparent : AppColors.slate200,

@@ -8,7 +8,7 @@ class DelegateMessagesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return _ChatListScreen(
       title: 'رسائل الطلاب',
-      index: 16,
+      index: 15,
       state: ref.watch(_delegateMessagesProvider),
       onRetry: () => ref.invalidate(_delegateMessagesProvider),
       extractor: (data) => asList(data['conversations'] ?? data['data']),
@@ -48,13 +48,16 @@ class _DelegateConversationScreenState
     return _ConversationView(
       title: 'محادثة طالب',
       subtitle: 'طالب',
-      index: 16,
+      index: 15,
       future: _future,
-      reload: () => setState(
-        () => _future = ref
+      reload: () {
+        final f = ref
             .read(delegateRepositoryProvider)
-            .conversation(widget.conversationId),
-      ),
+            .conversation(widget.conversationId);
+        setState(() {
+          _future = f;
+        });
+      },
       send: (body) => ref
           .read(delegateRepositoryProvider)
           .sendStudentMessage(
@@ -73,7 +76,7 @@ class DelegateDoctorChatsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return _ChatListScreen(
       title: 'محادثات الدكاترة',
-      index: 17,
+      index: 16,
       state: ref.watch(_delegateDoctorChatsProvider),
       onRetry: () => ref.invalidate(_delegateDoctorChatsProvider),
       extractor: (data) => asList(data['conversations'] ?? data['data']),
@@ -116,13 +119,16 @@ class _DelegateDoctorConversationScreenState
     return _ConversationView(
       title: 'محادثة دكتور',
       subtitle: 'دكتور',
-      index: 17,
+      index: 16,
       future: _future,
-      reload: () => setState(
-        () => _future = ref
+      reload: () {
+        final f = ref
             .read(delegateRepositoryProvider)
-            .doctorChat(widget.conversationId),
-      ),
+            .doctorChat(widget.conversationId);
+        setState(() {
+          _future = f;
+        });
+      },
       send: (body) => ref
           .read(delegateRepositoryProvider)
           .sendDoctorMessage(
@@ -152,7 +158,7 @@ class _DelegateInquiriesScreenState
     final canUpdate = session?.hasPermission('students', 'update') ?? false;
     final state = ref.watch(_delegateInquiriesProvider(_status));
     return DelegateShell(
-      currentIndex: 18,
+      currentIndex: 17,
       title: 'استفسارات الدكتور',
       child: _AsyncBody(
         state: state,
@@ -237,7 +243,10 @@ class _DelegateInquiriesScreenState
           ),
           const Text(
             'نص الاستفسار:',
-            style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.slate500),
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: AppColors.slate500,
+            ),
           ),
           const SizedBox(height: 8),
           Container(
@@ -261,7 +270,10 @@ class _DelegateInquiriesScreenState
             const SizedBox(height: 16),
             const Text(
               'الرد الحالي:',
-              style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.success),
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: AppColors.success,
+              ),
             ),
             const SizedBox(height: 8),
             Container(
@@ -269,7 +281,9 @@ class _DelegateInquiriesScreenState
               decoration: BoxDecoration(
                 color: AppColors.success.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.success.withValues(alpha: 0.1)),
+                border: Border.all(
+                  color: AppColors.success.withValues(alpha: 0.1),
+                ),
               ),
               child: Text(
                 text(item, 'answer'),
@@ -350,9 +364,8 @@ class _DelegateInquiriesScreenState
                       () => ref
                           .read(delegateRepositoryProvider)
                           .updateInquiryStatus(id: inquiryId, status: 'closed'),
-                      after: () => ref.invalidate(
-                        _delegateInquiriesProvider(_status),
-                      ),
+                      after: () =>
+                          ref.invalidate(_delegateInquiriesProvider(_status)),
                     );
                   } else {
                     _showNoPermissionSnackBar(context);

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
@@ -62,8 +64,32 @@ class ApiClient {
       final response = await _dio.get<List<int>>(
         path,
         queryParameters: queryParameters,
-        options: Options(responseType: ResponseType.bytes),
+        options: Options(
+          responseType: ResponseType.bytes,
+          validateStatus: (status) => status != null,
+        ),
       );
+      final statusCode = response.statusCode ?? 0;
+      if (statusCode >= 400) {
+        final data = response.data;
+        if (data != null && data.isNotEmpty) {
+          try {
+            final decoded = String.fromCharCodes(data);
+            final json = jsonDecode(decoded);
+            if (json is Map<String, dynamic>) {
+              throw ApiException(
+                (json['message'] ?? 'تعذر تحميل الملف.').toString(),
+                statusCode: statusCode,
+                errors: json['errors'],
+              );
+            }
+          } catch (_) {}
+        }
+        throw ApiException(
+          'حدث خطأ أثناء تحميل الملف (كود $statusCode).',
+          statusCode: statusCode,
+        );
+      }
       return response.data ?? const [];
     } on DioException catch (error) {
       final data = error.response?.data;

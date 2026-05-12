@@ -68,7 +68,9 @@ class _ChatListScreen extends ConsumerWidget {
                       itemCount: items.length,
                       itemBuilder: (context, index) {
                         final raw = items[index];
-                        final recipient = asMap(raw)['student'].isNotEmpty ? asMap(raw)['student'] : asMap(raw)['doctor'];
+                        final recipient = (asMap(raw)['student'] as Map?)?.isNotEmpty == true
+                            ? asMap(raw)['student']
+                            : asMap(raw)['doctor'];
                         final name = text(recipient, 'name', fallback: 'محادثة');
                         final last = asMap(raw)['last_message'];
                         final unread = number(raw, 'unread_count').toInt();
@@ -161,6 +163,8 @@ class _ConversationViewState extends State<_ConversationView> {
     super.dispose();
   }
 
+  Map<String, dynamic>? _cachedData;
+
   @override
   Widget build(BuildContext context) {
     return DelegateShell(
@@ -169,19 +173,27 @@ class _ConversationViewState extends State<_ConversationView> {
       child: FutureBuilder<Map<String, dynamic>>(
         future: widget.future,
         builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
+          if (snapshot.hasData) {
+            _cachedData = snapshot.data;
+          }
+
+          if (_cachedData == null && snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snapshot.hasError) {
+
+          if (snapshot.hasError && _cachedData == null) {
             return _ErrorState(
               message: snapshot.error.toString(),
               onRetry: widget.reload,
             );
           }
-          final data = snapshot.data ?? {};
+
+          final data = _cachedData ?? {};
           final messages = asList(data['messages']).map(asMap).toList();
           final conversation = asMap(data['conversation']);
-          final recipient = asMap(conversation['student']).isNotEmpty ? asMap(conversation['student']) : asMap(conversation['doctor']);
+          final recipient = (asMap(conversation['student']) as Map?)?.isNotEmpty == true
+              ? asMap(conversation['student'])
+              : asMap(conversation['doctor']);
           final name = text(recipient, 'name', fallback: 'المحادثة');
 
           return Column(

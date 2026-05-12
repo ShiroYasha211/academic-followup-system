@@ -23,6 +23,8 @@ class PushNotificationService {
       FlutterLocalNotificationsPlugin();
   static final StreamController<String> _navigationController =
       StreamController<String>.broadcast();
+  static final StreamController<Map<String, dynamic>> _refreshController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
     'moeen_push',
@@ -38,6 +40,8 @@ class PushNotificationService {
 
   static Stream<String> get navigationRequests =>
       _navigationController.stream;
+  static Stream<Map<String, dynamic>> get refreshRequests =>
+      _refreshController.stream;
 
   static String? takePendingNavigationPath() {
     final path = _pendingNavigationPath;
@@ -51,9 +55,7 @@ class PushNotificationService {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
-    );
+    const androidSettings = AndroidInitializationSettings('ic_notification');
     const settings = InitializationSettings(android: androidSettings);
     await _localNotifications.initialize(
       settings,
@@ -158,6 +160,7 @@ class PushNotificationService {
   }
 
   static Future<void> _showForegroundNotification(RemoteMessage message) async {
+    _refreshController.add(message.data);
     final notification = message.notification;
     final title = notification?.title ?? message.data['title'] ?? 'إشعار جديد';
     final body =
@@ -172,7 +175,7 @@ class PushNotificationService {
       channelDescription: _channel.description,
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: 'ic_notification',
       styleInformation: BigTextStyleInformation(body.toString()),
     );
 
@@ -197,7 +200,7 @@ class PushNotificationService {
   }
 
   static String? _pathFromNotificationData(Map<String, dynamic> data) {
-    final targetScreen = data['target_screen']?.toString();
+    final targetScreen = (data['target_screen'] ?? data['screen'])?.toString();
     final scheduleItemId = data['schedule_item_id']?.toString();
 
     if (targetScreen == 'study_session' &&
@@ -206,7 +209,20 @@ class PushNotificationService {
       return '/student/study-center/$scheduleItemId/session';
     }
 
-    return null;
+    return switch (targetScreen) {
+      'quizzes' || 'quiz' => '/student/quizzes',
+      'assignments' || 'assignment' => '/student/assignments',
+      'schedule' || 'schedules' => '/student/schedules',
+      'reminders' || 'reminder' => '/student/reminders',
+      'resources' || 'resource' => '/student/resources',
+      'library' => '/student/library',
+      'stars' || 'star' => '/student/stars',
+      'inquiries' || 'inquiry' || 'doctor_inquiry' => '/student/inquiries',
+      'messages' || 'message' => '/student/messages',
+      'news' || 'news_hub' || 'announcement' || 'alert' => '/student/news',
+      'notifications' => '/student/notifications',
+      _ => null,
+    };
   }
 
   static String get _platformName {

@@ -231,11 +231,24 @@ class StudentQuizTakeScreen extends ConsumerStatefulWidget {
 class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
   final Map<String, dynamic> _answers = {};
   final _pageController = PageController();
+  Timer? _timer;
+  int? _attemptId;
+  int? _secondsLeft;
+  int? _questionSecondsLeft;
   int _currentIndex = 0;
   bool _submitting = false;
+  bool _initializedAttempt = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_setQuizScreenSecurity(true));
+  }
 
   @override
   void dispose() {
+    _timer?.cancel();
+    unawaited(_setQuizScreenSecurity(false));
     _pageController.dispose();
     super.dispose();
   }
@@ -256,12 +269,19 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
           final attempt = asMap(data['attempt']);
           final questions = asList(data['questions']);
           final totalQuestions = questions.length;
+          _initializeAttempt(data, quiz, attempt, questions);
           final progress = totalQuestions > 0
               ? (_currentIndex + 1) / totalQuestions
               : 0.0;
 
-          return Column(
-            children: [
+          return PopScope(
+            canPop: false,
+            onPopInvokedWithResult: (didPop, result) async {
+              if (didPop) return;
+              await _confirmLeave();
+            },
+            child: Column(
+              children: [
               // Progress Header
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
@@ -297,12 +317,7 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
                             ],
                           ),
                         ),
-                        _TimerWidget(
-                          durationMinutes: number(
-                            quiz,
-                            'duration_minutes',
-                          ).toInt(),
-                        ),
+                        _QuizTimerPill(secondsLeft: _activeSecondsLeft),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -326,7 +341,10 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
                   controller: _pageController,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: totalQuestions,
-                  onPageChanged: (idx) => setState(() => _currentIndex = idx),
+                  onPageChanged: (idx) => setState(() {
+                    _currentIndex = idx;
+                    _resetQuestionTimer(asMap(questions[idx]));
+                  }),
                   itemBuilder: (context, index) => _QuestionCard(
                     question: asMap(questions[index]),
                     index: index,
@@ -426,11 +444,87 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
                   ),
                 ),
               ),
-            ],
+              ],
+            ),
           );
         },
       ),
     );
+  }
+
+  int? get _activeSecondsLeft {
+    if (_questionSecondsLeft != null && _questionSecondsLeft! > 0) {
+      return _questionSecondsLeft;
+    }
+    return _secondsLeft;
+  }
+
+  void _initializeAttempt(
+    Map<String, dynamic> data,
+    Map<String, dynamic> quiz,
+    Map<String, dynamic> attempt,
+    List<dynamic> questions,
+  ) {
+    final attemptId = number(attempt, 'id').toInt();
+    if (_initializedAttempt && _attemptId == attemptId) return;
+
+    _initializedAttempt = true;
+    _attemptId = attemptId;
+    _answers
+      ..clear()
+      ..addAll(asMap(data['existing_answers']).map((key, value) {
+        return MapEntry(key.toString(), value);
+      }));
+
+    final remaining = number(attempt, 'remaining_seconds').toInt();
+    final durationSeconds = number(quiz, 'duration_minutes').toInt() * 60;
+    _secondsLeft = remaining > 0
+        ? remaining
+        : (durationSeconds > 0 ? durationSeconds : null);
+
+    if (questions.isNotEmpty) _resetQuestionTimer(asMap(questions.first));
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _submitting) return;
+      var shouldSubmit = false;
+      setState(() {
+        if (_secondsLeft != null && _secondsLeft! > 0) {
+          _secondsLeft = _secondsLeft! - 1;
+          shouldSubmit = _secondsLeft == 0;
+        }
+        if (_questionSecondsLeft != null && _questionSecondsLeft! > 0) {
+          _questionSecondsLeft = _questionSecondsLeft! - 1;
+          if (_questionSecondsLeft == 0) {
+            if (_currentIndex < questions.length - 1) {
+              _pageController.nextPage(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+              );
+            } else {
+              shouldSubmit = true;
+            }
+          }
+        }
+      });
+      if (shouldSubmit) unawaited(_submit(_attemptId ?? 0, automatic: true));
+    });
+  }
+
+  void _resetQuestionTimer(Map<String, dynamic> question) {
+    final seconds = number(question, 'time_limit_seconds').toInt();
+    _questionSecondsLeft = seconds > 0 ? seconds : null;
+  }
+
+  Future<void> _confirmLeave() async {
+    final confirmed = await showMoeenConfirmDialog(
+      context: context,
+      title: 'تنبيه قبل الخروج',
+      message: 'الخروج من صفحة الكويز قد يؤدي إلى تسليم الاختبار أو فقدان الإجابات غير المرسلة. هل تريد الخروج؟',
+      confirmLabel: 'الخروج',
+      cancelLabel: 'البقاء',
+      color: AppColors.danger,
+    );
+    if (confirmed && mounted) context.go(StudentQuizzesScreen.route);
   }
 
   void _confirmSubmit(int attemptId) async {
@@ -445,8 +539,9 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
     if (confirmed) _submit(attemptId);
   }
 
-  Future<void> _submit(int attemptId) async {
+  Future<void> _submit(int attemptId, {bool automatic = false}) async {
     if (attemptId <= 0) return;
+    if (_submitting) return;
     setState(() => _submitting = true);
     try {
       final response = await ref
@@ -454,6 +549,11 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
           .submitQuiz(attemptId, _answers);
       final id = number(response, 'attempt_id', fallback: attemptId).toInt();
       if (mounted) {
+        if (automatic) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('انتهى وقت الكويز وتم تسليم إجاباتك الحالية.')),
+          );
+        }
         context.go(StudentQuizzesScreen.resultPath(id));
       }
     } on ApiException catch (error) {
@@ -471,69 +571,58 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
   }
 }
 
-class _TimerWidget extends StatefulWidget {
-  const _TimerWidget({required this.durationMinutes});
-  final int durationMinutes;
-
-  @override
-  State<_TimerWidget> createState() => _TimerWidgetState();
-}
-
-class _TimerWidgetState extends State<_TimerWidget> {
-  late int _secondsLeft;
-  late Stream<int> _timerStream;
-
-  @override
-  void initState() {
-    super.initState();
-    _secondsLeft = widget.durationMinutes * 60;
-    _timerStream = Stream.periodic(
-      const Duration(seconds: 1),
-      (i) => _secondsLeft - i - 1,
-    ).take(_secondsLeft);
-  }
+class _QuizTimerPill extends StatelessWidget {
+  const _QuizTimerPill({required this.secondsLeft});
+  final int? secondsLeft;
 
   @override
   Widget build(BuildContext context) {
-    if (_secondsLeft <= 0) return const SizedBox.shrink();
-    return StreamBuilder<int>(
-      stream: _timerStream,
-      initialData: _secondsLeft,
-      builder: (context, snapshot) {
-        final remaining = snapshot.data ?? 0;
-        final mins = remaining ~/ 60;
-        final secs = remaining % 60;
-        final isLow = remaining < 60;
+    final remaining = secondsLeft;
+    if (remaining == null || remaining <= 0) return const SizedBox.shrink();
+    final mins = remaining ~/ 60;
+    final secs = remaining % 60;
+    final isLow = remaining < 60;
 
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: (isLow ? AppColors.danger : AppColors.royalBlue).withValues(
-              alpha: 0.1,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: (isLow ? AppColors.danger : AppColors.royalBlue).withValues(
+          alpha: 0.1,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.timer_outlined,
+            size: 16,
+            color: isLow ? AppColors.danger : AppColors.royalBlue,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}',
+            style: TextStyle(
+              color: isLow ? AppColors.danger : AppColors.royalBlue,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'monospace',
             ),
-            borderRadius: BorderRadius.circular(12),
           ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.timer_outlined,
-                size: 16,
-                color: isLow ? AppColors.danger : AppColors.royalBlue,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}',
-                style: TextStyle(
-                  color: isLow ? AppColors.danger : AppColors.royalBlue,
-                  fontWeight: FontWeight.w900,
-                  fontFamily: 'monospace',
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+        ],
+      ),
     );
+  }
+}
+
+const _quizSecurityChannel = MethodChannel('moeen/security');
+
+Future<void> _setQuizScreenSecurity(bool enabled) async {
+  try {
+    await _quizSecurityChannel.invokeMethod<void>(
+      'setSecureScreen',
+      {'enabled': enabled},
+    );
+  } catch (_) {
+    // Older platforms can safely ignore screenshot protection.
   }
 }
 
@@ -831,13 +920,17 @@ class _AnswerReviewTile extends StatelessWidget {
     final question = asMap(answer['question']);
     final options = asList(question['options']);
     final selectedOptionId = number(answer, 'selected_option_id').toInt();
+    final isUnanswered =
+        text(answer, 'answer_status') == 'unanswered' || selectedOptionId <= 0;
     final isCorrect = boolValue(answer, 'is_correct');
     final score = number(answer, 'score_awarded').toDouble();
     final maxScore = number(question, 'score').toDouble();
     final correctionNote = text(question, 'correction_note');
     final infoSource = text(question, 'info_source');
 
-    final color = isCorrect ? AppColors.success : AppColors.danger;
+    final color = isCorrect
+        ? AppColors.success
+        : (isUnanswered ? AppColors.warning : AppColors.danger);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),

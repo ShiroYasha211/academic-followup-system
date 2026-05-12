@@ -28,7 +28,11 @@ class _StudentNewsScreenState extends ConsumerState<StudentNewsScreen> {
         ),
         builder: (data) {
           final stats = asMap(data['stats']);
-          final items = asList(data['items']).map(asMap).toList();
+          final rawItems = asList(data['items']).map(asMap).toList();
+
+          // Sort: pinned first, then by date
+          final pinned = rawItems.where((i) => boolValue(i, 'is_pinned')).toList();
+          final regular = rawItems.where((i) => !boolValue(i, 'is_pinned')).toList();
 
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(_newsProvider(_source)),
@@ -40,7 +44,7 @@ class _StudentNewsScreenState extends ConsumerState<StudentNewsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _NewsHero(total: items.length.toString()),
+                        _NewsHero(total: rawItems.length.toString()),
                         const SizedBox(height: 20),
                         _NewsFilters(
                           value: _source,
@@ -48,40 +52,118 @@ class _StudentNewsScreenState extends ConsumerState<StudentNewsScreen> {
                           onChanged: (value) => setState(() => _source = value),
                         ),
                         const SizedBox(height: 24),
-                        Text(
-                          'آخر التحديثات',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.slate800,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
                       ],
                     ),
                   ),
                 ),
-                if (items.isEmpty)
+                if (rawItems.isEmpty)
                   const SliverFillRemaining(
                     hasScrollBody: false,
                     child: EmptyState(
                       message: 'لا توجد أخبار أو إعلانات حالياً.',
                     ),
                   )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-                    sliver: SliverList.builder(
-                      itemCount: items.length,
-                      itemBuilder: (context, index) => _EntryAnimation(
-                        index: index,
-                        child: _NewsCard(
-                          items[index],
-                          isLast: index == items.length - 1,
+                else ...[
+                  // ── Pinned announcements section ──
+                  if (pinned.isNotEmpty) ...[
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+                      sliver: SliverToBoxAdapter(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.royalBlue.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.push_pin_rounded, size: 16, color: AppColors.royalBlue),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'إعلانات مثبتة',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.royalBlue,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Divider(
+                                color: AppColors.royalBlue.withValues(alpha: 0.15),
+                                thickness: 1.5,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+                      sliver: SliverList.builder(
+                        itemCount: pinned.length,
+                        itemBuilder: (context, index) => _EntryAnimation(
+                          index: index,
+                          child: _NewsCard(
+                            pinned[index],
+                            isLast: index == pinned.length - 1 && regular.isEmpty,
+                            isPinned: true,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  // ── Regular announcements section ──
+                  if (regular.isNotEmpty) ...[
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+                      sliver: SliverToBoxAdapter(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.slate400.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.feed_rounded, size: 16, color: AppColors.slate500),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'آخر التحديثات',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.slate800,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Divider(
+                                color: AppColors.slate200,
+                                thickness: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+                      sliver: SliverList.builder(
+                        itemCount: regular.length,
+                        itemBuilder: (context, index) => _EntryAnimation(
+                          index: pinned.length + index,
+                          child: _NewsCard(
+                            regular[index],
+                            isLast: index == regular.length - 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ],
             ),
           );

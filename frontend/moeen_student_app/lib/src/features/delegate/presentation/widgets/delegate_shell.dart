@@ -30,7 +30,10 @@ class DelegateRoutes {
   static const reminders = '/delegate/reminders';
   static const announcements = '/delegate/announcements';
   static const attendance = '/delegate/attendance';
+  static const attendanceTracking = '/delegate/attendance/tracking';
+  static const attendanceForm = '/delegate/attendance/form';
   static const qrAttendance = '/delegate/qr-attendance';
+  static const qrSession = '/delegate/attendance/qr-session';
   static const absenceAlerts = '/delegate/absence-alerts';
   static const authorizedGrades = '/delegate/authorized-grades';
   static const gradeDelegations = '/delegate/grade-helper-delegations';

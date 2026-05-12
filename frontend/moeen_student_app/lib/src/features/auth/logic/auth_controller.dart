@@ -35,13 +35,15 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     if (!session.canAccessDelegateWorkspace) return session;
 
     try {
-      final response = await ApiClient(token: session.token).get('/delegate/me');
+      final response = await ApiClient(
+        token: session.token,
+      ).get('/delegate/me');
       final data = response['data'];
       final user = data is Map ? data['user'] : null;
       final permissions = user is Map
           ? (user['permissions'] as List?)
-              ?.map((permission) => permission.toString())
-              .toList()
+                ?.map((permission) => permission.toString())
+                .toList()
           : null;
       if (permissions == null) return session;
 
@@ -110,6 +112,15 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     }
     await ref.read(sessionStorageProvider).clear();
     state = const AsyncData(null);
+  }
+
+  Future<void> updateEmail(String email) async {
+    final session = state.valueOrNull;
+    if (session == null) return;
+
+    final updated = session.copyWith(email: email);
+    await ref.read(sessionStorageProvider).save(updated);
+    state = AsyncData(updated);
   }
 
   Future<AuthSession?> switchWorkspace(AuthWorkspace workspace) async {

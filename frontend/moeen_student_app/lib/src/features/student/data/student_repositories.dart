@@ -742,6 +742,17 @@ class StudentContentRepository {
     return _data(response);
   }
 
+  Future<Map<String, dynamic>> updateEmail({
+    required String email,
+    required String currentPassword,
+  }) async {
+    final response = await _api.patch(
+      '/student/profile/email',
+      data: {'email': email, 'current_password': currentPassword},
+    );
+    return _data(response);
+  }
+
   Future<String> changePassword({
     required String currentPassword,
     required String newPassword,

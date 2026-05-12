@@ -153,6 +153,29 @@ class StudentProfileScreen extends ConsumerWidget {
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
+                          onPressed: () => _showChangeEmail(
+                            context,
+                            ref,
+                            text(profile, 'email'),
+                          ),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            backgroundColor: AppColors.royalBlue,
+                          ),
+                          icon: const Icon(Icons.alternate_email_rounded),
+                          label: const Text(
+                            'تعديل البريد الإلكتروني',
+                            style: TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
                           onPressed: () => _showChangePassword(context, ref),
                           style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 18),
@@ -179,6 +202,30 @@ class StudentProfileScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _showChangeEmail(
+    BuildContext context,
+    WidgetRef ref,
+    String currentEmail,
+  ) async {
+    await showMoeenBottomSheet(
+      context: context,
+      title: 'تعديل البريد الإلكتروني',
+      icon: Icons.alternate_email_rounded,
+      color: AppColors.royalBlue,
+      child: _ChangeEmailForm(
+        currentEmail: currentEmail,
+        onSubmit: (email, currentPassword) async {
+          final updated = await ref
+              .read(studentContentRepositoryProvider)
+              .updateEmail(email: email, currentPassword: currentPassword);
+          final newEmail = text(updated, 'email', fallback: email);
+          await ref.read(authControllerProvider.notifier).updateEmail(newEmail);
+          ref.invalidate(_studentProfileProvider);
+        },
+      ),
+    );
+  }
+
   Future<void> _showChangePassword(BuildContext context, WidgetRef ref) async {
     await showMoeenBottomSheet(
       context: context,
@@ -195,6 +242,147 @@ class StudentProfileScreen extends ConsumerWidget {
             ),
       ),
     );
+  }
+}
+
+class _ChangeEmailForm extends StatefulWidget {
+  const _ChangeEmailForm({required this.currentEmail, required this.onSubmit});
+
+  final String currentEmail;
+  final Future<void> Function(String email, String currentPassword) onSubmit;
+
+  @override
+  State<_ChangeEmailForm> createState() => _ChangeEmailFormState();
+}
+
+class _ChangeEmailFormState extends State<_ChangeEmailForm> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _emailController;
+  final _passwordController = TextEditingController();
+
+  bool _obscurePassword = true;
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.currentEmail);
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Form(
+      key: _formKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            validator: (value) {
+              final email = value?.trim() ?? '';
+              if (email.isEmpty) return 'اكتب البريد الإلكتروني الجديد.';
+              if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+                return 'اكتب بريدًا إلكترونيًا صحيحًا.';
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              labelText: 'البريد الإلكتروني الجديد',
+              prefixIcon: const Icon(Icons.alternate_email_rounded),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            textInputAction: TextInputAction.done,
+            validator: (value) => value == null || value.isEmpty
+                ? 'اكتب كلمة المرور الحالية.'
+                : null,
+            decoration: InputDecoration(
+              labelText: 'كلمة المرور الحالية',
+              prefixIcon: const Icon(Icons.lock_rounded),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_rounded
+                      : Icons.visibility_off_rounded,
+                ),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: _submitting ? null : _handleSave,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: _submitting
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'حفظ البريد الإلكتروني',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleSave() async {
+    if (_formKey.currentState?.validate() != true) return;
+    setState(() => _submitting = true);
+    try {
+      await widget.onSubmit(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم تحديث البريد الإلكتروني بنجاح'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: AppColors.danger),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 }
 

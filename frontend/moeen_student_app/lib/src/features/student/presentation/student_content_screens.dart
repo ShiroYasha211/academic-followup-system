@@ -1,5 +1,6 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/notifications/push_notification_service.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'features/student/presentation/widgets/student_shell.dart';
 import 'shared/widgets/download_banner_overlay.dart';
 
 class MoeenStudentApp extends ConsumerStatefulWidget {
@@ -17,6 +18,7 @@ class MoeenStudentApp extends ConsumerStatefulWidget {
 
 class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp> {
   StreamSubscription<String>? _notificationNavigationSubscription;
+  StreamSubscription<Map<String, dynamic>>? _notificationRefreshSubscription;
 
   @override
   void initState() {
@@ -30,12 +32,19 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp> {
 
       _notificationNavigationSubscription =
           PushNotificationService.navigationRequests.listen(router.go);
+      _notificationRefreshSubscription =
+          PushNotificationService.refreshRequests.listen((_) {
+        ref.invalidate(studentUnreadNotificationsCountProvider);
+        ref.invalidate(studentUnreadScreenCountsProvider);
+        ref.invalidate(studentUnreadMessagesCountProvider);
+      });
     });
   }
 
   @override
   void dispose() {
     unawaited(_notificationNavigationSubscription?.cancel());
+    unawaited(_notificationRefreshSubscription?.cancel());
     super.dispose();
   }
 

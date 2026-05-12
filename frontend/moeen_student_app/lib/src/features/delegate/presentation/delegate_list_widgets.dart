@@ -371,14 +371,12 @@ class _DataCard extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.color,
-    this.actions = const [],
   });
 
   final String title;
   final String subtitle;
   final IconData icon;
   final Color color;
-  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
@@ -423,7 +421,6 @@ class _DataCard extends StatelessWidget {
               ],
             ),
           ),
-          if (actions.isNotEmpty) Wrap(spacing: 2, children: actions),
         ],
       ),
     );

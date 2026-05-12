@@ -384,13 +384,21 @@ class DelegateRepository {
     return (response['message'] ?? 'تم حذف الإعلان.').toString();
   }
 
-  Future<Map<String, dynamic>> attendance() async =>
-      _data(await _api.get('/delegate/attendances'));
+  Future<Map<String, dynamic>> attendance({String? search, String? date}) async => _data(
+        await _api.get(
+          '/delegate/attendances',
+          queryParameters: {
+            if (search != null) 'search': search,
+            if (date != null) 'date': date,
+          },
+        ),
+      );
 
   Future<Map<String, dynamic>> attendanceCreate({
     required int subjectId,
     String? date,
     int? qrSessionId,
+    int? lectureId,
   }) async {
     return _data(
       await _api.get(
@@ -398,6 +406,7 @@ class DelegateRepository {
         queryParameters: {
           if (date != null) 'date': date,
           if (qrSessionId != null) 'qr_session_id': qrSessionId,
+          if (lectureId != null) 'lecture_id': lectureId,
         },
       ),
     );
@@ -406,6 +415,28 @@ class DelegateRepository {
   Future<String> saveAttendance(Map<String, dynamic> data) async {
     final response = await _api.post('/delegate/attendances', data: data);
     return (response['message'] ?? 'تم حفظ الحضور.').toString();
+  }
+
+  Future<Map<String, dynamic>> issuePairingCode({
+    required int subjectId,
+    required String date,
+    required String title,
+    String? lectureNumber,
+    String? deviceName,
+  }) async {
+    return _data(
+      await _api.post(
+        '/delegate/desktop/pairing-code',
+        data: {
+          'subject_id': subjectId,
+          'date': date,
+          'title': title,
+          if (lectureNumber != null && lectureNumber.isNotEmpty)
+            'lecture_number': lectureNumber,
+          if (deviceName != null) 'device_name': deviceName,
+        },
+      ),
+    );
   }
 
   Future<Map<String, dynamic>> attendanceAlerts() async =>
@@ -424,6 +455,53 @@ class DelegateRepository {
 
   Future<Map<String, dynamic>> finalizeQr(int sessionId) async =>
       _data(await _api.post('/delegate/qr-attendance/$sessionId/finalize'));
+
+  Future<Map<String, dynamic>> cancelQr(int sessionId) async =>
+      _data(await _api.post('/delegate/qr-attendance/$sessionId/cancel'));
+
+  Future<Map<String, dynamic>> activeQrAttendance({
+    required int subjectId,
+    required String date,
+    required String title,
+  }) async =>
+      _data(
+        await _api.get(
+          '/delegate/qr-attendance/active',
+          queryParameters: {
+            'subject_id': subjectId,
+            'date': date,
+            'title': title,
+          },
+        ),
+      );
+
+  Future<Map<String, dynamic>> attendanceReport({
+    required int subjectId,
+    required String date,
+    int? lectureId,
+    String? genderFilter,
+  }) async =>
+      _data(
+        await _api.get(
+          '/delegate/attendances/$subjectId/$date/report',
+          queryParameters: {
+            if (lectureId != null) 'lecture_id': lectureId,
+            if (genderFilter != null) 'gender_filter': genderFilter,
+          },
+        ),
+      );
+
+  Future<List<int>> attendanceReportPdf({
+    required int subjectId,
+    required String date,
+    int? lectureId,
+  }) =>
+      _api.getBytes(
+        '/delegate/attendances/$subjectId/$date/report-pdf',
+        queryParameters: {
+          if (lectureId != null) 'lecture_id': lectureId,
+        },
+      );
 
   Future<Map<String, dynamic>> authorizedGrades() async =>
       _data(await _api.get('/delegate/authorized-grades'));

@@ -226,9 +226,10 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
           .libraryDownloadUrl(id);
       if (!context.mounted) return;
 
-      final savedPath = await DownloadService.downloadUrl(
+      final savedPath = await DownloadService.downloadUrlCached(
         url: url,
         fileName: _safeFileName(item),
+        cacheKey: 'library_$id',
       );
 
       if (context.mounted && savedPath != null) {

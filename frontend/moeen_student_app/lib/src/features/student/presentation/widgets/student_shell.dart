@@ -34,6 +34,19 @@ final studentUnreadNotificationsCountProvider = FutureProvider.autoDispose<int>(
   },
 );
 
+final studentUnreadScreenCountsProvider =
+    FutureProvider.autoDispose<Map<String, int>>((ref) async {
+  final data = await ref
+      .watch(studentContentRepositoryProvider)
+      .unreadNotificationsCount();
+  final raw = data['by_screen'];
+  if (raw is! Map) return const <String, int>{};
+  return raw.map((key, value) {
+    final count = value is num ? value.toInt() : int.tryParse('$value') ?? 0;
+    return MapEntry(key.toString(), count);
+  });
+});
+
 final studentUnreadMessagesCountProvider = FutureProvider.autoDispose<int>((
   ref,
 ) async {
@@ -100,6 +113,7 @@ class _StudentShellState extends ConsumerState<StudentShell>
 
   void _refreshBadges() {
     ref.invalidate(studentUnreadNotificationsCountProvider);
+    ref.invalidate(studentUnreadScreenCountsProvider);
     ref.invalidate(studentUnreadMessagesCountProvider);
   }
 
@@ -337,6 +351,9 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
     final hasClinical = dashboardClinical ?? session?.hasClinical == true;
     final unreadNotifications =
         ref.watch(studentUnreadNotificationsCountProvider).valueOrNull ?? 0;
+    final unreadByScreen =
+        ref.watch(studentUnreadScreenCountsProvider).valueOrNull ??
+        const <String, int>{};
     final unreadMessages =
         ref.watch(studentUnreadMessagesCountProvider).valueOrNull ?? 0;
 
@@ -439,6 +456,13 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
         ),
         _DrawerItem(
           'المكتبة المشتركة',
+          Icons.upload_file_rounded,
+          21,
+          StudentSubjectsScreen.route,
+          true,
+        ),
+        _DrawerItem(
+          'ط§ظ„ظ…ظƒطھط¨ط© ط§ظ„ظ…ط´طھط±ظƒط©',
           Icons.library_books_rounded,
           12,
           StudentLibraryScreen.route,
@@ -620,7 +644,10 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
                               ? unreadNotifications
                               : (item.route == StudentMessagesScreen.route
                                     ? unreadMessages
-                                    : 0),
+                                    : _badgeForRoute(
+                                        item.route,
+                                        unreadByScreen,
+                                      )),
                           onTap: () => _go(item),
                         ),
                       const SizedBox(height: 12),
@@ -748,6 +775,50 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
   }
 }
 
+int _badgeForRoute(String route, Map<String, int> unreadByScreen) {
+  final screen = switch (route) {
+    StudentQuizzesScreen.route => 'quizzes',
+    StudentAssignmentsScreen.route => 'assignments',
+    StudentScheduleScreen.route => 'schedule',
+    StudentRemindersScreen.route => 'reminders',
+    StudentResourcesScreen.route => 'resources',
+    StudentLibraryScreen.route => 'library',
+    StudentStarsScreen.route => 'stars',
+    StudentInquiriesScreen.route => 'inquiries',
+    StudentNewsScreen.route => 'news_hub',
+    _ => null,
+  };
+  if (screen == null) return 0;
+  return unreadByScreen[screen] ?? 0;
+}
+
+String _drawerLabel(_DrawerItem item) {
+  if (item.index == 21) {
+    return String.fromCharCodes([1585, 1601, 1593, 32, 1593, 1584, 1585]);
+  }
+  if (item.index == 12) {
+    return String.fromCharCodes([
+      1575,
+      1604,
+      1605,
+      1603,
+      1578,
+      1576,
+      1577,
+      32,
+      1575,
+      1604,
+      1605,
+      1588,
+      1578,
+      1585,
+      1603,
+      1577,
+    ]);
+  }
+  return item.label;
+}
+
 class _WorkspaceSwitchTile extends StatelessWidget {
   const _WorkspaceSwitchTile({
     required this.label,
@@ -765,6 +836,10 @@ class _WorkspaceSwitchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final item = _DrawerItem(this.label, icon, 0, '', false);
+    final label = item.index == 21
+        ? 'رفع عذر'
+        : (item.index == 12 ? 'المكتبة المشتركة' : item.label);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
@@ -889,6 +964,10 @@ class _DrawerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ignore: unused_local_variable
+    final label = item.index == 21
+        ? 'رفع عذر'
+        : (item.index == 12 ? 'المكتبة المشتركة' : item.label);
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
@@ -906,7 +985,7 @@ class _DrawerTile extends StatelessWidget {
           size: 22,
         ),
         title: Text(
-          item.label,
+          _drawerLabel(item),
           style: TextStyle(
             color: selected ? AppColors.royalBlue : AppColors.midnight,
             fontWeight: selected ? FontWeight.w900 : FontWeight.w700,

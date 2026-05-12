@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -6,6 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../network/api_exception.dart';
 
@@ -37,7 +39,7 @@ class DownloadService {
 
   static Future<void> initialize() async {
     if (_initialized) return;
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const android = AndroidInitializationSettings('ic_notification');
     const settings = InitializationSettings(android: android);
     await _notifications.initialize(settings);
     final androidPlugin = _notifications
@@ -56,6 +58,7 @@ class DownloadService {
   static Future<String?> downloadUrl({
     required String url,
     required String fileName,
+    Map<String, dynamic>? headers,
   }) async {
     await initialize();
     final safeName = _safeFileName(fileName);
@@ -77,6 +80,7 @@ class DownloadService {
           responseType: ResponseType.bytes,
           followRedirects: true,
           receiveTimeout: const Duration(minutes: 2),
+          headers: headers,
         ),
         onReceiveProgress: (received, total) {
           if (!_activeDownloads.contains(id)) return;
@@ -109,9 +113,17 @@ class DownloadService {
         fileName: safeName,
         bytes: Uint8List.fromList(bytes),
       );
+      final finalPath = savedPath == null
+          ? null
+          : _ensureFileExtension(savedPath, safeName);
+
+      if (finalPath != null) {
+        final file = File(finalPath);
+        await file.writeAsBytes(bytes);
+      }
 
       _activeDownloads.remove(id);
-      if (savedPath == null || savedPath.isEmpty) {
+      if (finalPath == null || finalPath.isEmpty) {
         await _notifications.cancel(id);
         return null;
       }
@@ -122,8 +134,8 @@ class DownloadService {
       _eventController.add(
         DownloadEvent(type: DownloadEventType.completed, fileName: safeName),
       );
-      await OpenFilex.open(savedPath);
-      return savedPath;
+      await OpenFilex.open(finalPath);
+      return finalPath;
     } on DioException catch (error) {
       _activeDownloads.remove(id);
       await _showFailed(id, safeName);
@@ -148,6 +160,98 @@ class DownloadService {
     }
   }
 
+  static Future<String?> downloadUrlCached({
+    required String url,
+    required String fileName,
+    required String cacheKey,
+    Map<String, dynamic>? headers,
+  }) async {
+    await initialize();
+    final safeName = _safeFileName(fileName);
+    final safeKey = _safeFileName(cacheKey);
+    final dir = await getApplicationDocumentsDirectory();
+    final downloadsDir = Directory('${dir.path}${Platform.pathSeparator}moeen_downloads');
+    if (!await downloadsDir.exists()) {
+      await downloadsDir.create(recursive: true);
+    }
+
+    final cachedPath = '${downloadsDir.path}${Platform.pathSeparator}${safeKey}_$safeName';
+    final cachedFile = File(cachedPath);
+    if (await cachedFile.exists() && await cachedFile.length() > 0) {
+      await OpenFilex.open(cachedPath);
+      return cachedPath;
+    }
+
+    final id = Random().nextInt(2147480000);
+    final dio = Dio();
+    var lastProgress = -1;
+
+    try {
+      _activeDownloads.add(id);
+      _eventController.add(
+        DownloadEvent(type: DownloadEventType.started, fileName: safeName),
+      );
+      await _showProgress(id, safeName, null);
+
+      final response = await dio.get<List<int>>(
+        url,
+        options: Options(
+          responseType: ResponseType.bytes,
+          followRedirects: true,
+          receiveTimeout: const Duration(minutes: 2),
+          headers: headers,
+        ),
+        onReceiveProgress: (received, total) {
+          if (!_activeDownloads.contains(id)) return;
+          if (total <= 0) return;
+          final progress = ((received / total) * 100).clamp(0, 100).toInt();
+          if (progress != lastProgress) {
+            lastProgress = progress;
+            _showProgress(id, safeName, progress);
+          }
+        },
+      );
+
+      final bytes = response.data ?? const <int>[];
+      if (bytes.isEmpty) {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          type: DioExceptionType.badResponse,
+        );
+      }
+
+      await cachedFile.writeAsBytes(bytes, flush: true);
+      _activeDownloads.remove(id);
+      await _showProgress(id, safeName, 100);
+      await _showCompleted(id, safeName);
+      _eventController.add(
+        DownloadEvent(type: DownloadEventType.completed, fileName: safeName),
+      );
+      await OpenFilex.open(cachedPath);
+      return cachedPath;
+    } on DioException catch (error) {
+      _activeDownloads.remove(id);
+      await _showFailed(id, safeName);
+      _eventController.add(
+        DownloadEvent(type: DownloadEventType.failed, fileName: safeName),
+      );
+      throw ApiException(
+        error.type == DioExceptionType.connectionError
+            ? 'تعذر الاتصال أثناء تحميل الملف.'
+            : 'حدث خطأ أثناء تحميل الملف من الرابط المرسل.',
+        statusCode: error.response?.statusCode,
+      );
+    } catch (_) {
+      _activeDownloads.remove(id);
+      await _showFailed(id, safeName);
+      _eventController.add(
+        DownloadEvent(type: DownloadEventType.failed, fileName: safeName),
+      );
+      throw const ApiException('تعذر حفظ الملف أو فتحه من التخزين المحلي.');
+    }
+  }
+
   static Future<void> _showProgress(
     int id,
     String fileName,
@@ -167,6 +271,7 @@ class DownloadService {
       indeterminate: !hasKnownProgress,
       onlyAlertOnce: true,
       ongoing: true,
+      icon: 'ic_notification',
     );
     await _notifications.show(
       id,
@@ -185,6 +290,7 @@ class DownloadService {
       importance: Importance.high,
       priority: Priority.high,
       ongoing: false,
+      icon: 'ic_notification',
     );
     await _notifications.show(
       id,
@@ -202,6 +308,7 @@ class DownloadService {
       importance: Importance.high,
       priority: Priority.high,
       ongoing: false,
+      icon: 'ic_notification',
     );
     await _notifications.show(
       id,
@@ -214,5 +321,15 @@ class DownloadService {
   static String _safeFileName(String value) {
     final trimmed = value.trim().isEmpty ? 'moeen-file' : value.trim();
     return trimmed.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+  }
+
+  static String _ensureFileExtension(String path, String fileName) {
+    final dotIndex = fileName.lastIndexOf('.');
+    if (dotIndex <= 0 || dotIndex >= fileName.length - 1) return path;
+
+    final extension = fileName.substring(dotIndex).toLowerCase();
+    if (path.toLowerCase().endsWith(extension)) return path;
+
+    return '$path$extension';
   }
 }

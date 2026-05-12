@@ -10,39 +10,478 @@ class DelegateAttendanceScreen extends ConsumerStatefulWidget {
 }
 
 class _DelegateAttendanceScreenState
-    extends ConsumerState<DelegateAttendanceScreen> {
+    extends ConsumerState<DelegateAttendanceScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: DelegateShell(
-        currentIndex: 12,
-        title: 'رصد الحضور',
-        floatingActionButton: _AttendanceActionFAB(
-          onManual: () => _showManualSubjectPicker(context, ref),
-          onQr: () => _startQrSession(
-            context,
-            ref,
-            onStarted: (session) {
-              DefaultTabController.of(context).animateTo(1);
-            },
+    return DelegateShell(
+      currentIndex: 12,
+      title: 'رصد الحضور',
+      child: Column(
+        children: [
+          _PremiumTabBar(controller: _tabController),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _AttendanceSubjectsTab(),
+                _AttendanceHistoryTab(),
+              ],
+            ),
           ),
-          isEnabled: true,
-          onUnauthorized: () => _showNoPermissionSnackBar(context),
-        ),
-        bottom: const TabBar(
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          labelStyle: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-          tabs: [
-            Tab(text: 'رصد يدوي', icon: Icon(Icons.how_to_reg_rounded)),
-            Tab(text: 'QR حضور', icon: Icon(Icons.qr_code_2_rounded)),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumTabBar extends StatelessWidget {
+  const _PremiumTabBar({required this.controller});
+  final TabController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(18, 12, 18, 4),
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: AppColors.slate100.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: TabBar(
+        controller: controller,
+        dividerColor: Colors.transparent,
+        indicatorSize: TabBarIndicatorSize.tab,
+        labelColor: Colors.white,
+        unselectedLabelColor: AppColors.slate600,
+        indicator: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            colors: [AppColors.royalBlue, AppColors.teal],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.royalBlue.withValues(alpha: 0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
-        child: TabBarView(
+        labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+        tabs: const [
+          Tab(
+            height: 44,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.auto_stories_rounded, size: 18),
+                SizedBox(width: 8),
+                Text('المواد الدراسية'),
+              ],
+            ),
+          ),
+          Tab(
+            height: 44,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.analytics_rounded, size: 18),
+                SizedBox(width: 8),
+                Text('تقارير السجلات'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttendanceSubjectsTab extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _AsyncBody<Map<String, dynamic>>(
+      state: ref.watch(_delegateAttendanceProvider((search: null, date: null))),
+      onRetry: () => ref.invalidate(_delegateAttendanceProvider((search: null, date: null))),
+      builder: (data) {
+        final items = asList(data['subjects']).map(asMap).toList();
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(_delegateAttendanceProvider((search: null, date: null))),
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            children: [
+              const _HeroPanel(
+                title: 'رصد الحضور اليومي',
+                subtitle: 'إدارة جلسات التحضير للمواد الدراسية وتتبع حالة الطلاب.',
+                icon: Icons.how_to_reg_rounded,
+                colors: [AppColors.royalBlue, AppColors.teal],
+              ),
+              const SizedBox(height: 24),
+              // Table Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Text(
+                        'المادة والدكتور',
+                        style: TextStyle(
+                          color: AppColors.slate500,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 1,
+                      child: Text(
+                        'الحالة',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.slate500,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'التحضير',
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          color: AppColors.slate500,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: AppColors.slate100),
+              const SizedBox(height: 12),
+              if (items.isEmpty)
+                const _EmptyState('لا توجد مواد مسجلة حالياً.')
+              else
+                for (final item in items)
+                  _AttendanceSubjectCard(item: item),
+              const SizedBox(height: 80),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AttendanceSubjectCard extends ConsumerWidget {
+  const _AttendanceSubjectCard({required this.item});
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isAllowed = item['allow_delegate_attendance'] == true;
+    final doctor = asMap(item['doctor']);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.slate200.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Subject Info
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text(item, 'name'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                    color: AppColors.midnight,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  text(doctor, 'name', fallback: 'دكتور المادة'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.slate500,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Status Badge
+          Expanded(
+            flex: 1,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (isAllowed ? AppColors.success : AppColors.danger)
+                      .withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  isAllowed ? 'متاح' : 'مغلق',
+                  style: TextStyle(
+                    color: isAllowed ? AppColors.success : AppColors.danger,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Action Button
+          Expanded(
+            flex: 2,
+            child: Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: ElevatedButton(
+                onPressed: isAllowed
+                    ? () => context.push(DelegateRoutes.attendanceTracking, extra: item)
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.royalBlue,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: const Size(0, 36),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text(
+                  'بدء التحضير',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttendanceHistoryTab extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_AttendanceHistoryTab> createState() =>
+      _AttendanceHistoryTabState();
+}
+
+class _AttendanceHistoryTabState extends ConsumerState<_AttendanceHistoryTab> {
+  String _searchQuery = '';
+  DateTime? _selectedDate;
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) setState(() => _searchQuery = query);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dateStr = _selectedDate != null ? intl.DateFormat('yyyy-MM-dd').format(_selectedDate!) : null;
+    final asyncValue = ref.watch(_delegateAttendanceProvider((search: _searchQuery, date: dateStr)));
+    
+    return RefreshIndicator(
+      onRefresh: () async => ref.invalidate(_delegateAttendanceProvider((search: _searchQuery, date: dateStr))),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: _HistoryFiltersHeader(
+              onSearch: _onSearchChanged,
+              selectedDate: _selectedDate,
+              onDateSelected: (d) => setState(() => _selectedDate = d),
+              onClear: () => setState(() {
+                _searchQuery = '';
+                _selectedDate = null;
+              }),
+            ),
+          ),
+          asyncValue.when(
+            data: (data) {
+              final sessions = asList(data['sessions']).map(asMap).toList();
+              if (sessions.isEmpty) {
+                return const SliverFillRemaining(
+                  child: _EmptyState('لا توجد تقارير تطابق البحث.'),
+                );
+              }
+              return SliverPadding(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 100),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _AttendanceSessionCard(session: sessions[index]),
+                    childCount: sessions.length,
+                  ),
+                ),
+              );
+            },
+            loading: () => asyncValue.hasValue 
+              ? SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 100),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => Opacity(
+                        opacity: 0.6,
+                        child: _AttendanceSessionCard(session: asList(asyncValue.value!['sessions'])[index]),
+                      ),
+                      childCount: asList(asyncValue.value!['sessions']).length,
+                    ),
+                  ),
+                )
+              : const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+            error: (e, s) => SliverFillRemaining(
+              child: Center(child: Text('حدث خطأ: $e')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryFiltersHeader extends StatelessWidget {
+  const _HistoryFiltersHeader({
+    required this.onSearch,
+    required this.selectedDate,
+    required this.onDateSelected,
+    required this.onClear,
+  });
+
+  final ValueChanged<String> onSearch;
+  final DateTime? selectedDate;
+  final ValueChanged<DateTime?> onDateSelected;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      child: _GlassCard(
+        child: Column(
           children: [
-            _ManualAttendanceTab(),
-            _QrAttendanceTab(),
+            TextField(
+              onChanged: onSearch,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+              decoration: InputDecoration(
+                hintText: 'بحث باسم المحاضرة أو المادة...',
+                prefixIcon: const Icon(Icons.search_rounded, color: AppColors.royalBlue),
+                filled: true,
+                fillColor: AppColors.slate50,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate ?? DateTime.now(),
+                        firstDate: DateTime(2023),
+                        lastDate: DateTime.now(),
+                        builder: (context, child) => Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: const ColorScheme.light(primary: AppColors.royalBlue),
+                          ),
+                          child: child!,
+                        ),
+                      );
+                      if (picked != null) onDateSelected(picked);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.slate50,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.slate500),
+                          const SizedBox(width: 8),
+                          Text(
+                            selectedDate == null
+                                ? 'فلترة بالتاريخ'
+                                : intl.DateFormat('yMMMMEEEEd', 'ar').format(selectedDate!),
+                            style: TextStyle(
+                              color: selectedDate == null ? AppColors.slate500 : AppColors.midnight,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (selectedDate != null)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 8),
+                    child: IconButton.filledTonal(
+                      onPressed: onClear,
+                      icon: const Icon(Icons.filter_list_off_rounded),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.danger.withValues(alpha: 0.1),
+                        foregroundColor: AppColors.danger,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -50,52 +489,90 @@ class _DelegateAttendanceScreenState
   }
 }
 
-class _ManualAttendanceTab extends ConsumerWidget {
+class _AttendanceSessionCard extends ConsumerWidget {
+  const _AttendanceSessionCard({required this.session});
+  final Map<String, dynamic> session;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return _AsyncBody<Map<String, dynamic>>(
-      state: ref.watch(_delegateAttendanceProvider),
-      onRetry: () => ref.invalidate(_delegateAttendanceProvider),
-      builder: (data) {
-        final items = asList(data['subjects']);
-        return RefreshIndicator(
-          onRefresh: () async => ref.invalidate(_delegateAttendanceProvider),
-          child: _ListScaffold(
-            title: 'رصد يدوي (${items.length})',
-            subtitle: 'اختر المادة للبدء برصد حضور المحاضرة يدوياً.',
-            icon: Icons.how_to_reg_rounded,
-            colors: const [AppColors.success, AppColors.teal],
-            children: [
-              if (items.isEmpty) const _EmptyState('لا توجد مواد متاحة.'),
-              for (final item in items)
-                _DataCard(
-                  title: text(item, 'name'),
-                  subtitle: (item['allow_delegate_attendance'] == true)
-                      ? 'متاح للمندوب رصد الحضور'
-                      : 'مغلق من الدكتور',
-                  icon: (item['allow_delegate_attendance'] == true)
-                      ? Icons.check_circle_rounded
-                      : Icons.lock_rounded,
-                  color: (item['allow_delegate_attendance'] == true)
-                      ? AppColors.success
-                      : AppColors.slate400,
-                  actions: [
-                    if (item['allow_delegate_attendance'] == true)
-                      IconButton(
-                        onPressed: () {
-                          _attendanceSheet(context, ref, asMap(item));
-                        },
-                        icon: Opacity(
-                          opacity: 1.0,
-                          child: const Icon(Icons.edit_calendar_rounded),
+    final isQr = text(session, 'attendance_method') == 'qr';
+    final dateRaw = text(session, 'date');
+    DateTime? dateObj;
+    try { dateObj = DateTime.tryParse(dateRaw); } catch (_) {}
+
+    final isUnofficial = boolValue(session, 'is_unofficial');
+    final displayName = text(session, 'display_name');
+
+    return InkWell(
+      onTap: () => _showAttendanceReportSheet(context, ref, session),
+      borderRadius: BorderRadius.circular(24),
+      child: _GlassCard(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isUnofficial
+                      ? [Colors.orange.shade400, Colors.deepOrange.shade600]
+                      : (isQr ? [AppColors.teal, Colors.tealAccent] : [AppColors.royalBlue, Colors.blueAccent]),
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isUnofficial ? Icons.stars_rounded : (isQr ? Icons.qr_code_rounded : Icons.edit_calendar_rounded),
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayName,
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                       ),
-                  ],
-                ),
-            ],
-          ),
-        );
-      },
+                      if (isUnofficial)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.orange.shade100),
+                          ),
+                          child: Text(
+                            'غير رسمية',
+                            style: TextStyle(
+                              color: Colors.orange.shade800,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  Text(
+                    '${dateObj != null ? intl.DateFormat('yMMMMEEEEd', 'ar').format(dateObj) : dateRaw} | ${value(session, 'total_records')} طالب',
+                    style: const TextStyle(
+                      color: AppColors.slate500,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_left_rounded, color: AppColors.slate300),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -182,7 +659,7 @@ class _QrAttendanceTabState extends ConsumerState<_QrAttendanceTab> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('رمز الجلسة الحالي', style: _titleStyle),
-                    _StatusBadge(status: 'نشط', color: AppColors.success),
+                    _AttendanceStatusBadge(status: 'نشط', color: AppColors.success),
                   ],
                 ),
                 const SizedBox(height: 14),
@@ -281,10 +758,15 @@ class _QrAttendanceTabState extends ConsumerState<_QrAttendanceTab> {
       () => ref.read(delegateRepositoryProvider).finalizeQr(id),
       after: () {
         _timer?.cancel();
+        final sessionData = _session;
+        final statusData = _status;
         setState(() {
           _session = null;
           _status = null;
         });
+        if (sessionData != null && statusData != null && statusData.containsKey('subject')) {
+            _attendanceSheet(context, ref, asMap(statusData['subject']), qrSessionData: sessionData);
+        }
       },
     );
   }
@@ -296,8 +778,8 @@ class _QrAttendanceTabState extends ConsumerState<_QrAttendanceTab> {
   }
 }
 
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status, required this.color});
+class _AttendanceStatusBadge extends StatelessWidget {
+  const _AttendanceStatusBadge({required this.status, required this.color});
   final String status;
   final Color color;
 
@@ -338,119 +820,7 @@ class _StatItemRow extends StatelessWidget {
 }
 
 
-class _AttendanceActionFAB extends StatelessWidget {
-  const _AttendanceActionFAB({
-    required this.onManual,
-    required this.onQr,
-    this.isEnabled = true,
-    this.onUnauthorized,
-  });
-  final VoidCallback onManual;
-  final VoidCallback onQr;
-  final bool isEnabled;
-  final VoidCallback? onUnauthorized;
 
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: isEnabled ? 1.0 : 0.5,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.teal.withValues(alpha: isEnabled ? 0.3 : 0.1),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: FloatingActionButton.extended(
-          onPressed: isEnabled ? () => _showAttendanceOptions(context) : onUnauthorized,
-          backgroundColor: AppColors.teal,
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: const Icon(Icons.add_task_rounded, color: Colors.white, size: 26),
-        label: const Text(
-          'بدء تحضير',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-            fontSize: 15,
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-  void _showAttendanceOptions(BuildContext context) {
-    showMoeenBottomSheet(
-      context: context,
-      title: 'بدء رصد حضور',
-      icon: Icons.how_to_reg_rounded,
-      color: AppColors.teal,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const Icon(Icons.edit_calendar_rounded, color: AppColors.success),
-            title: const Text('رصد يدوي', style: TextStyle(fontWeight: FontWeight.w900)),
-            subtitle: const Text('اختيار مادة ورصد الطلاب يدوياً'),
-            onTap: () {
-              Navigator.pop(context);
-              onManual();
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.royalBlue),
-            title: const Text('جلسة QR حضور', style: TextStyle(fontWeight: FontWeight.w900)),
-            subtitle: const Text('توليد كود QR ليمسحه الطلاب'),
-            onTap: () {
-              Navigator.pop(context);
-              onQr();
-            },
-          ),
-          const SizedBox(height: 12),
-        ],
-      ),
-    );
-  }
-}
-
-Future<void> _showManualSubjectPicker(BuildContext context, WidgetRef ref) async {
-  final state = ref.read(_delegateAttendanceProvider);
-  final subjects = asList(state.value?['subjects']);
-  
-  if (subjects.isEmpty) {
-    _toast(context, 'لا توجد مواد متاحة حالياً.');
-    return;
-  }
-
-  await showMoeenBottomSheet(
-    context: context,
-    title: 'اختر المادة',
-    icon: Icons.book_rounded,
-    color: AppColors.royalBlue,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final item in subjects)
-          if (item['allow_delegate_attendance'] == true)
-            ListTile(
-              title: Text(text(item, 'name'), style: const TextStyle(fontWeight: FontWeight.w800)),
-              leading: const Icon(Icons.auto_stories_rounded, color: AppColors.slate400),
-              onTap: () {
-                Navigator.pop(context);
-                _attendanceSheet(context, ref, asMap(item));
-              },
-            ),
-        const SizedBox(height: 12),
-      ],
-    ),
-  );
-}
 
 class DelegateAbsenceAlertsScreen extends ConsumerWidget {
   const DelegateAbsenceAlertsScreen({super.key});
