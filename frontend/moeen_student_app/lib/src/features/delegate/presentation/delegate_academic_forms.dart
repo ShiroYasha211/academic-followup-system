@@ -6,10 +6,21 @@ Future<void> _subjectSheet(
   Map<String, dynamic>? item,
 }) async {
   final repo = ref.read(delegateRepositoryProvider);
-  final results = await Future.wait([repo.eligibleDoctors(), repo.terms()]);
+  final results = await Future.wait([
+    repo.eligibleDoctors(),
+    repo.subjectTermOptions(),
+  ]);
   if (!context.mounted) return;
-  final doctors = results[0];
-  final terms = results[1];
+  final doctors = results[0] as List<dynamic>;
+  final termOptions = asMap(results[1]);
+  final terms = (termOptions['terms'] as List? ?? const <dynamic>[])
+      .map(asMap)
+      .toList();
+  final major = asMap(termOptions['major']);
+  final hasSemesters =
+      major['has_semesters'] == true ||
+      major['has_semesters'] == 1 ||
+      major['has_semesters'] == '1';
   final name = TextEditingController(text: text(item, 'name'));
   final code = TextEditingController(text: text(item, 'code'));
   var doctorId = number(
@@ -22,12 +33,23 @@ Future<void> _subjectSheet(
     'term_id',
     fallback: number(asMap(item?['term']), 'id'),
   ).toInt();
+  var semesterId = number(
+    item,
+    'semester_id',
+    fallback: number(asMap(item?['semester']), 'id'),
+  ).toInt();
   doctorId = doctorId == 0 && doctors.isNotEmpty
       ? number(doctors.first, 'id').toInt()
       : doctorId;
   termId = termId == 0 && terms.isNotEmpty
       ? number(terms.first, 'id').toInt()
       : termId;
+  final termNotifier = ValueNotifier<int>(termId);
+  List<Map<String, dynamic>> semestersFor(int selectedTermId) => terms
+      .where((term) => number(term, 'id').toInt() == selectedTermId)
+      .expand((term) => (term['semesters'] as List? ?? const <dynamic>[]))
+      .map(asMap)
+      .toList();
 
   await _formSheet(
     context,
@@ -67,9 +89,39 @@ Future<void> _subjectSheet(
               ),
             )
             .toList(),
-        onChanged: (value) => termId = value ?? 0,
+        onChanged: (value) {
+          termId = value ?? 0;
+          semesterId = 0;
+          termNotifier.value = termId;
+        },
         decoration: const InputDecoration(labelText: 'الترم'),
         validator: (v) => v == null ? 'يرجى اختيار الترم الدراسي' : null,
+      ),
+      ValueListenableBuilder<int>(
+        valueListenable: termNotifier,
+        builder: (context, selectedTermId, _) {
+          if (!hasSemesters) return const SizedBox.shrink();
+          final semesters = semestersFor(selectedTermId);
+          final selectedSemesterExists = semesters.any(
+            (semester) => number(semester, 'id').toInt() == semesterId,
+          );
+          if (!selectedSemesterExists) semesterId = 0;
+          return DropdownButtonFormField<int>(
+            value: semesterId == 0 ? null : semesterId,
+            items: semesters
+                .map(
+                  (semester) => DropdownMenuItem(
+                    value: number(semester, 'id').toInt(),
+                    child: Text(text(semester, 'name')),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) => semesterId = value ?? 0,
+            decoration: const InputDecoration(labelText: 'السيمستر'),
+            validator: (v) =>
+                hasSemesters && v == null ? 'يرجى اختيار السيمستر' : null,
+          );
+        },
       ),
     ],
     onSave: () => repo.saveSubject(
@@ -79,6 +131,7 @@ Future<void> _subjectSheet(
         'code': code.text.trim(),
         'doctor_id': doctorId,
         'term_id': termId,
+        if (hasSemesters) 'semester_id': semesterId,
       },
     ),
     after: () => ref.invalidate(_delegateSubjectsProvider),
@@ -193,8 +246,9 @@ Future<void> _scheduleSheet(
                   labelText: 'نهاية المحاضرة',
                   prefixIcon: Icon(Icons.update_rounded),
                 ),
-                validator: (v) =>
-                    (v == null || v.isEmpty) ? 'يرجى اختيار وقت الانتهاء' : null,
+                validator: (v) => (v == null || v.isEmpty)
+                    ? 'يرجى اختيار وقت الانتهاء'
+                    : null,
               ),
             ),
           ],
@@ -255,21 +309,27 @@ Future<void> _assignmentSheet(
             .toList(),
         onChanged: (value) => subjectId = value ?? 0,
         decoration: const InputDecoration(
-            labelText: 'المادة', prefixIcon: Icon(Icons.book_rounded)),
+          labelText: 'المادة',
+          prefixIcon: Icon(Icons.book_rounded),
+        ),
         validator: (v) => v == null ? 'يرجى اختيار المادة' : null,
       ),
       TextFormField(
         controller: title,
         decoration: const InputDecoration(
-            labelText: 'عنوان التكليف', prefixIcon: Icon(Icons.title_rounded)),
-        validator: (v) => (v == null || v.isEmpty) ? 'يرجى إدخال العنوان' : null,
+          labelText: 'عنوان التكليف',
+          prefixIcon: Icon(Icons.title_rounded),
+        ),
+        validator: (v) =>
+            (v == null || v.isEmpty) ? 'يرجى إدخال العنوان' : null,
       ),
       TextFormField(
         controller: description,
         maxLines: 5,
         decoration: const InputDecoration(
-            labelText: 'تعليمات التكليف / الوصف',
-            prefixIcon: Icon(Icons.description_rounded)),
+          labelText: 'تعليمات التكليف / الوصف',
+          prefixIcon: Icon(Icons.description_rounded),
+        ),
         validator: (v) => (v == null || v.isEmpty) ? 'يرجى إدخال الوصف' : null,
       ),
       StatefulBuilder(
@@ -281,8 +341,9 @@ Future<void> _assignmentSheet(
             setState(() {});
           },
           decoration: const InputDecoration(
-              labelText: 'تاريخ التسليم النهائي',
-              prefixIcon: Icon(Icons.event_available_rounded)),
+            labelText: 'تاريخ التسليم النهائي',
+            prefixIcon: Icon(Icons.event_available_rounded),
+          ),
           validator: (v) =>
               (v == null || v.isEmpty) ? 'يرجى اختيار التاريخ' : null,
         ),
@@ -292,17 +353,24 @@ Future<void> _assignmentSheet(
         builder: (ctx, setState) => SwitchListTile(
           value: requiresSubmission,
           onChanged: (value) => setState(() => requiresSubmission = value),
-          title: const Text('يتطلب تسليم ملف من الطالب',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          secondary:
-              const Icon(Icons.upload_file_rounded, color: AppColors.primary),
+          title: const Text(
+            'يتطلب تسليم ملف من الطالب',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+          secondary: const Icon(
+            Icons.upload_file_rounded,
+            color: AppColors.primary,
+          ),
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: AppColors.slate200)),
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: AppColors.slate200),
+          ),
         ),
       ),
     ],
-    onSave: () => ref.read(delegateRepositoryProvider).saveAssignment(
+    onSave: () => ref
+        .read(delegateRepositoryProvider)
+        .saveAssignment(
           id: item == null ? null : number(item, 'id').toInt(),
           data: {
             'subject_id': subjectId,
@@ -345,15 +413,18 @@ Future<void> _examSheet(
       TextFormField(
         controller: title,
         decoration: const InputDecoration(
-            labelText: 'عنوان الجدول (مثلاً: امتحانات نصفية)',
-            prefixIcon: Icon(Icons.title_rounded)),
-        validator: (v) => (v == null || v.isEmpty) ? 'يرجى إدخال العنوان' : null,
+          labelText: 'عنوان الجدول (مثلاً: امتحانات نصفية)',
+          prefixIcon: Icon(Icons.title_rounded),
+        ),
+        validator: (v) =>
+            (v == null || v.isEmpty) ? 'يرجى إدخال العنوان' : null,
       ),
       TextFormField(
         controller: description,
         decoration: const InputDecoration(
-            labelText: 'الوصف أو ملاحظات عامة',
-            prefixIcon: Icon(Icons.description_rounded)),
+          labelText: 'الوصف أو ملاحظات عامة',
+          prefixIcon: Icon(Icons.description_rounded),
+        ),
       ),
       const SizedBox(height: 24),
       StatefulBuilder(
@@ -362,18 +433,23 @@ Future<void> _examSheet(
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('المواد والمواعيد',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                        color: AppColors.midnight)),
+                const Text(
+                  'المواد والمواعيد',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    color: AppColors.midnight,
+                  ),
+                ),
                 TextButton.icon(
-                  onPressed: () =>
-                      setState(() => formItems.add(_ExamFormItem.empty(subjects))),
+                  onPressed: () => setState(
+                    () => formItems.add(_ExamFormItem.empty(subjects)),
+                  ),
                   icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
                   label: const Text('إضافة مادة'),
-                  style:
-                      TextButton.styleFrom(foregroundColor: AppColors.primary),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                  ),
                 ),
               ],
             ),
@@ -396,23 +472,34 @@ Future<void> _examSheet(
                         CircleAvatar(
                           radius: 12,
                           backgroundColor: AppColors.primary,
-                          child: Text('${idx + 1}',
-                              style: const TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold)),
+                          child: Text(
+                            '${idx + 1}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 12),
                         const Expanded(
-                            child: Text('تفاصيل المادة',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 13))),
+                          child: Text(
+                            'تفاصيل المادة',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
                         if (formItems.length > 1)
                           IconButton(
                             onPressed: () =>
                                 setState(() => formItems.removeAt(idx)),
-                            icon: const Icon(Icons.remove_circle_outline_rounded,
-                                color: Colors.redAccent, size: 20),
+                            icon: const Icon(
+                              Icons.remove_circle_outline_rounded,
+                              color: Colors.redAccent,
+                              size: 20,
+                            ),
                           ),
                       ],
                     ),
@@ -420,14 +507,18 @@ Future<void> _examSheet(
                     DropdownButtonFormField<int>(
                       value: fItem.subjectId == 0 ? null : fItem.subjectId,
                       items: subjects
-                          .map((s) => DropdownMenuItem(
+                          .map(
+                            (s) => DropdownMenuItem(
                               value: number(s, 'id').toInt(),
-                              child: Text(text(s, 'name'))))
+                              child: Text(text(s, 'name')),
+                            ),
+                          )
                           .toList(),
                       onChanged: (value) => fItem.subjectId = value ?? 0,
                       decoration: const InputDecoration(
-                          labelText: 'المادة',
-                          prefixIcon: Icon(Icons.book_rounded)),
+                        labelText: 'المادة',
+                        prefixIcon: Icon(Icons.book_rounded),
+                      ),
                       validator: (v) => v == null ? 'اختر المادة' : null,
                     ),
                     const SizedBox(height: 12),
@@ -439,8 +530,9 @@ Future<void> _examSheet(
                         setState(() {});
                       },
                       decoration: const InputDecoration(
-                          labelText: 'التاريخ',
-                          prefixIcon: Icon(Icons.event_rounded)),
+                        labelText: 'التاريخ',
+                        prefixIcon: Icon(Icons.event_rounded),
+                      ),
                       validator: (v) =>
                           (v == null || v.isEmpty) ? 'اختر التاريخ' : null,
                     ),
@@ -456,8 +548,9 @@ Future<void> _examSheet(
                               setState(() {});
                             },
                             decoration: const InputDecoration(
-                                labelText: 'البداية',
-                                prefixIcon: Icon(Icons.schedule_rounded)),
+                              labelText: 'البداية',
+                              prefixIcon: Icon(Icons.schedule_rounded),
+                            ),
                             validator: (v) =>
                                 (v == null || v.isEmpty) ? 'وقت البدء' : null,
                           ),
@@ -472,10 +565,12 @@ Future<void> _examSheet(
                               setState(() {});
                             },
                             decoration: const InputDecoration(
-                                labelText: 'النهاية',
-                                prefixIcon: Icon(Icons.update_rounded)),
-                            validator: (v) =>
-                                (v == null || v.isEmpty) ? 'وقت الانتهاء' : null,
+                              labelText: 'النهاية',
+                              prefixIcon: Icon(Icons.update_rounded),
+                            ),
+                            validator: (v) => (v == null || v.isEmpty)
+                                ? 'وقت الانتهاء'
+                                : null,
                           ),
                         ),
                       ],
@@ -484,8 +579,9 @@ Future<void> _examSheet(
                     TextFormField(
                       controller: fItem.location,
                       decoration: const InputDecoration(
-                          labelText: 'المكان',
-                          prefixIcon: Icon(Icons.room_rounded)),
+                        labelText: 'المكان',
+                        prefixIcon: Icon(Icons.room_rounded),
+                      ),
                       validator: (v) =>
                           (v == null || v.isEmpty) ? 'ادخل المكان' : null,
                     ),
@@ -495,14 +591,18 @@ Future<void> _examSheet(
                       items: const [
                         DropdownMenuItem(value: 'midterm', child: Text('نصفي')),
                         DropdownMenuItem(value: 'final', child: Text('نهائي')),
-                        DropdownMenuItem(value: 'practical', child: Text('عملي')),
+                        DropdownMenuItem(
+                          value: 'practical',
+                          child: Text('عملي'),
+                        ),
                         DropdownMenuItem(value: 'quiz', child: Text('كويز')),
                         DropdownMenuItem(value: 'other', child: Text('آخر')),
                       ],
                       onChanged: (value) => fItem.examType = value ?? 'midterm',
                       decoration: const InputDecoration(
-                          labelText: 'النوع',
-                          prefixIcon: Icon(Icons.category_rounded)),
+                        labelText: 'النوع',
+                        prefixIcon: Icon(Icons.category_rounded),
+                      ),
                     ),
                   ],
                 ),
@@ -512,20 +612,24 @@ Future<void> _examSheet(
         ),
       ),
     ],
-    onSave: () => ref.read(delegateRepositoryProvider).saveExamSchedule(
+    onSave: () => ref
+        .read(delegateRepositoryProvider)
+        .saveExamSchedule(
           id: item == null ? null : number(item, 'id').toInt(),
           data: {
             'title': title.text.trim(),
             'description': description.text.trim(),
             'items': formItems
-                .map((fi) => {
-                      'subject_id': fi.subjectId,
-                      'date': fi.date.text,
-                      'start_time': fi.start.text,
-                      'end_time': fi.end.text,
-                      'location': fi.location.text,
-                      'type': fi.examType,
-                    })
+                .map(
+                  (fi) => {
+                    'subject_id': fi.subjectId,
+                    'date': fi.date.text,
+                    'start_time': fi.start.text,
+                    'end_time': fi.end.text,
+                    'location': fi.location.text,
+                    'type': fi.examType,
+                  },
+                )
                 .toList(),
           },
         ),
@@ -551,22 +655,22 @@ class _ExamFormItem {
   });
 
   factory _ExamFormItem.empty(List<dynamic> subjects) => _ExamFormItem(
-        subjectId: subjects.isNotEmpty ? number(subjects.first, 'id').toInt() : 0,
-        date: TextEditingController(),
-        start: TextEditingController(),
-        end: TextEditingController(),
-        location: TextEditingController(),
-        examType: 'midterm',
-      );
+    subjectId: subjects.isNotEmpty ? number(subjects.first, 'id').toInt() : 0,
+    date: TextEditingController(),
+    start: TextEditingController(),
+    end: TextEditingController(),
+    location: TextEditingController(),
+    examType: 'midterm',
+  );
 
   factory _ExamFormItem.fromMap(Map<String, dynamic> map) => _ExamFormItem(
-        subjectId: number(map, 'subject_id').toInt(),
-        date: TextEditingController(text: text(map, 'date')),
-        start: TextEditingController(text: text(map, 'start_time')),
-        end: TextEditingController(text: text(map, 'end_time')),
-        location: TextEditingController(text: text(map, 'location')),
-        examType: text(map, 'type', fallback: 'midterm'),
-      );
+    subjectId: number(map, 'subject_id').toInt(),
+    date: TextEditingController(text: text(map, 'date')),
+    start: TextEditingController(text: text(map, 'start_time')),
+    end: TextEditingController(text: text(map, 'end_time')),
+    location: TextEditingController(text: text(map, 'location')),
+    examType: text(map, 'type', fallback: 'midterm'),
+  );
 }
 
 Future<void> _resourceSheet(
@@ -600,99 +704,116 @@ Future<void> _resourceSheet(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DropdownButtonFormField<int>(
-            value: subjectId == 0 ? null : subjectId,
-            items: subjects
-                .map((s) => DropdownMenuItem(
-                    value: number(s, 'id').toInt(), child: Text(text(s, 'name'))))
-                .toList(),
-            onChanged: (v) => subjectId = v ?? 0,
-            decoration: const InputDecoration(
-                labelText: 'المادة', prefixIcon: Icon(Icons.book_rounded)),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: title,
-            decoration: const InputDecoration(
-                labelText: 'العنوان', prefixIcon: Icon(Icons.title_rounded)),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'يرجى إدخال العنوان' : null,
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: category,
-            items: const [
-              DropdownMenuItem(value: 'lectures', child: Text('محاضرات')),
-              DropdownMenuItem(value: 'references', child: Text('مراجع')),
-              DropdownMenuItem(value: 'summaries', child: Text('ملخصات')),
-              DropdownMenuItem(value: 'exams', child: Text('اختبارات')),
-              DropdownMenuItem(value: 'quizzes', child: Text('كويزات')),
-              DropdownMenuItem(value: 'other', child: Text('أخرى')),
-            ],
-            onChanged: (v) => category = v ?? 'lectures',
-            decoration: const InputDecoration(
-                labelText: 'التصنيف', prefixIcon: Icon(Icons.category_rounded)),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: description,
-            maxLines: 2,
-            decoration: const InputDecoration(
-                labelText: 'وصف إضافي (اختياري)',
-                prefixIcon: Icon(Icons.description_rounded)),
-          ),
-          const SizedBox(height: 16),
-          if (item == null) ...[
-            OutlinedButton.icon(
-              onPressed: () async {
-                final res = await FilePicker.platform.pickFiles();
-                if (res != null) {
-                  setState(() => selected = res.files.first);
-                }
-              },
-              icon: const Icon(Icons.attach_file_rounded),
-              label: Text(selected?.name ?? 'اختيار ملف'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+              value: subjectId == 0 ? null : subjectId,
+              items: subjects
+                  .map(
+                    (s) => DropdownMenuItem(
+                      value: number(s, 'id').toInt(),
+                      child: Text(text(s, 'name')),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) => subjectId = v ?? 0,
+              decoration: const InputDecoration(
+                labelText: 'المادة',
+                prefixIcon: Icon(Icons.book_rounded),
               ),
             ),
-            const SizedBox(height: 24),
-          ],
-          ElevatedButton(
-            onPressed: (item == null && selected?.path == null)
-                ? null
-                : () async {
-                    if (formKey.currentState?.validate() != true) return;
-                    await _run(
-                      ctx,
-                      () => item == null
-                          ? ref.read(delegateRepositoryProvider).uploadResource(
-                                subjectId: subjectId,
-                                title: title.text.trim(),
-                                category: category,
-                                filePath: selected!.path!,
-                                fileName: selected!.name,
-                                description: description.text.trim(),
-                              )
-                          : ref.read(delegateRepositoryProvider).updateResource(
-                                id: number(item, 'id').toInt(),
-                                subjectId: subjectId,
-                                title: title.text.trim(),
-                                category: category,
-                                description: description.text.trim(),
-                              ),
-                      after: () => ref.invalidate(_delegateResourcesProvider),
-                    );
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D9488),
-              padding: const EdgeInsets.symmetric(vertical: 16),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: title,
+              decoration: const InputDecoration(
+                labelText: 'العنوان',
+                prefixIcon: Icon(Icons.title_rounded),
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'يرجى إدخال العنوان' : null,
             ),
-            child: Text(item == null ? 'رفع الملف الآن' : 'حفظ التعديلات'),
-          ),
-        ],
-      ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: category,
+              items: const [
+                DropdownMenuItem(value: 'lectures', child: Text('محاضرات')),
+                DropdownMenuItem(value: 'references', child: Text('مراجع')),
+                DropdownMenuItem(value: 'summaries', child: Text('ملخصات')),
+                DropdownMenuItem(value: 'exams', child: Text('اختبارات')),
+                DropdownMenuItem(value: 'quizzes', child: Text('كويزات')),
+                DropdownMenuItem(value: 'other', child: Text('أخرى')),
+              ],
+              onChanged: (v) => category = v ?? 'lectures',
+              decoration: const InputDecoration(
+                labelText: 'التصنيف',
+                prefixIcon: Icon(Icons.category_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: description,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'وصف إضافي (اختياري)',
+                prefixIcon: Icon(Icons.description_rounded),
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (item == null) ...[
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final res = await FilePicker.platform.pickFiles();
+                  if (res != null) {
+                    setState(() => selected = res.files.first);
+                  }
+                },
+                icon: const Icon(Icons.attach_file_rounded),
+                label: Text(selected?.name ?? 'اختيار ملف'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+            ElevatedButton(
+              onPressed: (item == null && selected?.path == null)
+                  ? null
+                  : () async {
+                      if (formKey.currentState?.validate() != true) return;
+                      await _run(
+                        ctx,
+                        () => item == null
+                            ? ref
+                                  .read(delegateRepositoryProvider)
+                                  .uploadResource(
+                                    subjectId: subjectId,
+                                    title: title.text.trim(),
+                                    category: category,
+                                    filePath: selected!.path!,
+                                    fileName: selected!.name,
+                                    description: description.text.trim(),
+                                  )
+                            : ref
+                                  .read(delegateRepositoryProvider)
+                                  .updateResource(
+                                    id: number(item, 'id').toInt(),
+                                    subjectId: subjectId,
+                                    title: title.text.trim(),
+                                    category: category,
+                                    description: description.text.trim(),
+                                  ),
+                        after: () => ref.invalidate(_delegateResourcesProvider),
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D9488),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: Text(item == null ? 'رفع الملف الآن' : 'حفظ التعديلات'),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -715,8 +836,12 @@ Future<void> _reminderSheet(
     fields: [
       TextFormField(
         controller: title,
-        decoration: const InputDecoration(labelText: 'العنوان', hintText: 'مثلاً: اختبار الجراحة'),
-        validator: (v) => (v == null || v.trim().isEmpty) ? 'يرجى إدخال العنوان' : null,
+        decoration: const InputDecoration(
+          labelText: 'العنوان',
+          hintText: 'مثلاً: اختبار الجراحة',
+        ),
+        validator: (v) =>
+            (v == null || v.trim().isEmpty) ? 'يرجى إدخال العنوان' : null,
       ),
       TextFormField(
         controller: description,
@@ -727,7 +852,10 @@ Future<void> _reminderSheet(
         builder: (context, setState) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('مستوى الأولوية', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const Text(
+              'مستوى الأولوية',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -767,7 +895,8 @@ Future<void> _reminderSheet(
           labelText: 'وقت الحدث',
           prefixIcon: Icon(Icons.calendar_today_rounded),
         ),
-        validator: (v) => (v == null || v.isEmpty) ? 'يرجى تحديد وقت الحدث' : null,
+        validator: (v) =>
+            (v == null || v.isEmpty) ? 'يرجى تحديد وقت الحدث' : null,
       ),
       TextFormField(
         controller: notifyAt,
@@ -779,19 +908,22 @@ Future<void> _reminderSheet(
           labelText: 'وقت التنبيه',
           prefixIcon: Icon(Icons.notifications_active_rounded),
         ),
-        validator: (v) => (v == null || v.isEmpty) ? 'يرجى تحديد وقت التنبيه' : null,
+        validator: (v) =>
+            (v == null || v.isEmpty) ? 'يرجى تحديد وقت التنبيه' : null,
       ),
     ],
-    onSave: () => ref.read(delegateRepositoryProvider).saveReminder(
-      id: item == null ? null : number(item, 'id').toInt(),
-      data: {
-        'title': title.text.trim(),
-        'description': description.text.trim(),
-        'event_date': eventDate.text.trim(),
-        'notify_at': notifyAt.text.trim(),
-        'priority': priority,
-      },
-    ),
+    onSave: () => ref
+        .read(delegateRepositoryProvider)
+        .saveReminder(
+          id: item == null ? null : number(item, 'id').toInt(),
+          data: {
+            'title': title.text.trim(),
+            'description': description.text.trim(),
+            'event_date': eventDate.text.trim(),
+            'notify_at': notifyAt.text.trim(),
+            'priority': priority,
+          },
+        ),
     after: () => ref.invalidate(_delegateRemindersProvider('all')),
   );
 }
@@ -861,187 +993,240 @@ Future<void> _newsSheet(
           ),
           child: StatefulBuilder(
             builder: (context, setState) => Container(
-        height: MediaQuery.of(context).size.height * 0.85,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  item == null ? 'نشر إعلان جديد' : 'تعديل الإعلان',
-                  style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.midnight),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Expanded(
-              child: SingleChildScrollView(
+              height: MediaQuery.of(context).size.height * 0.85,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+              ),
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildFieldLabel('عنوان الإعلان'),
-                    TextFormField(
-                      controller: title,
-                      decoration: _formInputDecoration('أدخل عنواناً جذاباً...'),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'يرجى إدخال العنوان' : null,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildFieldLabel('محتوى الخبر'),
-                    TextFormField(
-                      controller: content,
-                      maxLines: 6,
-                      decoration: _formInputDecoration('اكتب تفاصيل الإعلان هنا...'),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'يرجى إدخال المحتوى' : null,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildFieldLabel('تصنيف الإعلان'),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _CategorySelectChip(
-                          label: 'عام',
-                          isSelected: category == 'general',
-                          onSelected: (v) => setState(() => category = 'general'),
+                        Text(
+                          item == null ? 'نشر إعلان جديد' : 'تعديل الإعلان',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.midnight,
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        _CategorySelectChip(
-                          label: 'أكاديمي',
-                          isSelected: category == 'academic',
-                          onSelected: (v) => setState(() => category = 'academic'),
-                        ),
-                        const SizedBox(width: 8),
-                        _CategorySelectChip(
-                          label: 'عاجل 🔥',
-                          isSelected: category == 'urgent',
-                          onSelected: (v) => setState(() => category = 'urgent'),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close_rounded),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
-                    SwitchListTile(
-                      value: isPinned,
-                      onChanged: (v) => setState(() => isPinned = v),
-                      title: const Text('تثبيت الإعلان في الأعلى',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 14)),
-                      secondary: Icon(Icons.push_pin_rounded,
-                          color: isPinned ? AppColors.royalBlue : AppColors.slate400),
-                      contentPadding: EdgeInsets.zero,
-                      activeColor: AppColors.royalBlue,
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildFieldLabel('عنوان الإعلان'),
+                            TextFormField(
+                              controller: title,
+                              decoration: _formInputDecoration(
+                                'أدخل عنواناً جذاباً...',
+                              ),
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'يرجى إدخال العنوان'
+                                  : null,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildFieldLabel('محتوى الخبر'),
+                            TextFormField(
+                              controller: content,
+                              maxLines: 6,
+                              decoration: _formInputDecoration(
+                                'اكتب تفاصيل الإعلان هنا...',
+                              ),
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'يرجى إدخال المحتوى'
+                                  : null,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildFieldLabel('تصنيف الإعلان'),
+                            Row(
+                              children: [
+                                _CategorySelectChip(
+                                  label: 'عام',
+                                  isSelected: category == 'general',
+                                  onSelected: (v) =>
+                                      setState(() => category = 'general'),
+                                ),
+                                const SizedBox(width: 8),
+                                _CategorySelectChip(
+                                  label: 'أكاديمي',
+                                  isSelected: category == 'academic',
+                                  onSelected: (v) =>
+                                      setState(() => category = 'academic'),
+                                ),
+                                const SizedBox(width: 8),
+                                _CategorySelectChip(
+                                  label: 'عاجل 🔥',
+                                  isSelected: category == 'urgent',
+                                  onSelected: (v) =>
+                                      setState(() => category = 'urgent'),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            SwitchListTile(
+                              value: isPinned,
+                              onChanged: (v) => setState(() => isPinned = v),
+                              title: const Text(
+                                'تثبيت الإعلان في الأعلى',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              secondary: Icon(
+                                Icons.push_pin_rounded,
+                                color: isPinned
+                                    ? AppColors.royalBlue
+                                    : AppColors.slate400,
+                              ),
+                              contentPadding: EdgeInsets.zero,
+                              activeColor: AppColors.royalBlue,
+                            ),
+                            const SizedBox(height: 24),
+                            _buildFieldLabel('المرفقات (صور أو مستندات)'),
+                            if (attachment != null)
+                              _SelectedFileCard(
+                                name: attachment!.path.split('/').last,
+                                onRemove: () =>
+                                    setState(() => attachment = null),
+                              )
+                            else if (existingAttachment.isNotEmpty &&
+                                !removeExisting)
+                              _SelectedFileCard(
+                                name: 'مرفق حالي',
+                                isExisting: true,
+                                onRemove: () =>
+                                    setState(() => removeExisting = true),
+                              )
+                            else
+                              InkWell(
+                                onTap: () async {
+                                  final result = await FilePicker.platform
+                                      .pickFiles();
+                                  if (result != null &&
+                                      result.files.single.path != null) {
+                                    setState(() {
+                                      attachment = File(
+                                        result.files.single.path!,
+                                      );
+                                      removeExisting = true;
+                                    });
+                                  }
+                                },
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 24,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.slate50,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: AppColors.slate200,
+                                      style: BorderStyle.solid,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.add_photo_alternate_rounded,
+                                        color: AppColors.royalBlue.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                        size: 32,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                        'اضغط لاختيار صورة أو ملف',
+                                        style: TextStyle(
+                                          color: AppColors.slate500,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 24),
-                    _buildFieldLabel('المرفقات (صور أو مستندات)'),
-                    if (attachment != null)
-                      _SelectedFileCard(
-                        name: attachment!.path.split('/').last,
-                        onRemove: () => setState(() => attachment = null),
-                      )
-                    else if (existingAttachment.isNotEmpty && !removeExisting)
-                      _SelectedFileCard(
-                        name: 'مرفق حالي',
-                        isExisting: true,
-                        onRemove: () => setState(() => removeExisting = true),
-                      )
-                    else
-                      InkWell(
-                        onTap: () async {
-                          final result = await FilePicker.platform.pickFiles();
-                          if (result != null && result.files.single.path != null) {
-                            setState(() {
-                              attachment = File(result.files.single.path!);
-                              removeExisting = true;
-                            });
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          if (formKey.currentState?.validate() != true) return;
+
+                          final data = {
+                            'title': title.text.trim(),
+                            'content': content.text.trim(),
+                            'category': category,
+                            'is_pinned': isPinned ? 1 : 0,
+                            if (attachment != null)
+                              'attachment': await MultipartFile.fromFile(
+                                attachment!.path,
+                              ),
+                            if (removeExisting) 'remove_attachment': 1,
+                          };
+
+                          try {
+                            await ref
+                                .read(delegateRepositoryProvider)
+                                .saveAnnouncement(
+                                  id: item == null
+                                      ? null
+                                      : number(item, 'id').toInt(),
+                                  data: data,
+                                );
+                            ref.invalidate(_delegateAnnouncementsProvider);
+                            if (context.mounted) Navigator.pop(context);
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(e.toString())),
+                              );
+                            }
                           }
                         },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 24),
-                          decoration: BoxDecoration(
-                            color: AppColors.slate50,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: AppColors.slate200, style: BorderStyle.solid),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.orange,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          child: Column(
-                            children: [
-                              Icon(Icons.add_photo_alternate_rounded,
-                                  color: AppColors.royalBlue.withValues(alpha: 0.5), size: 32),
-                              const SizedBox(height: 8),
-                              const Text('اضغط لاختيار صورة أو ملف',
-                                  style: TextStyle(
-                                      color: AppColors.slate500, fontSize: 13)),
-                            ],
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'تأكيد ونشر الآن',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ),
+                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: () async {
-                  if (formKey.currentState?.validate() != true) return;
-                  
-                  final data = {
-                    'title': title.text.trim(),
-                    'content': content.text.trim(),
-                    'category': category,
-                    'is_pinned': isPinned ? 1 : 0,
-                    if (attachment != null)
-                      'attachment': await MultipartFile.fromFile(attachment!.path),
-                    if (removeExisting) 'remove_attachment': 1,
-                  };
-
-                  try {
-                    await ref.read(delegateRepositoryProvider).saveAnnouncement(
-                          id: item == null ? null : number(item, 'id').toInt(),
-                          data: data,
-                        );
-                    ref.invalidate(_delegateAnnouncementsProvider);
-                    if (context.mounted) Navigator.pop(context);
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(e.toString())));
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.orange,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  elevation: 0,
-                ),
-                child: const Text('تأكيد ونشر الآن',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
-    ),
-  ),
-),
-    ),
     ),
   );
 }
@@ -1101,7 +1286,10 @@ class _SelectedFileCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.insert_drive_file_rounded, color: AppColors.royalBlue),
+          const Icon(
+            Icons.insert_drive_file_rounded,
+            color: AppColors.royalBlue,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -1127,7 +1315,10 @@ Widget _buildFieldLabel(String label) {
     child: Text(
       label,
       style: const TextStyle(
-          fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.slate700),
+        fontSize: 14,
+        fontWeight: FontWeight.w800,
+        color: AppColors.slate700,
+      ),
     ),
   );
 }

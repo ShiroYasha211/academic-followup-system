@@ -54,6 +54,7 @@ class DelegateShell extends ConsumerWidget {
     this.floatingActionButton,
     this.bottom,
     this.actions,
+    this.onBackPressed,
   });
 
   final int currentIndex;
@@ -62,6 +63,7 @@ class DelegateShell extends ConsumerWidget {
   final Widget? floatingActionButton;
   final PreferredSizeWidget? bottom;
   final List<Widget>? actions;
+  final Future<bool> Function()? onBackPressed;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -71,6 +73,9 @@ class DelegateShell extends ConsumerWidget {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
+        if (onBackPressed != null && await onBackPressed!()) {
+          return;
+        }
         if (context.canPop()) {
           context.pop();
           return;
@@ -97,6 +102,7 @@ class DelegateShell extends ConsumerWidget {
           session: session,
           bottom: bottom,
           actions: actions,
+          onBackPressed: onBackPressed,
         ),
         body: SafeArea(child: child),
         floatingActionButton: floatingActionButton,
@@ -112,12 +118,14 @@ class _DelegateAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.session,
     this.bottom,
     this.actions,
+    this.onBackPressed,
   });
 
   final String title;
   final AuthSession? session;
   final PreferredSizeWidget? bottom;
   final List<Widget>? actions;
+  final Future<bool> Function()? onBackPressed;
 
   @override
   Size get preferredSize =>
@@ -143,9 +151,16 @@ class _DelegateAppBar extends StatelessWidget implements PreferredSizeWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: IconButton(
-                onPressed: () => context.canPop()
-                    ? context.pop()
-                    : Scaffold.of(context).openDrawer(),
+                onPressed: () async {
+                  if (onBackPressed != null && await onBackPressed!()) {
+                    return;
+                  }
+                  if (context.canPop()) {
+                    context.pop();
+                    return;
+                  }
+                  Scaffold.of(context).openDrawer();
+                },
                 icon: Icon(
                   context.canPop()
                       ? Icons.arrow_back_rounded
@@ -178,12 +193,14 @@ class _DelegateAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
             ],
           ),
-          actions: actions ?? const [
-            Padding(
-              padding: EdgeInsetsDirectional.only(end: 12),
-              child: _DelegateBadge(),
-            ),
-          ],
+          actions:
+              actions ??
+              const [
+                Padding(
+                  padding: EdgeInsetsDirectional.only(end: 12),
+                  child: _DelegateBadge(),
+                ),
+              ],
           bottom: bottom,
         ),
       ),

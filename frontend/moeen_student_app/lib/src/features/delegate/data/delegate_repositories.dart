@@ -61,7 +61,8 @@ class DelegateRepository {
 
   Future<String> markAllNotificationsRead() async {
     final response = await _api.post('/delegate/notifications/mark-all-read');
-    return (response['message'] ?? 'تم تحديد جميع التنبيهات كمقروءة.').toString();
+    return (response['message'] ?? 'تم تحديد جميع التنبيهات كمقروءة.')
+        .toString();
   }
 
   Future<Map<String, dynamic>> news() async =>
@@ -106,7 +107,10 @@ class DelegateRepository {
 
   Future<Map<String, dynamic>> importStudents(String filePath) async {
     final formData = FormData.fromMap({
-      'csv_file': await MultipartFile.fromFile(filePath, filename: 'students.csv'),
+      'csv_file': await MultipartFile.fromFile(
+        filePath,
+        filename: 'students.csv',
+      ),
     });
     return _data(await _api.post('/delegate/students/import', data: formData));
   }
@@ -150,8 +154,19 @@ class DelegateRepository {
   Future<List<dynamic>> doctors() async =>
       _list(await _api.get('/delegate/subjects/doctors'));
 
-  Future<List<dynamic>> terms() async =>
-      _list(await _api.get('/delegate/subjects/terms'));
+  Future<Map<String, dynamic>> subjectTermOptions() async {
+    final response = await _api.get('/delegate/subjects/terms');
+    final data = response['data'];
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return data.cast<String, dynamic>();
+    return {'terms': _list(response)};
+  }
+
+  Future<List<dynamic>> terms() async {
+    final options = await subjectTermOptions();
+    final terms = options['terms'];
+    return terms is List ? terms : const <dynamic>[];
+  }
 
   Future<Map<String, dynamic>> subjectDetails(int id) async =>
       _data(await _api.get('/delegate/subjects/$id'));
@@ -325,16 +340,15 @@ class DelegateRepository {
   Future<Map<String, dynamic>> announcements({
     String? query,
     String? category,
-  }) async =>
-      _data(
-        await _api.get(
-          '/delegate/announcements',
-          queryParameters: {
-            if (query != null && query.isNotEmpty) 'q': query,
-            if (category != null && category != 'all') 'category': category,
-          },
-        ),
-      );
+  }) async => _data(
+    await _api.get(
+      '/delegate/announcements',
+      queryParameters: {
+        if (query != null && query.isNotEmpty) 'q': query,
+        if (category != null && category != 'all') 'category': category,
+      },
+    ),
+  );
 
   Future<String> saveReminder({
     int? id,
@@ -356,21 +370,18 @@ class DelegateRepository {
     required Map<String, dynamic> data,
   }) async {
     Object? finalData = data;
-    
+
     // Check if we have a file (attachment)
     if (data['attachment'] != null) {
-      finalData = FormData.fromMap({
-        ...data,
-        if (id != null) '_method': 'PUT',
-      });
+      finalData = FormData.fromMap({...data, if (id != null) '_method': 'PUT'});
     }
 
     final response = id == null
         ? await _api.post('/delegate/announcements', data: finalData)
-        : (data['attachment'] != null 
-            ? await _api.post('/delegate/announcements/$id', data: finalData)
-            : await _api.put('/delegate/announcements/$id', data: finalData));
-            
+        : (data['attachment'] != null
+              ? await _api.post('/delegate/announcements/$id', data: finalData)
+              : await _api.put('/delegate/announcements/$id', data: finalData));
+
     return (response['message'] ?? 'تم نشر الإعلان.').toString();
   }
 
@@ -384,15 +395,18 @@ class DelegateRepository {
     return (response['message'] ?? 'تم حذف الإعلان.').toString();
   }
 
-  Future<Map<String, dynamic>> attendance({String? search, String? date}) async => _data(
-        await _api.get(
-          '/delegate/attendances',
-          queryParameters: {
-            if (search != null) 'search': search,
-            if (date != null) 'date': date,
-          },
-        ),
-      );
+  Future<Map<String, dynamic>> attendance({
+    String? search,
+    String? date,
+  }) async => _data(
+    await _api.get(
+      '/delegate/attendances',
+      queryParameters: {
+        if (search != null) 'search': search,
+        if (date != null) 'date': date,
+      },
+    ),
+  );
 
   Future<Map<String, dynamic>> attendanceCreate({
     required int subjectId,
@@ -463,45 +477,36 @@ class DelegateRepository {
     required int subjectId,
     required String date,
     required String title,
-  }) async =>
-      _data(
-        await _api.get(
-          '/delegate/qr-attendance/active',
-          queryParameters: {
-            'subject_id': subjectId,
-            'date': date,
-            'title': title,
-          },
-        ),
-      );
+  }) async => _data(
+    await _api.get(
+      '/delegate/qr-attendance/active',
+      queryParameters: {'subject_id': subjectId, 'date': date, 'title': title},
+    ),
+  );
 
   Future<Map<String, dynamic>> attendanceReport({
     required int subjectId,
     required String date,
     int? lectureId,
     String? genderFilter,
-  }) async =>
-      _data(
-        await _api.get(
-          '/delegate/attendances/$subjectId/$date/report',
-          queryParameters: {
-            if (lectureId != null) 'lecture_id': lectureId,
-            if (genderFilter != null) 'gender_filter': genderFilter,
-          },
-        ),
-      );
+  }) async => _data(
+    await _api.get(
+      '/delegate/attendances/$subjectId/$date/report',
+      queryParameters: {
+        if (lectureId != null) 'lecture_id': lectureId,
+        if (genderFilter != null) 'gender_filter': genderFilter,
+      },
+    ),
+  );
 
   Future<List<int>> attendanceReportPdf({
     required int subjectId,
     required String date,
     int? lectureId,
-  }) =>
-      _api.getBytes(
-        '/delegate/attendances/$subjectId/$date/report-pdf',
-        queryParameters: {
-          if (lectureId != null) 'lecture_id': lectureId,
-        },
-      );
+  }) => _api.getBytes(
+    '/delegate/attendances/$subjectId/$date/report-pdf',
+    queryParameters: {if (lectureId != null) 'lecture_id': lectureId},
+  );
 
   Future<Map<String, dynamic>> authorizedGrades() async =>
       _data(await _api.get('/delegate/authorized-grades'));

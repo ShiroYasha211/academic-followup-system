@@ -43,7 +43,8 @@ class _StudentStudyCenterScreenState
 
   @override
   Widget build(BuildContext context) {
-    final subjectsState = ref.watch(_subjectsProvider);
+    final subjectsState = ref.watch(_subjectsProvider(const SubjectFilters()));
+    final subjectItems = asList(subjectsState.asData?.value['subjects']);
 
     return StudentShell(
       currentIndex: 4,
@@ -51,7 +52,7 @@ class _StudentStudyCenterScreenState
       floatingActionButton: _currentTab == 'assignments'
           ? null
           : FloatingActionButton(
-              onPressed: () => _showAddTask(subjectsState.asData?.value ?? []),
+              onPressed: () => _showAddTask(subjectItems),
               backgroundColor: _studyTabColor(_currentTab),
               foregroundColor: Colors.white,
               elevation: 8,

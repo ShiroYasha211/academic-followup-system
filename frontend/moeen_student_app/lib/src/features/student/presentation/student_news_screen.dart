@@ -31,8 +31,12 @@ class _StudentNewsScreenState extends ConsumerState<StudentNewsScreen> {
           final rawItems = asList(data['items']).map(asMap).toList();
 
           // Sort: pinned first, then by date
-          final pinned = rawItems.where((i) => boolValue(i, 'is_pinned')).toList();
-          final regular = rawItems.where((i) => !boolValue(i, 'is_pinned')).toList();
+          final pinned = rawItems
+              .where((i) => boolValue(i, 'is_pinned'))
+              .toList();
+          final regular = rawItems
+              .where((i) => !boolValue(i, 'is_pinned'))
+              .toList();
 
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(_newsProvider(_source)),
@@ -74,10 +78,16 @@ class _StudentNewsScreenState extends ConsumerState<StudentNewsScreen> {
                             Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: AppColors.royalBlue.withValues(alpha: 0.1),
+                                color: AppColors.royalBlue.withValues(
+                                  alpha: 0.1,
+                                ),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.push_pin_rounded, size: 16, color: AppColors.royalBlue),
+                              child: const Icon(
+                                Icons.push_pin_rounded,
+                                size: 16,
+                                color: AppColors.royalBlue,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             const Text(
@@ -91,7 +101,9 @@ class _StudentNewsScreenState extends ConsumerState<StudentNewsScreen> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Divider(
-                                color: AppColors.royalBlue.withValues(alpha: 0.15),
+                                color: AppColors.royalBlue.withValues(
+                                  alpha: 0.15,
+                                ),
                                 thickness: 1.5,
                               ),
                             ),
@@ -107,8 +119,10 @@ class _StudentNewsScreenState extends ConsumerState<StudentNewsScreen> {
                           index: index,
                           child: _NewsCard(
                             pinned[index],
-                            isLast: index == pinned.length - 1 && regular.isEmpty,
+                            isLast:
+                                index == pinned.length - 1 && regular.isEmpty,
                             isPinned: true,
+                            onOpen: _markNewsRead,
                           ),
                         ),
                       ),
@@ -124,10 +138,16 @@ class _StudentNewsScreenState extends ConsumerState<StudentNewsScreen> {
                             Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: AppColors.slate400.withValues(alpha: 0.1),
+                                color: AppColors.slate400.withValues(
+                                  alpha: 0.1,
+                                ),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.feed_rounded, size: 16, color: AppColors.slate500),
+                              child: const Icon(
+                                Icons.feed_rounded,
+                                size: 16,
+                                color: AppColors.slate500,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Text(
@@ -158,6 +178,7 @@ class _StudentNewsScreenState extends ConsumerState<StudentNewsScreen> {
                           child: _NewsCard(
                             regular[index],
                             isLast: index == regular.length - 1,
+                            onOpen: _markNewsRead,
                           ),
                         ),
                       ),
@@ -170,6 +191,21 @@ class _StudentNewsScreenState extends ConsumerState<StudentNewsScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _markNewsRead(Map<String, dynamic> item) async {
+    final rawId = text(item, 'id');
+    if (!rawId.startsWith('center-')) return;
+    final id = int.tryParse(rawId.substring('center-'.length));
+    if (id == null || id <= 0) return;
+    try {
+      await ref.read(studentContentRepositoryProvider).markNotificationRead(id);
+      ref.invalidate(_newsProvider(_source));
+      ref.invalidate(studentUnreadNotificationsCountProvider);
+      ref.invalidate(studentUnreadScreenCountsProvider);
+    } catch (_) {
+      // Details still open if marking read fails.
+    }
   }
 }
 

@@ -236,6 +236,7 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
   int? _secondsLeft;
   int? _questionSecondsLeft;
   int _currentIndex = 0;
+  String _quizTimerMode = 'quiz';
   bool _submitting = false;
   bool _initializedAttempt = false;
 
@@ -261,6 +262,8 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
     return StudentShell(
       currentIndex: 7,
       title: 'حل الكويز',
+      safeAreaBottom: false,
+      onBackPressed: _confirmLeave,
       child: _AsyncBody(
         state: state,
         onRetry: () => ref.invalidate(_quizTakeProvider(params)),
@@ -270,118 +273,146 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
           final questions = asList(data['questions']);
           final totalQuestions = questions.length;
           _initializeAttempt(data, quiz, attempt, questions);
+          final usesQuestionTimer = _usesQuestionTimer;
           final progress = totalQuestions > 0
               ? (_currentIndex + 1) / totalQuestions
               : 0.0;
 
-          return PopScope(
-            canPop: false,
-            onPopInvokedWithResult: (didPop, result) async {
-              if (didPop) return;
-              await _confirmLeave();
-            },
-            child: Column(
+          return Column(
               children: [
-              // Progress Header
-              Container(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(
-                    bottom: Radius.circular(32),
+                // Progress Header
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(
+                      bottom: Radius.circular(32),
+                    ),
                   ),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                text(quiz, 'title'),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 16,
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  text(quiz, 'title'),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 16,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                'السؤال ${_currentIndex + 1} من $totalQuestions',
-                                style: const TextStyle(
-                                  color: AppColors.slate500,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
+                                Text(
+                                  'السؤال ${_currentIndex + 1} من $totalQuestions',
+                                  style: const TextStyle(
+                                    color: AppColors.slate500,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
+                          ),
+                          _QuizTimerPill(secondsLeft: _activeSecondsLeft),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 8,
+                          backgroundColor: AppColors.slate100,
+                          valueColor: const AlwaysStoppedAnimation(
+                            AppColors.royalBlue,
                           ),
                         ),
-                        _QuizTimerPill(secondsLeft: _activeSecondsLeft),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 8,
-                        backgroundColor: AppColors.slate100,
-                        valueColor: const AlwaysStoppedAnimation(
-                          AppColors.royalBlue,
-                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              // Questions PageView
-              Expanded(
-                child: PageView.builder(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: totalQuestions,
-                  onPageChanged: (idx) => setState(() {
-                    _currentIndex = idx;
-                    _resetQuestionTimer(asMap(questions[idx]));
-                  }),
-                  itemBuilder: (context, index) => _QuestionCard(
-                    question: asMap(questions[index]),
-                    index: index,
-                    total: totalQuestions,
-                    answers: _answers,
-                    onOptionSelected: () {
-                      // Optional: auto-advance or just visual feedback
-                    },
+                    ],
                   ),
                 ),
-              ),
-              // Navigation Bottom Bar
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 20,
-                      offset: const Offset(0, -5),
+                // Questions PageView
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pageController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: totalQuestions,
+                    onPageChanged: (idx) => setState(() {
+                      _currentIndex = idx;
+                      _resetQuestionTimer(asMap(questions[idx]));
+                    }),
+                    itemBuilder: (context, index) => _QuestionCard(
+                      question: asMap(questions[index]),
+                      index: index,
+                      total: totalQuestions,
+                      answers: _answers,
+                      onOptionSelected: () {
+                        // Optional: auto-advance or just visual feedback
+                      },
                     ),
-                  ],
+                  ),
                 ),
-                child: SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Row(
-                      children: [
-                        if (_currentIndex > 0)
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => _pageController.previousPage(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
+                // Navigation Bottom Bar
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 20,
+                        offset: const Offset(0, -5),
+                      ),
+                    ],
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Row(
+                        children: [
+                          if (_currentIndex > 0 && !usesQuestionTimer)
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => _pageController.previousPage(
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'السابق',
+                                  style: TextStyle(fontWeight: FontWeight.w900),
+                                ),
                               ),
-                              style: OutlinedButton.styleFrom(
+                            ),
+                          if (_currentIndex > 0 && !usesQuestionTimer)
+                            const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton(
+                              onPressed: () {
+                                if (_currentIndex < totalQuestions - 1) {
+                                  _pageController.nextPage(
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                  );
+                                } else {
+                                  _confirmSubmit(number(attempt, 'id').toInt());
+                                }
+                              },
+                              style: FilledButton.styleFrom(
+                                backgroundColor:
+                                    _currentIndex == totalQuestions - 1
+                                    ? AppColors.success
+                                    : AppColors.royalBlue,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 16,
                                 ),
@@ -389,63 +420,32 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
-                              child: const Text(
-                                'السابق',
-                                style: TextStyle(fontWeight: FontWeight.w900),
-                              ),
+                              child: _submitting
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Text(
+                                      _currentIndex == totalQuestions - 1
+                                          ? 'إرسال الإجابات'
+                                          : 'التالي',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 16,
+                                      ),
+                                    ),
                             ),
                           ),
-                        if (_currentIndex > 0) const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: FilledButton(
-                            onPressed: () {
-                              if (_currentIndex < totalQuestions - 1) {
-                                _pageController.nextPage(
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                              } else {
-                                _confirmSubmit(number(attempt, 'id').toInt());
-                              }
-                            },
-                            style: FilledButton.styleFrom(
-                              backgroundColor:
-                                  _currentIndex == totalQuestions - 1
-                                  ? AppColors.success
-                                  : AppColors.royalBlue,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            child: _submitting
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Text(
-                                    _currentIndex == totalQuestions - 1
-                                        ? 'إرسال الإجابات'
-                                        : 'التالي',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
               ],
-            ),
           );
         },
       ),
@@ -453,11 +453,15 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
   }
 
   int? get _activeSecondsLeft {
-    if (_questionSecondsLeft != null && _questionSecondsLeft! > 0) {
+    if (_usesQuestionTimer &&
+        _questionSecondsLeft != null &&
+        _questionSecondsLeft! > 0) {
       return _questionSecondsLeft;
     }
     return _secondsLeft;
   }
+
+  bool get _usesQuestionTimer => _quizTimerMode == 'per_question';
 
   void _initializeAttempt(
     Map<String, dynamic> data,
@@ -470,17 +474,22 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
 
     _initializedAttempt = true;
     _attemptId = attemptId;
+    _quizTimerMode = text(quiz, 'timer_mode', fallback: 'quiz');
     _answers
       ..clear()
-      ..addAll(asMap(data['existing_answers']).map((key, value) {
-        return MapEntry(key.toString(), value);
-      }));
+      ..addAll(
+        asMap(data['existing_answers']).map((key, value) {
+          return MapEntry(key.toString(), value);
+        }),
+      );
 
     final remaining = number(attempt, 'remaining_seconds').toInt();
     final durationSeconds = number(quiz, 'duration_minutes').toInt() * 60;
-    _secondsLeft = remaining > 0
-        ? remaining
-        : (durationSeconds > 0 ? durationSeconds : null);
+    _secondsLeft = _usesQuestionTimer
+        ? null
+        : (remaining > 0
+              ? remaining
+              : (durationSeconds > 0 ? durationSeconds : null));
 
     if (questions.isNotEmpty) _resetQuestionTimer(asMap(questions.first));
     _timer?.cancel();
@@ -488,11 +497,13 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
       if (!mounted || _submitting) return;
       var shouldSubmit = false;
       setState(() {
-        if (_secondsLeft != null && _secondsLeft! > 0) {
+        if (!_usesQuestionTimer && _secondsLeft != null && _secondsLeft! > 0) {
           _secondsLeft = _secondsLeft! - 1;
           shouldSubmit = _secondsLeft == 0;
         }
-        if (_questionSecondsLeft != null && _questionSecondsLeft! > 0) {
+        if (_usesQuestionTimer &&
+            _questionSecondsLeft != null &&
+            _questionSecondsLeft! > 0) {
           _questionSecondsLeft = _questionSecondsLeft! - 1;
           if (_questionSecondsLeft == 0) {
             if (_currentIndex < questions.length - 1) {
@@ -511,20 +522,29 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
   }
 
   void _resetQuestionTimer(Map<String, dynamic> question) {
+    if (!_usesQuestionTimer) {
+      _questionSecondsLeft = null;
+      return;
+    }
     final seconds = number(question, 'time_limit_seconds').toInt();
     _questionSecondsLeft = seconds > 0 ? seconds : null;
   }
 
-  Future<void> _confirmLeave() async {
+  Future<bool> _confirmLeave() async {
+    if (_submitting) return true;
     final confirmed = await showMoeenConfirmDialog(
       context: context,
       title: 'تنبيه قبل الخروج',
-      message: 'الخروج من صفحة الكويز قد يؤدي إلى تسليم الاختبار أو فقدان الإجابات غير المرسلة. هل تريد الخروج؟',
-      confirmLabel: 'الخروج',
+      message:
+          'إذا خرجت من صفحة الكويز سيتم تسليم إجاباتك الحالية وإنهاء المحاولة. هل تريد المتابعة؟',
+      confirmLabel: 'تسليم وخروج',
       cancelLabel: 'البقاء',
       color: AppColors.danger,
     );
-    if (confirmed && mounted) context.go(StudentQuizzesScreen.route);
+    if (confirmed) {
+      await _submit(_attemptId ?? 0, automatic: true);
+    }
+    return true;
   }
 
   void _confirmSubmit(int attemptId) async {
@@ -536,12 +556,12 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
       confirmLabel: 'نعم، إرسال الآن',
       color: AppColors.success,
     );
-    if (confirmed) _submit(attemptId);
+    if (confirmed) unawaited(_submit(attemptId));
   }
 
-  Future<void> _submit(int attemptId, {bool automatic = false}) async {
-    if (attemptId <= 0) return;
-    if (_submitting) return;
+  Future<bool> _submit(int attemptId, {bool automatic = false}) async {
+    if (attemptId <= 0) return false;
+    if (_submitting) return false;
     setState(() => _submitting = true);
     try {
       final response = await ref
@@ -551,11 +571,14 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
       if (mounted) {
         if (automatic) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('انتهى وقت الكويز وتم تسليم إجاباتك الحالية.')),
+            const SnackBar(
+              content: Text('تم تسليم إجاباتك الحالية وإنهاء الكويز.'),
+            ),
           );
         }
         context.go(StudentQuizzesScreen.resultPath(id));
       }
+      return true;
     } on ApiException catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -565,6 +588,7 @@ class _StudentQuizTakeScreenState extends ConsumerState<StudentQuizTakeScreen> {
           ),
         );
       }
+      return false;
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -617,10 +641,9 @@ const _quizSecurityChannel = MethodChannel('moeen/security');
 
 Future<void> _setQuizScreenSecurity(bool enabled) async {
   try {
-    await _quizSecurityChannel.invokeMethod<void>(
-      'setSecureScreen',
-      {'enabled': enabled},
-    );
+    await _quizSecurityChannel.invokeMethod<void>('setSecureScreen', {
+      'enabled': enabled,
+    });
   } catch (_) {
     // Older platforms can safely ignore screenshot protection.
   }

@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -9,15 +10,19 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:moeen_student_app/src/features/student/presentation/student_dashboard_screen.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/downloads/download_service.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/offline/connectivity_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/moeen_dialogs.dart';
 import '../../auth/logic/auth_controller.dart';
+import '../data/flashcard_local_store.dart';
 import '../data/student_repositories.dart';
+import '../data/tree_farm_local_store.dart';
 import '../logic/student_controllers.dart';
 import 'widgets/student_shell.dart';
 import 'widgets/student_widgets.dart';
@@ -42,12 +47,33 @@ part 'student_messages_screen.dart';
 part 'student_inquiries_screen.dart';
 part 'student_profile_screen.dart';
 part 'student_clinical_screen.dart';
+part 'student_tree_farm_screen.dart';
 part 'widgets/student_content_widgets.dart';
 part 'utils/student_content_formatters.dart';
 
-final _subjectsProvider = FutureProvider.autoDispose<List<dynamic>>((ref) {
-  return ref.watch(studentContentRepositoryProvider).subjects();
-});
+class SubjectFilters {
+  const SubjectFilters({this.termId, this.semesterId});
+
+  final int? termId;
+  final int? semesterId;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SubjectFilters &&
+          other.termId == termId &&
+          other.semesterId == semesterId;
+
+  @override
+  int get hashCode => Object.hash(termId, semesterId);
+}
+
+final _subjectsProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, SubjectFilters>((ref, filters) {
+      return ref
+          .watch(studentContentRepositoryProvider)
+          .subjects(termId: filters.termId, semesterId: filters.semesterId);
+    });
 
 final _subjectDetailsProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, int>((ref, id) {
@@ -100,6 +126,12 @@ final _quizResultProvider = FutureProvider.autoDispose
 
 final _starsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
   return ref.watch(studentContentRepositoryProvider).stars();
+});
+
+final _treeFarmProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
+  ref,
+) {
+  return ref.watch(studentContentRepositoryProvider).treeFarm();
 });
 
 final _notificationsProvider = FutureProvider.autoDispose
@@ -157,6 +189,11 @@ final _flashcardReviewProvider = FutureProvider.autoDispose
       return ref.watch(studentContentRepositoryProvider).flashcardReview(id);
     });
 
+final _flashcardDailyQueueProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
+      return ref.watch(studentContentRepositoryProvider).flashcardDailyQueue();
+    });
+
 final _flashcardStoreProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, String>((ref, search) {
       return ref
@@ -206,6 +243,11 @@ final _clinicalMockExamsProvider =
 final _clinicalRareCasesProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
       return ref.watch(studentContentRepositoryProvider).clinicalRareCases();
+    });
+
+final _clinicalRareCaseProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, int>((ref, id) {
+      return ref.watch(studentContentRepositoryProvider).clinicalRareCase(id);
     });
 
 final _clinicalMockTakeProvider = FutureProvider.autoDispose

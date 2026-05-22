@@ -131,8 +131,9 @@ class _PremiumAddButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color:
-                  AppColors.royalBlue.withValues(alpha: isEnabled ? 0.4 : 0.1),
+              color: AppColors.royalBlue.withValues(
+                alpha: isEnabled ? 0.4 : 0.1,
+              ),
               blurRadius: 24,
               offset: const Offset(0, 12),
             ),
@@ -507,6 +508,7 @@ class _SubjectCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final doctor = asMap(subject['doctor']);
     final term = asMap(subject['term']);
+    final semester = asMap(subject['semester']);
 
     return _GlassCard(
       margin: const EdgeInsets.only(bottom: 16),
@@ -560,6 +562,14 @@ class _SubjectCard extends StatelessWidget {
                 icon: Icons.calendar_view_day_rounded,
                 color: AppColors.slate500,
               ),
+              if (semester.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                _SubjectBadge(
+                  label: text(semester, 'name'),
+                  icon: Icons.view_week_rounded,
+                  color: AppColors.success,
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 16),

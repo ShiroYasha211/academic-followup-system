@@ -221,6 +221,7 @@ class StudentProfileScreen extends ConsumerWidget {
           final newEmail = text(updated, 'email', fallback: email);
           await ref.read(authControllerProvider.notifier).updateEmail(newEmail);
           ref.invalidate(_studentProfileProvider);
+          return newEmail;
         },
       ),
     );
@@ -249,7 +250,7 @@ class _ChangeEmailForm extends StatefulWidget {
   const _ChangeEmailForm({required this.currentEmail, required this.onSubmit});
 
   final String currentEmail;
-  final Future<void> Function(String email, String currentPassword) onSubmit;
+  final Future<String> Function(String email, String currentPassword) onSubmit;
 
   @override
   State<_ChangeEmailForm> createState() => _ChangeEmailFormState();
@@ -361,23 +362,28 @@ class _ChangeEmailFormState extends State<_ChangeEmailForm> {
     if (_formKey.currentState?.validate() != true) return;
     setState(() => _submitting = true);
     try {
-      await widget.onSubmit(
+      final newEmail = await widget.onSubmit(
         _emailController.text.trim(),
         _passwordController.text,
       );
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم تحديث البريد الإلكتروني بنجاح'),
-            backgroundColor: AppColors.success,
-          ),
+        await showMoeenInfoDialog(
+          context: context,
+          title: 'تم تغيير البريد الإلكتروني بنجاح',
+          message: 'البريد الجديد: $newEmail',
+          icon: Icons.check_circle_rounded,
+          color: AppColors.success,
         );
       }
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: AppColors.danger),
+        await showMoeenInfoDialog(
+          context: context,
+          title: 'تعذر تغيير البريد الإلكتروني',
+          message: e.message,
+          icon: Icons.error_rounded,
+          color: AppColors.danger,
         );
       }
     } finally {

@@ -35,6 +35,7 @@ class PushNotificationService {
   );
 
   static bool _initialized = false;
+  static Future<void>? _initializing;
   static StreamSubscription<String>? _tokenRefreshSubscription;
   static String? _pendingNavigationPath;
 
@@ -49,9 +50,27 @@ class PushNotificationService {
     return path;
   }
 
+  static void storePendingNavigationPath(String path) {
+    _pendingNavigationPath = path;
+  }
+
   static Future<void> initialize() async {
     if (_initialized) return;
+    final initializing = _initializing;
+    if (initializing != null) {
+      await initializing;
+      return;
+    }
 
+    _initializing = _initialize();
+    try {
+      await _initializing;
+    } finally {
+      _initializing = null;
+    }
+  }
+
+  static Future<void> _initialize() async {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
@@ -70,6 +89,21 @@ class PushNotificationService {
         }
       },
     );
+
+    final launchDetails = await _localNotifications
+        .getNotificationAppLaunchDetails();
+    final launchPayload = launchDetails?.notificationResponse?.payload;
+    if (launchDetails?.didNotificationLaunchApp == true &&
+        launchPayload != null &&
+        launchPayload.isNotEmpty) {
+      try {
+        final data = jsonDecode(launchPayload) as Map<String, dynamic>;
+        _pendingNavigationPath = _pathFromNotificationData(data);
+      } catch (error, stackTrace) {
+        debugPrint('Failed to parse launch notification payload: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    }
 
     final androidPlugin = _localNotifications
         .resolvePlatformSpecificImplementation<
@@ -190,7 +224,6 @@ class PushNotificationService {
 
   static void _handleNotificationNavigation(Map<String, dynamic> data) {
     final path = _pathFromNotificationData(data);
-    if (path == null) return;
 
     if (_navigationController.hasListener) {
       _navigationController.add(path);
@@ -199,17 +232,27 @@ class PushNotificationService {
     }
   }
 
-  static String? _pathFromNotificationData(Map<String, dynamic> data) {
-    final targetScreen = (data['target_screen'] ?? data['screen'])?.toString();
-    final scheduleItemId = data['schedule_item_id']?.toString();
+  static String _pathFromNotificationData(Map<String, dynamic> data) {
+    final rawTargetScreen = (data['target_screen'] ?? data['screen'])
+        ?.toString();
+    final notificationType = data['type']?.toString();
+    final targetScreen =
+        rawTargetScreen == null || rawTargetScreen == 'notifications'
+        ? notificationType
+        : rawTargetScreen;
+    final scheduleItemId =
+        data['schedule_item_id']?.toString() ??
+        data['study_item_id']?.toString() ??
+        data['item_id']?.toString();
 
-    if (targetScreen == 'study_session' &&
+    if ((targetScreen == 'study_session' || targetScreen == 'study_reminder') &&
         scheduleItemId != null &&
         scheduleItemId.isNotEmpty) {
       return '/student/study-center/$scheduleItemId/session';
     }
 
     return switch (targetScreen) {
+      'study_center' || 'study' || 'study_reminder' => '/student/study-center',
       'quizzes' || 'quiz' => '/student/quizzes',
       'assignments' || 'assignment' => '/student/assignments',
       'schedule' || 'schedules' => '/student/schedules',
@@ -221,7 +264,7 @@ class PushNotificationService {
       'messages' || 'message' => '/student/messages',
       'news' || 'news_hub' || 'announcement' || 'alert' => '/student/news',
       'notifications' => '/student/notifications',
-      _ => null,
+      _ => '/student/notifications',
     };
   }
 

@@ -10,6 +10,7 @@ class StudentFlashcardsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(_flashcardsProvider);
+    final queueState = ref.watch(_flashcardDailyQueueProvider);
     return StudentShell(
       currentIndex: 15,
       title: 'One Line Shot',
@@ -22,16 +23,81 @@ class StudentFlashcardsScreen extends ConsumerWidget {
       ),
       child: _AsyncBody(
         state: state,
-        onRetry: () => ref.invalidate(_flashcardsProvider),
+        onRetry: () {
+          ref.invalidate(_flashcardsProvider);
+          ref.invalidate(_flashcardDailyQueueProvider);
+        },
         builder: (data) {
           final stats = asMap(data['stats']);
           final packs = asList(data['packs']).map(asMap).toList();
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(_flashcardsProvider),
+            onRefresh: () async {
+              ref.invalidate(_flashcardsProvider);
+              ref.invalidate(_flashcardDailyQueueProvider);
+            },
             child: ListView(
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 90),
               children: [
-                _MasteryHeader(stats: stats),
+                queueState.when(
+                  data: (queueData) {
+                    final queue = asList(
+                      queueData['queue'],
+                    ).map(asMap).toList();
+                    return FutureBuilder<FlashcardLocalState>(
+                      future: ref.read(flashcardLocalStoreProvider).load(),
+                      builder: (context, snapshot) {
+                        return _OneLineShotHero(
+                          stats: stats,
+                          queue: queue,
+                          pendingSync:
+                              snapshot.data?.pendingProgress.length ?? 0,
+                          onStart: () {
+                            final packId = queue.isNotEmpty
+                                ? number(queue.first, 'pack_id').toInt()
+                                : packs.isNotEmpty
+                                ? number(packs.first, 'id').toInt()
+                                : 0;
+                            if (packId > 0) {
+                              context.push(
+                                StudentFlashcardsScreen.reviewPath(packId),
+                              );
+                            } else {
+                              _showCreatePack(context, ref);
+                            }
+                          },
+                        );
+                      },
+                    );
+                  },
+                  loading: () => _OneLineShotHero(
+                    stats: stats,
+                    queue: const [],
+                    pendingSync: 0,
+                    loading: true,
+                    onStart: packs.isEmpty
+                        ? () => _showCreatePack(context, ref)
+                        : () => context.push(
+                            StudentFlashcardsScreen.reviewPath(
+                              number(packs.first, 'id').toInt(),
+                            ),
+                          ),
+                  ),
+                  error: (_, _) => _OneLineShotHero(
+                    stats: stats,
+                    queue: const [],
+                    pendingSync: 0,
+                    offlineMode: true,
+                    onStart: packs.isEmpty
+                        ? () => _showCreatePack(context, ref)
+                        : () => context.push(
+                            StudentFlashcardsScreen.reviewPath(
+                              number(packs.first, 'id').toInt(),
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _ShotModeStrip(),
                 const SizedBox(height: 20),
                 Row(
                   children: [
@@ -56,18 +122,12 @@ class StudentFlashcardsScreen extends ConsumerWidget {
                 if (packs.isEmpty)
                   const EmptyState(message: 'ابدأ بإنشاء أول حزمة مراجعة لك.')
                 else
-                  GridView.builder(
+                  ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 0.85,
-                        ),
                     itemCount: packs.length,
-                    itemBuilder: (ctx, i) => _FlashcardPackCard(packs[i]),
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (ctx, i) => _ShotPackListTile(packs[i]),
                   ),
               ],
             ),
@@ -198,6 +258,396 @@ class StudentFlashcardsScreen extends ConsumerWidget {
         'repeat_cycle': cycle,
       }),
       onDone: () => ref.invalidate(_flashcardsProvider),
+    );
+  }
+}
+
+class _OneLineShotHero extends StatelessWidget {
+  const _OneLineShotHero({
+    required this.stats,
+    required this.queue,
+    required this.pendingSync,
+    required this.onStart,
+    this.loading = false,
+    this.offlineMode = false,
+  });
+
+  final Map<String, dynamic> stats;
+  final List<Map<String, dynamic>> queue;
+  final int pendingSync;
+  final VoidCallback onStart;
+  final bool loading;
+  final bool offlineMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final dueCount = queue.length;
+    final total = number(stats, 'total_items').toInt();
+    final packs = number(stats, 'total_packs').toInt();
+    final next = queue.isNotEmpty ? queue.first : null;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.midnight, AppColors.royalBlue],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.royalBlue.withValues(alpha: 0.22),
+            blurRadius: 20,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(
+                  Icons.style_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'One Line Shot',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      offlineMode
+                          ? 'سيتم عرض البيانات المحفوظة ومزامنة التقدم لاحقًا'
+                          : 'مراجعة سريعة بكروت تظهر لك حسب الأولوية',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w700,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          if (next != null)
+            _NextShotPreview(item: next)
+          else
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Text(
+                loading
+                    ? 'جاري تجهيز كروت اليوم...'
+                    : 'لا توجد كروت مجدولة الآن. يمكنك البدء من أي حزمة.',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _ShotStat(label: 'اليوم', value: '$dueCount'),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _ShotStat(label: 'الكروت', value: '$total'),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _ShotStat(label: 'الحزم', value: '$packs'),
+              ),
+            ],
+          ),
+          if (pendingSync > 0) ...[
+            const SizedBox(height: 10),
+            _PendingSyncBadge(count: pendingSync),
+          ],
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onStart,
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: Text(dueCount > 0 ? 'ابدأ كروت اليوم' : 'ابدأ المراجعة'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.midnight,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NextShotPreview extends StatelessWidget {
+  const _NextShotPreview({required this.item});
+
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _ShotTypeChip(type: _itemType(item)),
+              const Spacer(),
+              Text(
+                text(item, 'scheduled_time', fallback: '--:--'),
+                style: const TextStyle(
+                  color: AppColors.slate500,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            text(item, 'front_content', fallback: 'كرت مراجعة'),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.midnight,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            text(item, 'pack_title', fallback: 'حزمة مراجعة'),
+            style: const TextStyle(
+              color: AppColors.slate500,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShotStat extends StatelessWidget {
+  const _ShotStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PendingSyncBadge extends StatelessWidget {
+  const _PendingSyncBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.gold.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_sync_rounded, color: Colors.white, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$count مراجعة محفوظة محليًا بانتظار المزامنة',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShotModeStrip extends StatelessWidget {
+  const _ShotModeStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    const modes = [
+      ('قراءة', Icons.article_rounded),
+      ('اقلب الكرت', Icons.flip_rounded),
+      ('سؤال وجواب', Icons.question_answer_rounded),
+      ('اختيارات', Icons.checklist_rounded),
+    ];
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: modes.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final mode = modes[index];
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.slate100,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.slate200),
+            ),
+            child: Row(
+              children: [
+                Icon(mode.$2, size: 18, color: AppColors.royalBlue),
+                const SizedBox(width: 6),
+                Text(
+                  mode.$1,
+                  style: const TextStyle(
+                    color: AppColors.midnight,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ShotPackListTile extends ConsumerWidget {
+  const _ShotPackListTile(this.pack);
+
+  final Map<String, dynamic> pack;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final color = Color(_parseHex(text(pack, 'color', fallback: '#4338ca')));
+    final id = number(pack, 'id').toInt();
+    final count = number(pack, 'items_count').toInt();
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => context.push(StudentFlashcardsScreen.detailsPath(id)),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.slate200),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(Icons.style_rounded, color: color, size: 28),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      text(pack, 'title', fallback: 'حزمة مراجعة'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.midnight,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '$count كرت • ${_typeLabel(text(pack, 'display_mode', fallback: 'one_line'))}',
+                      style: const TextStyle(
+                        color: AppColors.slate500,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'مراجعة',
+                onPressed: () =>
+                    context.push(StudentFlashcardsScreen.reviewPath(id)),
+                icon: const Icon(Icons.play_circle_fill_rounded),
+                color: color,
+              ),
+              _FlashcardPackMenu(pack: pack),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -519,6 +969,13 @@ class _StudentFlashcardReviewScreenState
     extends ConsumerState<StudentFlashcardReviewScreen> {
   int _index = 0;
   bool _showBack = false;
+  bool _recording = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_syncPendingProgress);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -587,11 +1044,13 @@ class _StudentFlashcardReviewScreenState
                     ],
                   ),
                   const Spacer(),
-                  _FlashCardPreview(
-                    content: text(item, 'front_content'),
-                    backContent: _showBack ? text(item, 'back_content') : null,
+                  _ShotReviewCard(
+                    item: item,
                     color: color,
-                    onTap: () => setState(() => _showBack = !_showBack),
+                    showBack: _showBack,
+                    onToggleBack: () => setState(() => _showBack = !_showBack),
+                    onAnswer: (level) => _record(item, level, items.length),
+                    recording: _recording,
                   ),
                   const Spacer(),
                   if (!_showBack && text(item, 'back_content').isNotEmpty)
@@ -605,36 +1064,37 @@ class _StudentFlashcardReviewScreenState
                         ),
                       ),
                     ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ReviewButton(
-                          label: 'صعب',
-                          color: AppColors.rose,
-                          icon: Icons.sentiment_very_dissatisfied_rounded,
-                          onTap: () => _record(item, 'hard', items.length),
+                  if (_itemType(item) != 'mcq')
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ReviewButton(
+                            label: 'صعب',
+                            color: AppColors.rose,
+                            icon: Icons.sentiment_very_dissatisfied_rounded,
+                            onTap: () => _record(item, 'hard', items.length),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _ReviewButton(
-                          label: 'متوسط',
-                          color: AppColors.goldDeep,
-                          icon: Icons.sentiment_neutral_rounded,
-                          onTap: () => _record(item, 'medium', items.length),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _ReviewButton(
+                            label: 'متوسط',
+                            color: AppColors.goldDeep,
+                            icon: Icons.sentiment_neutral_rounded,
+                            onTap: () => _record(item, 'medium', items.length),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _ReviewButton(
-                          label: 'سهل',
-                          color: AppColors.success,
-                          icon: Icons.sentiment_very_satisfied_rounded,
-                          onTap: () => _record(item, 'easy', items.length),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _ReviewButton(
+                            label: 'سهل',
+                            color: AppColors.success,
+                            icon: Icons.sentiment_very_satisfied_rounded,
+                            onTap: () => _record(item, 'easy', items.length),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -649,13 +1109,56 @@ class _StudentFlashcardReviewScreenState
     String level,
     int total,
   ) async {
-    await ref
-        .read(studentContentRepositoryProvider)
-        .recordFlashcardProgress(
-          itemId: number(item, 'id').toInt(),
-          responseLevel: level,
-        );
+    if (_recording) return;
+    setState(() => _recording = true);
+    final itemId = number(item, 'id').toInt();
+    var savedOffline = false;
+    try {
+      final isOnline = await ref.read(connectivityServiceProvider).isOnline();
+      if (!isOnline) {
+        await ref
+            .read(flashcardLocalStoreProvider)
+            .addPendingProgress(itemId: itemId, responseLevel: level);
+        savedOffline = true;
+      } else {
+        await ref
+            .read(studentContentRepositoryProvider)
+            .recordFlashcardProgress(itemId: itemId, responseLevel: level);
+      }
+    } on ApiException catch (error) {
+      if (error.isOffline) {
+        await ref
+            .read(flashcardLocalStoreProvider)
+            .addPendingProgress(itemId: itemId, responseLevel: level);
+        savedOffline = true;
+      } else {
+        if (mounted) {
+          await showMoeenInfoDialog(
+            context: context,
+            title: 'تعذر تسجيل المراجعة',
+            message: error.message,
+            icon: Icons.error_outline_rounded,
+            color: AppColors.rose,
+          );
+        }
+        if (mounted) setState(() => _recording = false);
+        return;
+      }
+    } catch (_) {
+      await ref
+          .read(flashcardLocalStoreProvider)
+          .addPendingProgress(itemId: itemId, responseLevel: level);
+      savedOffline = true;
+    }
     if (!mounted) return;
+    setState(() => _recording = false);
+    if (savedOffline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم حفظ المراجعة محليًا للمزامنة لاحقًا.'),
+        ),
+      );
+    }
     if (_index + 1 >= total) {
       await showMoeenInfoDialog(
         context: context,
@@ -671,6 +1174,30 @@ class _StudentFlashcardReviewScreenState
         _showBack = false;
       });
     }
+  }
+
+  Future<void> _syncPendingProgress() async {
+    final isOnline = await ref.read(connectivityServiceProvider).isOnline();
+    if (!isOnline) return;
+    final store = ref.read(flashcardLocalStoreProvider);
+    final state = await store.load();
+    if (state.pendingProgress.isEmpty) return;
+    final repo = ref.read(studentContentRepositoryProvider);
+    final remaining = <Map<String, dynamic>>[];
+    for (final entry in state.pendingProgress) {
+      final itemId = int.tryParse(entry['item_id']?.toString() ?? '');
+      final level = entry['response_level']?.toString();
+      if (itemId == null || level == null || level.isEmpty) continue;
+      try {
+        await repo.recordFlashcardProgress(
+          itemId: itemId,
+          responseLevel: level,
+        );
+      } catch (_) {
+        remaining.add(entry);
+      }
+    }
+    await store.save(state.copyWith(pendingProgress: remaining));
   }
 }
 
@@ -1001,6 +1528,7 @@ class _ReviewButton extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _MasteryHeader extends StatelessWidget {
   const _MasteryHeader({required this.stats});
   final Map<String, dynamic> stats;
@@ -1129,9 +1657,235 @@ class _StatMini extends StatelessWidget {
   }
 }
 
+class _ShotReviewCard extends StatefulWidget {
+  const _ShotReviewCard({
+    required this.item,
+    required this.color,
+    required this.showBack,
+    required this.onToggleBack,
+    required this.onAnswer,
+    required this.recording,
+  });
+
+  final Map<String, dynamic> item;
+  final Color color;
+  final bool showBack;
+  final VoidCallback onToggleBack;
+  final ValueChanged<String> onAnswer;
+  final bool recording;
+
+  @override
+  State<_ShotReviewCard> createState() => _ShotReviewCardState();
+}
+
+class _ShotReviewCardState extends State<_ShotReviewCard> {
+  int? _selectedOption;
+
+  @override
+  void didUpdateWidget(covariant _ShotReviewCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (number(oldWidget.item, 'id') != number(widget.item, 'id')) {
+      _selectedOption = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final type = _itemType(widget.item);
+    final options = _flashcardOptions(widget.item);
+    final back = text(widget.item, 'back_content');
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 320),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: widget.color.withValues(alpha: 0.18),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(30),
+        onTap: type == 'mcq' ? null : widget.onToggleBack,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: _ShotTypeChip(type: type),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                text(widget.item, 'front_content', fallback: 'كرت مراجعة'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.midnight,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  height: 1.35,
+                ),
+              ),
+              if (type == 'mcq') ...[
+                const SizedBox(height: 24),
+                ...options.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _ShotOptionTile(
+                      label: entry.value,
+                      selected: _selectedOption == index,
+                      color: widget.color,
+                      onTap: widget.recording
+                          ? null
+                          : () {
+                              setState(() => _selectedOption = index);
+                              final correct = _correctOptionIndex(widget.item);
+                              widget.onAnswer(
+                                index == correct ? 'easy' : 'hard',
+                              );
+                            },
+                    ),
+                  );
+                }),
+              ] else if (back.isNotEmpty && widget.showBack) ...[
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 24),
+                Text(
+                  back,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: widget.color,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    height: 1.4,
+                  ),
+                ),
+              ] else if (back.isNotEmpty) ...[
+                const SizedBox(height: 26),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.touch_app_rounded,
+                      color: widget.color,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'اضغط على الكرت لرؤية الإجابة',
+                      style: TextStyle(
+                        color: widget.color,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShotOptionTile extends StatelessWidget {
+  const _ShotOptionTile({
+    required this.label,
+    required this.selected,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? color.withValues(alpha: 0.12) : AppColors.slate50,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? color : AppColors.slate200,
+              width: selected ? 1.6 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                color: selected ? color : AppColors.slate400,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: selected ? AppColors.midnight : AppColors.slate700,
+                    fontWeight: FontWeight.w800,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShotTypeChip extends StatelessWidget {
+  const _ShotTypeChip({required this.type});
+
+  final String type;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.royalBlue.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        _typeLabel(type),
+        style: const TextStyle(
+          color: AppColors.royalBlue,
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
 class _FlashCardPreview extends StatelessWidget {
+  // ignore: unused_element_parameter
   const _FlashCardPreview({
     required this.content,
+    // ignore: unused_element_parameter
     this.backContent,
     required this.color,
     required this.onTap,
@@ -1204,6 +1958,39 @@ String _flashModeLabel(String mode) {
     'mcq' => 'اختيار من متعدد',
     _ => 'One Line',
   };
+}
+
+String _typeLabel(String mode) {
+  return switch (mode) {
+    'flash_card' => 'اقلب الكرت',
+    'qa' => 'سؤال وجواب',
+    'mcq' => 'اختيارات',
+    _ => 'قراءة سريعة',
+  };
+}
+
+String _itemType(Map<String, dynamic> item) {
+  final direct = text(item, 'item_type');
+  if (direct.isNotEmpty) return direct;
+  final resolved = text(item, 'resolved_item_type');
+  if (resolved.isNotEmpty) return resolved;
+  return text(asMap(item['pack']), 'display_mode', fallback: 'one_line');
+}
+
+List<String> _flashcardOptions(Map<String, dynamic> item) {
+  final raw = item['options'];
+  if (raw is List) {
+    return raw
+        .map((value) => value.toString())
+        .where((value) => value.isNotEmpty)
+        .toList();
+  }
+  return const [];
+}
+
+int _correctOptionIndex(Map<String, dynamic> item) {
+  final parsed = int.tryParse(item['correct_option']?.toString() ?? '') ?? 0;
+  return parsed > 0 ? parsed - 1 : parsed;
 }
 
 int _parseHex(String input) {

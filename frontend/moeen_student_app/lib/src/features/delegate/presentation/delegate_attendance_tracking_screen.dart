@@ -19,6 +19,8 @@ class _DelegateAttendanceTrackingScreenState
   bool _pairingWaiting = false;
   bool _externalFinalizedDialogShown = false;
   bool _desktopManagedQr = false;
+  String? _pairingCode;
+  String? _pairingExpiresAt;
 
   String _date = DateTime.now().toIso8601String().split('T').first;
   final _titleController = TextEditingController();
@@ -61,7 +63,9 @@ class _DelegateAttendanceTrackingScreenState
   Future<void> _fetchData({int? qrSessionId}) async {
     setState(() => _isLoading = true);
     try {
-      final data = await ref.read(delegateRepositoryProvider).attendanceCreate(
+      final data = await ref
+          .read(delegateRepositoryProvider)
+          .attendanceCreate(
             subjectId: number(widget.subject, 'id').toInt(),
             date: _date,
             qrSessionId: qrSessionId,
@@ -93,12 +97,15 @@ class _DelegateAttendanceTrackingScreenState
   }
 
   bool get _hasActiveQr => _qrSessionId != null && _qrToken != null;
+  bool get _hasUnsavedSession =>
+      _hasActiveQr || _pairingWaiting || _statuses.isNotEmpty;
 
   Future<void> _handleBack() async {
-    if (_hasActiveQr) {
+    if (_hasUnsavedSession) {
       final confirm = await _confirmCancelSession();
       if (!confirm) return;
-      await _cancelQrSession(showMessage: false);
+      if (_hasActiveQr) await _cancelQrSession(showMessage: false);
+      _pairingTimer?.cancel();
     }
     if (mounted) context.pop();
   }
@@ -170,12 +177,14 @@ class _DelegateAttendanceTrackingScreenState
                         setState(() => _lectureType = val ?? 'official'),
                     startTime: _startTime,
                     endTime: _endTime,
-                    onStartTimeChanged: (val) => setState(() => _startTime = val),
+                    onStartTimeChanged: (val) =>
+                        setState(() => _startTime = val),
                     onEndTimeChanged: (val) => setState(() => _endTime = val),
                   ),
                   const SizedBox(height: 20),
                   _IntegratedActionBar(
-                    isEnabled: widget.subject['allow_delegate_attendance'] == true,
+                    isEnabled:
+                        widget.subject['allow_delegate_attendance'] == true,
                     showStudents: _showStudents,
                     qrActive: _hasActiveQr,
                     qrStarting: _qrStarting,
@@ -190,9 +199,11 @@ class _DelegateAttendanceTrackingScreenState
                       token: _qrToken!,
                       remainingSeconds: _remainingSeconds,
                       scannedCount: number(_qrStatus, 'scanned_count').toInt(),
-                      totalStudents: number(_qrStatus, 'total_students',
-                              fallback: _students.length)
-                          .toInt(),
+                      totalStudents: number(
+                        _qrStatus,
+                        'total_students',
+                        fallback: _students.length,
+                      ).toInt(),
                       recentScans: asList(_qrStatus?['recent_scans']),
                       presentStudents: asList(_qrStatus?['students'])
                           .where((s) => text(s, 'status') == 'present')
@@ -205,7 +216,23 @@ class _DelegateAttendanceTrackingScreenState
                   ],
                   if (_pairingWaiting && !_hasActiveQr) ...[
                     const SizedBox(height: 20),
-                    const _PairingWaitingCard(),
+                    _PairingWaitingCard(
+                      onShowCode: _pairingCode == null
+                          ? null
+                          : () => _showPairingCodeDialog(
+                              context,
+                              _pairingCode!,
+                              _pairingExpiresAt ?? '',
+                            ),
+                      onCancel: () {
+                        _pairingTimer?.cancel();
+                        setState(() {
+                          _pairingWaiting = false;
+                          _pairingCode = null;
+                          _pairingExpiresAt = null;
+                        });
+                      },
+                    ),
                   ],
                   const SizedBox(height: 20),
                   if (_showStudents) _buildStudentsSection(),
@@ -362,14 +389,16 @@ class _DelegateAttendanceTrackingScreenState
     });
 
     try {
-      final session = await ref.read(delegateRepositoryProvider).startQrAttendance({
-        'subject_id': number(widget.subject, 'id').toInt(),
-        'title': _titleController.text.trim(),
-        'date': _date,
-        if (_lectureNumberController.text.trim().isNotEmpty)
-          'lecture_number': _lectureNumberController.text.trim(),
-        'lecture_type': _lectureType,
-      });
+      final session = await ref
+          .read(delegateRepositoryProvider)
+          .startQrAttendance({
+            'subject_id': number(widget.subject, 'id').toInt(),
+            'title': _titleController.text.trim(),
+            'date': _date,
+            if (_lectureNumberController.text.trim().isNotEmpty)
+              'lecture_number': _lectureNumberController.text.trim(),
+            'lecture_type': _lectureType,
+          });
 
       _activateQrSession(session);
     } catch (e) {
@@ -384,7 +413,9 @@ class _DelegateAttendanceTrackingScreenState
 
     try {
       _showLoadingDialog(context);
-      final result = await ref.read(delegateRepositoryProvider).issuePairingCode(
+      final result = await ref
+          .read(delegateRepositoryProvider)
+          .issuePairingCode(
             subjectId: number(widget.subject, 'id').toInt(),
             date: _date,
             title: _titleController.text.trim(),
@@ -403,7 +434,11 @@ class _DelegateAttendanceTrackingScreenState
         return;
       }
 
-      setState(() => _pairingWaiting = true);
+      setState(() {
+        _pairingWaiting = true;
+        _pairingCode = code;
+        _pairingExpiresAt = expiresAt;
+      });
       _startPairingPolling();
       _showPairingCodeDialog(context, code, expiresAt);
     } catch (e) {
@@ -415,7 +450,11 @@ class _DelegateAttendanceTrackingScreenState
   }
 
   void _activateQrSession(Map<String, dynamic> session) {
-    final id = number(session, 'session_id', fallback: number(session, 'id')).toInt();
+    final id = number(
+      session,
+      'session_id',
+      fallback: number(session, 'id'),
+    ).toInt();
     final token = text(session, 'token', fallback: text(session, 'qr_code'));
     if (id <= 0 || token.isEmpty) {
       _toast(context, 'استجابة جلسة QR غير مكتملة.');
@@ -426,9 +465,15 @@ class _DelegateAttendanceTrackingScreenState
     setState(() {
       _qrSessionId = id;
       _qrToken = token;
-      _rotationSeconds = number(session, 'rotation_seconds', fallback: 30).toInt();
+      _rotationSeconds = number(
+        session,
+        'rotation_seconds',
+        fallback: 30,
+      ).toInt();
       _remainingSeconds = _rotationSeconds;
       _pairingWaiting = false;
+      _pairingCode = null;
+      _pairingExpiresAt = null;
       _externalFinalizedDialogShown = false;
       _desktopManagedQr = false;
     });
@@ -474,7 +519,11 @@ class _DelegateAttendanceTrackingScreenState
       if (!mounted) return;
       setState(() {
         _qrToken = text(data, 'token');
-        _rotationSeconds = number(data, 'rotation_seconds', fallback: 30).toInt();
+        _rotationSeconds = number(
+          data,
+          'rotation_seconds',
+          fallback: 30,
+        ).toInt();
         _remainingSeconds = _rotationSeconds;
       });
     } catch (_) {
@@ -553,6 +602,9 @@ class _DelegateAttendanceTrackingScreenState
           _qrToken = null;
           _qrStatus = null;
           _desktopManagedQr = false;
+          _pairingWaiting = false;
+          _pairingCode = null;
+          _pairingExpiresAt = null;
         });
       }
     }
@@ -564,7 +616,9 @@ class _DelegateAttendanceTrackingScreenState
       if (!mounted || _hasActiveQr) return;
 
       try {
-        final data = await ref.read(delegateRepositoryProvider).activeQrAttendance(
+        final data = await ref
+            .read(delegateRepositoryProvider)
+            .activeQrAttendance(
               subjectId: number(widget.subject, 'id').toInt(),
               date: _date,
               title: _titleController.text.trim(),
@@ -577,6 +631,8 @@ class _DelegateAttendanceTrackingScreenState
             _qrSessionId = id;
             _qrToken = 'desktop-session';
             _pairingWaiting = false;
+            _pairingCode = null;
+            _pairingExpiresAt = null;
             _desktopManagedQr = true;
           });
           _beginQrTimers();
@@ -661,7 +717,11 @@ class _DelegateAttendanceTrackingScreenState
         expiresAt: expiresAt,
         onCancel: () {
           _pairingTimer?.cancel();
-          setState(() => _pairingWaiting = false);
+          setState(() {
+            _pairingWaiting = false;
+            _pairingCode = null;
+            _pairingExpiresAt = null;
+          });
         },
       ),
     );
@@ -742,16 +802,17 @@ class _IntegratedActionBar extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: isEnabled && !pairingWaiting ? onPairing : null,
             icon: const Icon(Icons.cast_rounded),
-            label: Text(pairingWaiting
-                ? 'بانتظار اتصال تطبيق العرض'
-                : 'ربط تطبيق العرض'),
+            label: Text(
+              pairingWaiting ? 'بانتظار اتصال تطبيق العرض' : 'ربط تطبيق العرض',
+            ),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
               side: BorderSide(
                 color: isEnabled ? AppColors.royalBlue : AppColors.slate300,
               ),
-              foregroundColor:
-                  isEnabled ? AppColors.royalBlue : AppColors.slate400,
+              foregroundColor: isEnabled
+                  ? AppColors.royalBlue
+                  : AppColors.slate400,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -877,7 +938,10 @@ class _QrLivePanel extends StatelessWidget {
           const SizedBox(height: 14),
           _MiniStudentList(title: 'آخر من مسحوا', students: recentScans),
           const SizedBox(height: 10),
-          _MiniStudentList(title: 'عينة من الحاضرين', students: presentStudents),
+          _MiniStudentList(
+            title: 'عينة من الحاضرين',
+            students: presentStudents,
+          ),
           const SizedBox(height: 14),
           ElevatedButton.icon(
             onPressed: finalizing ? null : onFinalize,
@@ -1036,20 +1100,51 @@ class _DesktopManagedQrNotice extends StatelessWidget {
 }
 
 class _PairingWaitingCard extends StatelessWidget {
-  const _PairingWaitingCard();
+  const _PairingWaitingCard({required this.onShowCode, required this.onCancel});
+
+  final VoidCallback? onShowCode;
+  final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
     return _GlassCard(
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const CircularProgressIndicator(strokeWidth: 2),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Text(
-              'بانتظار أن يبدأ تطبيق العرض جلسة QR. سيتم التحديث تلقائياً.',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
+          Row(
+            children: [
+              const CircularProgressIndicator(strokeWidth: 2),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Text(
+                  'بانتظار أن يبدأ تطبيق العرض جلسة QR. سيتم التحديث تلقائياً.',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onShowCode,
+                  icon: const Icon(Icons.qr_code_2_rounded),
+                  label: const Text('عرض كود الربط'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: onCancel,
+                  icon: const Icon(Icons.close_rounded),
+                  label: const Text('إلغاء الربط'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.danger,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1190,14 +1285,8 @@ class _SessionForm extends StatelessWidget {
                   child: DropdownButton<String>(
                     value: lectureType,
                     items: const [
-                      DropdownMenuItem(
-                        value: 'official',
-                        child: Text('رسمية'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'special',
-                        child: Text('إضافية'),
-                      ),
+                      DropdownMenuItem(value: 'official', child: Text('رسمية')),
+                      DropdownMenuItem(value: 'special', child: Text('إضافية')),
                     ],
                     onChanged: onTypeChanged,
                     style: const TextStyle(
@@ -1307,7 +1396,8 @@ class _PairingCodeDialogState extends State<_PairingCodeDialog>
   @override
   void initState() {
     super.initState();
-    final expiry = DateTime.tryParse(widget.expiresAt) ??
+    final expiry =
+        DateTime.tryParse(widget.expiresAt) ??
         DateTime.now().add(const Duration(minutes: 10));
     _timeLeft = expiry.difference(DateTime.now());
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {

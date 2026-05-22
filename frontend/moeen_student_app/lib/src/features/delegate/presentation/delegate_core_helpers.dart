@@ -226,6 +226,174 @@ void _showNoPermissionSnackBar(BuildContext context) {
   );
 }
 
+String _delegateResourceUrl(Map<String, dynamic> resource) {
+  final explicit = text(
+    resource,
+    'download_url',
+    fallback: text(resource, 'file_url', fallback: text(resource, 'url')),
+  );
+  if (explicit.isNotEmpty) return absoluteUrl(explicit);
+  final path = text(resource, 'file_path');
+  if (path.isEmpty) return '';
+  return absoluteUrl(path.startsWith('/storage/') ? path : '/storage/$path');
+}
+
+String _delegateResourceFileName(Map<String, dynamic> resource) {
+  final title = text(resource, 'title', fallback: 'resource');
+  final ext = text(
+    resource,
+    'file_type',
+    fallback: 'pdf',
+  ).replaceAll('.', '').trim();
+  if (ext.isEmpty || title.toLowerCase().endsWith('.$ext')) return title;
+  return '$title.$ext';
+}
+
+Future<void> _downloadDelegateResource(
+  BuildContext context,
+  Map<String, dynamic> resource, {
+  required String section,
+}) async {
+  final url = _delegateResourceUrl(resource);
+  if (url.isEmpty) {
+    _toast(context, 'لا يوجد رابط تحميل لهذا الملف.');
+    return;
+  }
+  try {
+    final savedPath = await DownloadService.downloadUrlToMoeenFolder(
+      url: url,
+      fileName: _delegateResourceFileName(resource),
+      section: section,
+      openAfterDownload: true,
+    );
+    if (context.mounted && savedPath != null) {
+      _toast(context, 'تم تحميل الملف في: $savedPath');
+    }
+  } catch (error) {
+    if (context.mounted) _showError(context, error);
+  }
+}
+
+Widget _delegateDetailRow(IconData icon, String label, String value) {
+  if (value.trim().isEmpty) return const SizedBox.shrink();
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: AppColors.slate500),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.slate500,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: AppColors.midnight,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _showDelegateResourceDetails(
+  BuildContext context,
+  Map<String, dynamic> resource, {
+  required String section,
+  VoidCallback? onEdit,
+  VoidCallback? onDelete,
+  VoidCallback? onImport,
+}) async {
+  final subject = asMap(resource['subject']);
+  final uploader = asMap(resource['uploader']);
+  final ext = text(resource, 'file_type', fallback: 'ملف');
+  await showMoeenBottomSheet<void>(
+    context: context,
+    title: text(resource, 'title', fallback: 'تفاصيل الملف'),
+    icon: Icons.insert_drive_file_rounded,
+    color: AppColors.royalBlue,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _delegateDetailRow(
+          Icons.school_rounded,
+          'المادة',
+          text(subject, 'name'),
+        ),
+        _delegateDetailRow(
+          Icons.category_rounded,
+          'التصنيف',
+          text(resource, 'category'),
+        ),
+        _delegateDetailRow(Icons.extension_rounded, 'نوع الملف', ext),
+        _delegateDetailRow(
+          Icons.person_rounded,
+          'الناشر',
+          text(uploader, 'name'),
+        ),
+        _delegateDetailRow(
+          Icons.notes_rounded,
+          'الوصف',
+          text(resource, 'description'),
+        ),
+        _delegateDetailRow(
+          Icons.event_rounded,
+          'تاريخ النشر',
+          dateOnly(text(resource, 'created_at')),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            FilledButton.icon(
+              onPressed: () => _downloadDelegateResource(
+                context,
+                resource,
+                section: section,
+              ),
+              icon: const Icon(Icons.download_rounded),
+              label: const Text('تحميل / فتح'),
+            ),
+            if (onImport != null)
+              OutlinedButton.icon(
+                onPressed: onImport,
+                icon: const Icon(Icons.library_add_rounded),
+                label: const Text('استيراد'),
+              ),
+            if (onEdit != null)
+              OutlinedButton.icon(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_rounded),
+                label: const Text('تعديل'),
+              ),
+            if (onDelete != null)
+              TextButton.icon(
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('حذف'),
+                style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+              ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
 String _monthName(int month) {
   const names = [

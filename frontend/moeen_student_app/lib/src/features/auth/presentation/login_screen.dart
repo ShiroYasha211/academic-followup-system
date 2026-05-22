@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/notifications/push_notification_service.dart';
 import '../../../core/router/landing_route.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/auth_shell.dart';
@@ -45,7 +46,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
     final session = ref.read(authControllerProvider).valueOrNull;
     if (session != null) {
-      context.go(landingRouteFor(session));
+      final pendingPath = PushNotificationService.takePendingNavigationPath();
+      context.go(pendingPath ?? landingRouteFor(session));
     }
   }
 

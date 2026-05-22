@@ -507,10 +507,14 @@ String _accountStatusLabel(String status) {
 }
 
 String absoluteUrl(String url) {
-  if (url.isEmpty) return '';
-  if (url.startsWith('http')) return url;
-  const baseUrl = 'https://moeen-student.com'; // Adjust if needed
-  return '$baseUrl/${url.startsWith('/') ? url.substring(1) : url}';
+  final trimmed = url.trim();
+  if (trimmed.isEmpty) return '';
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  final base = AppConfig.apiBaseUrl.replaceFirst(RegExp(r'/api/?$'), '');
+  if (trimmed.startsWith('/')) return '$base$trimmed';
+  return '$base/$trimmed';
 }
 
 String money(num value) => '${value.toStringAsFixed(0)} ريال';

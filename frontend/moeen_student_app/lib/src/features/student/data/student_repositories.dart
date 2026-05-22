@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/authenticated_api_client.dart';
+import '../../../core/offline/offline_cache_service.dart';
+import '../../../core/providers.dart';
 import 'models/financial_ledger.dart';
 import 'models/student_dashboard.dart';
 import 'models/subscription_models.dart';
@@ -14,43 +16,63 @@ final studentDashboardRepositoryProvider = Provider<StudentDashboardRepository>(
   (ref) {
     return StudentDashboardRepository(
       ref.watch(authenticatedApiClientProvider),
+      ref.watch(offlineCacheServiceProvider),
     );
   },
 );
 
 final subscriptionRepositoryProvider = Provider<SubscriptionRepository>((ref) {
-  return SubscriptionRepository(ref.watch(authenticatedApiClientProvider));
+  return SubscriptionRepository(
+    ref.watch(authenticatedApiClientProvider),
+    ref.watch(offlineCacheServiceProvider),
+  );
 });
 
 final ledgerRepositoryProvider = Provider<LedgerRepository>((ref) {
-  return LedgerRepository(ref.watch(authenticatedApiClientProvider));
+  return LedgerRepository(
+    ref.watch(authenticatedApiClientProvider),
+    ref.watch(offlineCacheServiceProvider),
+  );
 });
 
 final studentContentRepositoryProvider = Provider<StudentContentRepository>((
   ref,
 ) {
-  return StudentContentRepository(ref.watch(authenticatedApiClientProvider));
+  return StudentContentRepository(
+    ref.watch(authenticatedApiClientProvider),
+    ref.watch(offlineCacheServiceProvider),
+  );
 });
 
 class StudentDashboardRepository {
-  const StudentDashboardRepository(this._api);
+  const StudentDashboardRepository(this._api, this._cache);
 
   final ApiClient _api;
+  final OfflineCacheService _cache;
 
   Future<StudentDashboard> fetch() async {
-    final response = await _api.get('/student/dashboard');
-    return StudentDashboard.fromJson(_data(response));
+    final data = await _cachedMap(
+      cache: _cache,
+      key: 'student.dashboard',
+      load: () async => _data(await _api.get('/student/dashboard')),
+    );
+    return StudentDashboard.fromJson(data);
   }
 }
 
 class SubscriptionRepository {
-  const SubscriptionRepository(this._api);
+  const SubscriptionRepository(this._api, this._cache);
 
   final ApiClient _api;
+  final OfflineCacheService _cache;
 
   Future<SubscriptionOverview> fetch() async {
-    final response = await _api.get('/student/subscription');
-    return SubscriptionOverview.fromJson(_data(response));
+    final data = await _cachedMap(
+      cache: _cache,
+      key: 'student.subscription',
+      load: () async => _data(await _api.get('/student/subscription')),
+    );
+    return SubscriptionOverview.fromJson(data);
   }
 
   Future<String> redeem(String code) async {
@@ -79,16 +101,20 @@ class SubscriptionRepository {
 }
 
 class LedgerRepository {
-  const LedgerRepository(this._api);
+  const LedgerRepository(this._api, this._cache);
 
   final ApiClient _api;
+  final OfflineCacheService _cache;
 
   Future<FinancialLedger> fetch({int page = 1}) async {
-    final response = await _api.get(
-      '/student/ledger',
-      queryParameters: {'page': page},
+    final data = await _cachedMap(
+      cache: _cache,
+      key: 'student.ledger.$page',
+      load: () async => _data(
+        await _api.get('/student/ledger', queryParameters: {'page': page}),
+      ),
     );
-    return FinancialLedger.fromJson(_data(response));
+    return FinancialLedger.fromJson(data);
   }
 
   Future<String> exportUrl() async {
@@ -101,18 +127,41 @@ class LedgerRepository {
 }
 
 class StudentContentRepository {
-  const StudentContentRepository(this._api);
+  const StudentContentRepository(this._api, this._cache);
 
   final ApiClient _api;
+  final OfflineCacheService _cache;
 
-  Future<List<dynamic>> subjects() async {
-    final response = await _api.get('/student/subjects');
-    return _listData(response);
+  Future<Map<String, dynamic>> subjects({int? termId, int? semesterId}) async {
+    return _cachedMap(
+      cache: _cache,
+      key:
+          'student.subjects.term_${termId ?? 'all'}.semester_${semesterId ?? 'all'}',
+      load: () async {
+        final response = await _api.get(
+          '/student/subjects',
+          queryParameters: {
+            if (termId != null) 'term_id': termId,
+            if (semesterId != null) 'semester_id': semesterId,
+          },
+        );
+        final data = _data(response);
+        if (data.isNotEmpty) return data;
+        return {
+          'subjects': _listData(response),
+          'terms': const [],
+          'major': null,
+        };
+      },
+    );
   }
 
   Future<Map<String, dynamic>> subjectDetails(int id) async {
-    final response = await _api.get('/student/subjects/$id');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.subject.$id',
+      load: () async => _data(await _api.get('/student/subjects/$id')),
+    );
   }
 
   Future<String> toggleLectureListen(int lectureId) async {
@@ -148,16 +197,25 @@ class StudentContentRepository {
       // Reminder checks should not block opening the study center.
     }
 
-    final response = await _api.get(
-      '/student/study-center',
-      queryParameters: {if (tab != null) 'tab': tab},
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.study_center.${tab ?? 'all'}',
+      load: () async => _data(
+        await _api.get(
+          '/student/study-center',
+          queryParameters: {if (tab != null) 'tab': tab},
+        ),
+      ),
     );
-    return _data(response);
   }
 
   Future<Map<String, dynamic>> studySession(int id) async {
-    final response = await _api.get('/student/study-center/$id/session');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.study_session.$id',
+      load: () async =>
+          _data(await _api.get('/student/study-center/$id/session')),
+    );
   }
 
   Future<Map<String, dynamic>> addStudySessionColumn({
@@ -231,6 +289,23 @@ class StudentContentRepository {
   }
 
   Future<Map<String, dynamic>> schedules() async {
+    final useCache = DateTime.now().year > 0;
+    if (useCache) {
+      return _cachedMap(
+        cache: _cache,
+        key: 'student.schedules',
+        load: () async {
+          final response = await _api.get('/student/schedules');
+          final data = response['data'];
+          if (data is Map<String, dynamic>) return data;
+          if (data is Map) {
+            return data.map((key, value) => MapEntry(key.toString(), value));
+          }
+          if (data is List && data.isEmpty) return <String, dynamic>{};
+          throw const ApiException('استجابة غير مكتملة من الخادم.');
+        },
+      );
+    }
     final response = await _api.get('/student/schedules');
     final data = response['data'];
     if (data is Map<String, dynamic>) return data;
@@ -241,19 +316,27 @@ class StudentContentRepository {
   }
 
   Future<Map<String, dynamic>> newsHub({String? source, int page = 1}) async {
-    final response = await _api.get(
-      '/student/news-hub',
-      queryParameters: {
-        'page': page,
-        if (source != null && source != 'all') 'source': source,
-      },
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.news.${source ?? 'all'}.$page',
+      load: () async => _data(
+        await _api.get(
+          '/student/news-hub',
+          queryParameters: {
+            'page': page,
+            if (source != null && source != 'all') 'source': source,
+          },
+        ),
+      ),
     );
-    return _data(response);
   }
 
   Future<Map<String, dynamic>> quizzes() async {
-    final response = await _api.get('/student/quizzes');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.quizzes',
+      load: () async => _data(await _api.get('/student/quizzes')),
+    );
   }
 
   Future<Map<String, dynamic>> takeQuiz(
@@ -282,13 +365,20 @@ class StudentContentRepository {
   }
 
   Future<Map<String, dynamic>> quizResult(int attemptId) async {
-    final response = await _api.get('/student/quizzes/results/$attemptId');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.quiz_result.$attemptId',
+      load: () async =>
+          _data(await _api.get('/student/quizzes/results/$attemptId')),
+    );
   }
 
   Future<Map<String, dynamic>> stars() async {
-    final response = await _api.get('/student/stars');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.stars',
+      load: () async => _data(await _api.get('/student/stars')),
+    );
   }
 
   Future<List<dynamic>> searchStarUsers(String query) async {
@@ -315,17 +405,135 @@ class StudentContentRepository {
     return (response['message'] ?? 'تم إهداء النجوم بنجاح.').toString();
   }
 
-  Future<Map<String, dynamic>> notifications({int page = 1}) async {
-    final response = await _api.get(
-      '/student/notifications',
-      queryParameters: {'page': page},
+  Future<Map<String, dynamic>> treeFarm() async {
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.tree_farm',
+      load: () async => _flexData(await _api.get('/student/tree-farm')),
     );
-    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> startTreeFarmSession({
+    required String farmScope,
+    required int plannedMinutes,
+    required String clientUuid,
+  }) async {
+    final response = await _api.post(
+      '/student/tree-farm/sessions/start',
+      data: {
+        'farm_scope': farmScope,
+        'planned_minutes': plannedMinutes,
+        'client_uuid': clientUuid,
+      },
+    );
+    return _flexData(response);
+  }
+
+  Future<Map<String, dynamic>> treeFarmHeartbeat(int sessionId) async {
+    return _flexData(
+      await _api.post('/student/tree-farm/sessions/$sessionId/heartbeat'),
+    );
+  }
+
+  Future<Map<String, dynamic>> requestTreeFarmGrace({
+    required int sessionId,
+    required int seconds,
+  }) async {
+    return _flexData(
+      await _api.post(
+        '/student/tree-farm/sessions/$sessionId/grace',
+        data: {'seconds': seconds},
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>> finishTreeFarmSession(int sessionId) async {
+    return _flexData(
+      await _api.post(
+        '/student/tree-farm/sessions/$sessionId/finish',
+        data: {'finish_reason': 'completed'},
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>> syncTreeFarmOffline({
+    required List<Map<String, dynamic>> sessions,
+    required List<Map<String, dynamic>> thoughts,
+  }) async {
+    return _flexData(
+      await _api.post(
+        '/student/tree-farm/offline-sync',
+        data: {'sessions': sessions, 'thoughts': thoughts},
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>> storeTreeFarmThought({
+    required String body,
+    String? clientUuid,
+    int? sessionId,
+    DateTime? reminderAt,
+  }) async {
+    return _flexData(
+      await _api.post(
+        '/student/tree-farm/thoughts',
+        data: {
+          'body': body,
+          if (clientUuid != null) 'client_uuid': clientUuid,
+          if (sessionId != null) 'session_id': sessionId,
+          if (reminderAt != null) 'reminder_at': reminderAt.toIso8601String(),
+        },
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>> requestTreeFarmReward(int coinsAmount) async {
+    return _flexData(
+      await _api.post(
+        '/student/tree-farm/reward-requests',
+        data: {'coins_amount': coinsAmount},
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>> updateTreeFarmProfile({
+    String? publicName,
+    bool? isPublic,
+    bool? useAlias,
+  }) async {
+    return _flexData(
+      await _api.patch(
+        '/student/tree-farm/profile',
+        data: {
+          if (publicName != null) 'public_name': publicName,
+          if (isPublic != null) 'is_public': isPublic,
+          if (useAlias != null) 'use_alias': useAlias,
+        },
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>> notifications({int page = 1}) async {
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.notifications.$page',
+      load: () async => _data(
+        await _api.get(
+          '/student/notifications',
+          queryParameters: {'page': page},
+        ),
+      ),
+    );
   }
 
   Future<Map<String, dynamic>> unreadNotificationsCount() async {
-    final response = await _api.get('/student/notifications/unread-count');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.notifications.unread_count',
+      load: () async =>
+          _data(await _api.get('/student/notifications/unread-count')),
+      maxAge: const Duration(hours: 24),
+    );
   }
 
   Future<String> markNotificationRead(int id) async {
@@ -351,8 +559,11 @@ class StudentContentRepository {
   }
 
   Future<Map<String, dynamic>> exams() async {
-    final response = await _api.get('/student/exams');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.exams',
+      load: () async => _data(await _api.get('/student/exams')),
+    );
   }
 
   Future<Map<String, dynamic>> resources({
@@ -363,18 +574,25 @@ class StudentContentRepository {
     bool scheduled = false,
     int page = 1,
   }) async {
-    final response = await _api.get(
-      '/student/resources',
-      queryParameters: {
-        'page': page,
-        'sort': sort,
-        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
-        if (subjectId != null && subjectId > 0) 'subject_id': subjectId,
-        if (category != null && category != 'all') 'category': category,
-        if (scheduled) 'scheduled': '1',
-      },
+    return _cachedMap(
+      cache: _cache,
+      key:
+          'student.resources.$page.$sort.${search ?? ''}.${subjectId ?? 'all'}.${category ?? 'all'}.$scheduled',
+      load: () async => _data(
+        await _api.get(
+          '/student/resources',
+          queryParameters: {
+            'page': page,
+            'sort': sort,
+            if (search != null && search.trim().isNotEmpty)
+              'search': search.trim(),
+            if (subjectId != null && subjectId > 0) 'subject_id': subjectId,
+            if (category != null && category != 'all') 'category': category,
+            if (scheduled) 'scheduled': '1',
+          },
+        ),
+      ),
     );
-    return _data(response);
   }
 
   Future<Map<String, dynamic>> library({
@@ -385,18 +603,25 @@ class StudentContentRepository {
     bool myUploads = false,
     int page = 1,
   }) async {
-    final response = await _api.get(
-      '/student/library',
-      queryParameters: {
-        'page': page,
-        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
-        if (subjectId != null && subjectId > 0) 'subject_id': subjectId,
-        if (category != null && category != 'all') 'category': category,
-        if (fileType != null && fileType != 'all') 'file_type': fileType,
-        if (myUploads) 'my_uploads': '1',
-      },
+    return _cachedMap(
+      cache: _cache,
+      key:
+          'student.library.$page.${search ?? ''}.${subjectId ?? 'all'}.${category ?? 'all'}.${fileType ?? 'all'}.$myUploads',
+      load: () async => _data(
+        await _api.get(
+          '/student/library',
+          queryParameters: {
+            'page': page,
+            if (search != null && search.trim().isNotEmpty)
+              'search': search.trim(),
+            if (subjectId != null && subjectId > 0) 'subject_id': subjectId,
+            if (category != null && category != 'all') 'category': category,
+            if (fileType != null && fileType != 'all') 'file_type': fileType,
+            if (myUploads) 'my_uploads': '1',
+          },
+        ),
+      ),
     );
-    return _data(response);
   }
 
   Future<String> libraryDownloadUrl(int id) async {
@@ -446,18 +671,36 @@ class StudentContentRepository {
   }
 
   Future<Map<String, dynamic>> flashcards() async {
-    final response = await _api.get('/student/flashcards');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.flashcards',
+      load: () async => _data(await _api.get('/student/flashcards')),
+    );
   }
 
   Future<Map<String, dynamic>> flashcardDetails(int id) async {
-    final response = await _api.get('/student/flashcards/$id');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.flashcard.$id',
+      load: () async => _data(await _api.get('/student/flashcards/$id')),
+    );
   }
 
   Future<Map<String, dynamic>> flashcardReview(int id) async {
-    final response = await _api.get('/student/flashcards/$id/review');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.flashcard_review.$id',
+      load: () async => _data(await _api.get('/student/flashcards/$id/review')),
+    );
+  }
+
+  Future<Map<String, dynamic>> flashcardDailyQueue() async {
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.flashcard_daily_queue',
+      load: () async =>
+          _data(await _api.get('/student/flashcards/daily-queue')),
+    );
   }
 
   Future<Map<String, dynamic>> flashcardStore({
@@ -477,22 +720,22 @@ class StudentContentRepository {
 
   Future<String> createFlashcardPack(Map<String, dynamic> data) async {
     final response = await _api.post('/student/flashcards', data: data);
-    return (response['message'] ?? '?? ????? ?????? ?????.').toString();
+    return (response['message'] ?? 'تم إنشاء الحزمة بنجاح.').toString();
   }
 
   Future<String> deleteFlashcardPack(int id) async {
     final response = await _api.delete('/student/flashcards/$id');
-    return (response['message'] ?? '?? ??? ?????? ?????.').toString();
+    return (response['message'] ?? 'تم حذف الحزمة بنجاح.').toString();
   }
 
   Future<String> toggleFlashcardPack(int id) async {
     final response = await _api.post('/student/flashcards/$id/toggle');
-    return (response['message'] ?? '?? ????? ???? ??????.').toString();
+    return (response['message'] ?? 'تم تحديث حالة الحزمة.').toString();
   }
 
   Future<String> cloneFlashcardPack(int id) async {
     final response = await _api.post('/student/flashcards/clone/$id');
-    return (response['message'] ?? '??? ????? ?????? ??? ?????.').toString();
+    return (response['message'] ?? 'تمت إضافة الحزمة إلى مكتبتك.').toString();
   }
 
   Future<String> createFlashcardItem(
@@ -503,12 +746,12 @@ class StudentContentRepository {
       '/student/flashcards/$packId/items',
       data: data,
     );
-    return (response['message'] ?? '??? ????? ?????? ?????.').toString();
+    return (response['message'] ?? 'تمت إضافة البطاقة بنجاح.').toString();
   }
 
   Future<String> deleteFlashcardItem(int itemId) async {
     final response = await _api.delete('/student/flashcards/items/$itemId');
-    return (response['message'] ?? '?? ??? ?????? ?????.').toString();
+    return (response['message'] ?? 'تم حذف البطاقة بنجاح.').toString();
   }
 
   Future<String> recordFlashcardProgress({
@@ -519,20 +762,29 @@ class StudentContentRepository {
       '/student/flashcards/progress',
       data: {'item_id': itemId, 'response_level': responseLevel},
     );
-    return (response['message'] ?? '?? ????? ????????.').toString();
+    return (response['message'] ?? 'تم تسجيل المراجعة.').toString();
   }
 
   Future<Map<String, dynamic>> assignments({String sortBy = 'due_date'}) async {
-    final response = await _api.get(
-      '/student/assignments',
-      queryParameters: {'sort_by': sortBy},
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.assignments.$sortBy',
+      load: () async => _data(
+        await _api.get(
+          '/student/assignments',
+          queryParameters: {'sort_by': sortBy},
+        ),
+      ),
     );
-    return _data(response);
   }
 
   Future<Map<String, dynamic>> assignmentDetails(int id) async {
-    final response = await _api.get('/student/assignments/$id/details');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.assignment.$id',
+      load: () async =>
+          _data(await _api.get('/student/assignments/$id/details')),
+    );
   }
 
   Future<String> updateAssignmentPriority({
@@ -543,7 +795,7 @@ class StudentContentRepository {
       '/student/assignments/$assignmentId/priority',
       data: {'priority': priority},
     );
-    return (response['message'] ?? '?? ????? ????????.').toString();
+    return (response['message'] ?? 'تم تحديث الأولوية.').toString();
   }
 
   Future<String> submitAssignment({
@@ -561,12 +813,15 @@ class StudentContentRepository {
       '/student/assignments/$assignmentId/submit',
       data: form,
     );
-    return (response['message'] ?? '?? ????? ??????? ?????.').toString();
+    return (response['message'] ?? 'تم تسليم التكليف بنجاح.').toString();
   }
 
   Future<Map<String, dynamic>> reminders() async {
-    final response = await _api.get('/student/reminders');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.reminders',
+      load: () async => _data(await _api.get('/student/reminders')),
+    );
   }
 
   Future<String> scanQrAttendance(String token) async {
@@ -574,12 +829,15 @@ class StudentContentRepository {
       '/student/qr-attendance/scan',
       data: {'token': token},
     );
-    return (response['message'] ?? '?? ????? ?????? ?????.').toString();
+    return (response['message'] ?? 'تم تسجيل الحضور بنجاح.').toString();
   }
 
   Future<Map<String, dynamic>> messages() async {
-    final response = await _api.get('/student/messages');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.messages',
+      load: () async => _data(await _api.get('/student/messages')),
+    );
   }
 
   Future<Map<String, dynamic>> startConversation() async {
@@ -588,8 +846,11 @@ class StudentContentRepository {
   }
 
   Future<Map<String, dynamic>> conversation(int id) async {
-    final response = await _api.get('/student/messages/$id');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.conversation.$id',
+      load: () async => _data(await _api.get('/student/messages/$id')),
+    );
   }
 
   Future<Map<String, dynamic>> sendMessage({
@@ -604,8 +865,11 @@ class StudentContentRepository {
   }
 
   Future<Map<String, dynamic>> clinicalLogbook() async {
-    final response = await _api.get('/student/clinical/logbook');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.clinical.logbook',
+      load: () async => _data(await _api.get('/student/clinical/logbook')),
+    );
   }
 
   Future<Map<String, dynamic>> createClinicalLog(
@@ -622,6 +886,13 @@ class StudentContentRepository {
     final response = await _api.put(
       '/student/clinical/logbook/$id',
       data: data,
+    );
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> regenerateClinicalLogQr(int id) async {
+    final response = await _api.post(
+      '/student/clinical/logbook/$id/regenerate-qr',
     );
     return _data(response);
   }
@@ -643,13 +914,19 @@ class StudentContentRepository {
   }
 
   Future<Map<String, dynamic>> clinicalEvaluations() async {
-    final response = await _api.get('/student/clinical/evaluations');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.clinical.evaluations',
+      load: () async => _data(await _api.get('/student/clinical/evaluations')),
+    );
   }
 
   Future<Map<String, dynamic>> clinicalMockExams() async {
-    final response = await _api.get('/student/clinical/mock-exams');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.clinical.mock_exams',
+      load: () async => _data(await _api.get('/student/clinical/mock-exams')),
+    );
   }
 
   Future<Map<String, dynamic>> createClinicalCustomChecklist(
@@ -689,40 +966,61 @@ class StudentContentRepository {
   }
 
   Future<Map<String, dynamic>> clinicalMockResult(int evaluationId) async {
-    final response = await _api.get(
-      '/student/clinical/mock-exams/results/$evaluationId',
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.clinical.mock_result.$evaluationId',
+      load: () async => _data(
+        await _api.get('/student/clinical/mock-exams/results/$evaluationId'),
+      ),
     );
-    return _data(response);
   }
 
   Future<Map<String, dynamic>> clinicalRareCases() async {
-    final response = await _api.get('/student/clinical/rare-cases');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.clinical.rare_cases',
+      load: () async => _data(await _api.get('/student/clinical/rare-cases')),
+    );
   }
 
   Future<Map<String, dynamic>> clinicalRareCase(int id) async {
-    final response = await _api.get('/student/clinical/rare-cases/$id');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.clinical.rare_case.$id',
+      load: () async =>
+          _data(await _api.get('/student/clinical/rare-cases/$id')),
+    );
   }
 
   Future<Map<String, dynamic>> inquiries({String? status}) async {
-    final response = await _api.get(
-      '/student/inquiries',
-      queryParameters: {
-        if (status != null && status.isNotEmpty) 'status': status,
-      },
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.inquiries.${status ?? 'all'}',
+      load: () async => _data(
+        await _api.get(
+          '/student/inquiries',
+          queryParameters: {
+            if (status != null && status.isNotEmpty) 'status': status,
+          },
+        ),
+      ),
     );
-    return _data(response);
   }
 
   Future<Map<String, dynamic>> inquiryOptions() async {
-    final response = await _api.get('/student/inquiries/options');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.inquiries.options',
+      load: () async => _data(await _api.get('/student/inquiries/options')),
+    );
   }
 
   Future<Map<String, dynamic>> inquiryDetails(int id) async {
-    final response = await _api.get('/student/inquiries/$id');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.inquiry.$id',
+      load: () async => _data(await _api.get('/student/inquiries/$id')),
+    );
   }
 
   Future<String> createInquiry({
@@ -738,8 +1036,12 @@ class StudentContentRepository {
   }
 
   Future<Map<String, dynamic>> profile() async {
-    final response = await _api.get('/student/me');
-    return _data(response);
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.profile',
+      load: () async => _data(await _api.get('/student/me')),
+      maxAge: const Duration(hours: 24),
+    );
   }
 
   Future<Map<String, dynamic>> updateEmail({
@@ -770,10 +1072,38 @@ class StudentContentRepository {
   }
 }
 
+Future<Map<String, dynamic>> _cachedMap({
+  required OfflineCacheService cache,
+  required String key,
+  required Future<Map<String, dynamic>> Function() load,
+  Duration maxAge = OfflineCacheService.maxOfflineAge,
+}) async {
+  try {
+    final data = await load();
+    await cache.writeMap(key, data);
+    return data;
+  } on ApiException catch (error) {
+    if (!error.isOffline) rethrow;
+    final cached = await cache.readMap(key, maxAge: maxAge);
+    if (cached != null) return cached;
+    throw ApiException(
+      'لا توجد بيانات محفوظة لهذه الصفحة. يرجى الاتصال بالإنترنت للتحديث.',
+      isOffline: true,
+      statusCode: error.statusCode,
+    );
+  }
+}
+
 Map<String, dynamic> _data(Map<String, dynamic> response) {
   final data = response['data'];
   if (data is Map<String, dynamic>) return data;
   throw const ApiException('استجابة غير مكتملة من الخادم.');
+}
+
+Map<String, dynamic> _flexData(Map<String, dynamic> response) {
+  final data = response['data'];
+  if (data is Map<String, dynamic>) return data;
+  return response;
 }
 
 List<dynamic> _listData(Map<String, dynamic> response) {

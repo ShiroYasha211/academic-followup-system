@@ -180,6 +180,16 @@ class _DelegateSharedLibraryScreenState
                         itemBuilder: (ctx, i) => _SharedResourceGridCard(
                           resource: asMap(tabItems[i]),
                           canImport: true,
+                          onDetails: () => _showDelegateResourceDetails(
+                            context,
+                            asMap(tabItems[i]),
+                            section: 'DelegateSharedLibrary',
+                            onImport: () => _showImportSheet(
+                              context,
+                              asMap(tabItems[i]),
+                              subjects,
+                            ),
+                          ),
                           onImport: () => _showImportSheet(
                             context,
                             asMap(tabItems[i]),
@@ -197,6 +207,16 @@ class _DelegateSharedLibraryScreenState
                       itemBuilder: (ctx, i) => _SharedResourceCard(
                         resource: asMap(tabItems[i]),
                         canImport: true,
+                        onDetails: () => _showDelegateResourceDetails(
+                          context,
+                          asMap(tabItems[i]),
+                          section: 'DelegateSharedLibrary',
+                          onImport: () => _showImportSheet(
+                            context,
+                            asMap(tabItems[i]),
+                            subjects,
+                          ),
+                        ),
                         onImport: () => _showImportSheet(
                           context,
                           asMap(tabItems[i]),
@@ -449,11 +469,13 @@ class _IconButton extends StatelessWidget {
 class _SharedResourceCard extends StatelessWidget {
   const _SharedResourceCard({
     required this.resource,
+    required this.onDetails,
     required this.onImport,
     required this.onPreview,
     this.canImport = true,
   });
   final Map<String, dynamic> resource;
+  final VoidCallback onDetails;
   final VoidCallback onImport;
   final VoidCallback onPreview;
   final bool canImport;
@@ -462,73 +484,77 @@ class _SharedResourceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cat = text(resource, 'category');
     final color = _getSharedCategoryColor(cat);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.slate200),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
+    return InkWell(
+      onTap: onDetails,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.slate200),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(_getSharedCategoryIcon(cat), color: color, size: 24),
             ),
-            child: Icon(_getSharedCategoryIcon(cat), color: color, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    text(resource, 'title'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    text(
+                      asMap(resource['subject']),
+                      'name',
+                      fallback: 'مورد مكتبة',
+                    ),
+                    style: TextStyle(color: AppColors.slate500, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Row(
               children: [
-                Text(
-                  text(resource, 'title'),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                IconButton(
+                  onPressed: onPreview,
+                  icon: const Icon(
+                    Icons.visibility_outlined,
+                    size: 20,
+                    color: AppColors.slate500,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  text(
-                    asMap(resource['subject']),
-                    'name',
-                    fallback: 'مورد مكتبة',
+                IconButton(
+                  onPressed: onImport,
+                  icon: Opacity(
+                    opacity: canImport ? 1.0 : 0.5,
+                    child: const Icon(
+                      Icons.library_add_rounded,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
                   ),
-                  style: TextStyle(color: AppColors.slate500, fontSize: 12),
                 ),
               ],
             ),
-          ),
-          Row(
-            children: [
-              IconButton(
-                onPressed: onPreview,
-                icon: const Icon(
-                  Icons.visibility_outlined,
-                  size: 20,
-                  color: AppColors.slate500,
-                ),
-              ),
-              IconButton(
-                onPressed: onImport,
-                icon: Opacity(
-                  opacity: canImport ? 1.0 : 0.5,
-                  child: const Icon(
-                    Icons.library_add_rounded,
-                    size: 20,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -537,11 +563,13 @@ class _SharedResourceCard extends StatelessWidget {
 class _SharedResourceGridCard extends StatelessWidget {
   const _SharedResourceGridCard({
     required this.resource,
+    required this.onDetails,
     required this.onImport,
     required this.onPreview,
     this.canImport = true,
   });
   final Map<String, dynamic> resource;
+  final VoidCallback onDetails;
   final VoidCallback onImport;
   final VoidCallback onPreview;
   final bool canImport;
@@ -550,79 +578,83 @@ class _SharedResourceGridCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cat = text(resource, 'category');
     final color = _getSharedCategoryColor(cat);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.slate200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(18),
+    return InkWell(
+      onTap: onDetails,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.slate200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(_getSharedCategoryIcon(cat), color: color, size: 36),
             ),
-            child: Icon(_getSharedCategoryIcon(cat), color: color, size: 36),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  text(resource, 'title'),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+            const SizedBox(height: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    text(resource, 'title'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 4),
+                  Text(
+                    text(asMap(resource['subject']), 'name', fallback: 'مادة'),
+                    style: TextStyle(color: AppColors.slate500, fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: onPreview,
+                  icon: const Icon(Icons.visibility_outlined, size: 14),
+                  label: const Text('عرض', style: TextStyle(fontSize: 11)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.slate600,
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  text(asMap(resource['subject']), 'name', fallback: 'مادة'),
-                  style: TextStyle(color: AppColors.slate500, fontSize: 11),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                IconButton(
+                  onPressed: onImport,
+                  icon: Opacity(
+                    opacity: canImport ? 1.0 : 0.5,
+                    child: const Icon(
+                      Icons.library_add_rounded,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
-          ),
-          const Divider(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              TextButton.icon(
-                onPressed: onPreview,
-                icon: const Icon(Icons.visibility_outlined, size: 14),
-                label: const Text('عرض', style: TextStyle(fontSize: 11)),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.slate600,
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                ),
-              ),
-              IconButton(
-                onPressed: onImport,
-                icon: Opacity(
-                  opacity: canImport ? 1.0 : 0.5,
-                  child: const Icon(
-                    Icons.library_add_rounded,
-                    size: 18,
-                    color: AppColors.primary,
-                  ),
-                ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

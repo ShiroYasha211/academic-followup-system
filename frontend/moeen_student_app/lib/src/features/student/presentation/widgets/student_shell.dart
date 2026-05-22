@@ -36,16 +36,18 @@ final studentUnreadNotificationsCountProvider = FutureProvider.autoDispose<int>(
 
 final studentUnreadScreenCountsProvider =
     FutureProvider.autoDispose<Map<String, int>>((ref) async {
-  final data = await ref
-      .watch(studentContentRepositoryProvider)
-      .unreadNotificationsCount();
-  final raw = data['by_screen'];
-  if (raw is! Map) return const <String, int>{};
-  return raw.map((key, value) {
-    final count = value is num ? value.toInt() : int.tryParse('$value') ?? 0;
-    return MapEntry(key.toString(), count);
-  });
-});
+      final data = await ref
+          .watch(studentContentRepositoryProvider)
+          .unreadNotificationsCount();
+      final raw = data['by_screen'];
+      if (raw is! Map) return const <String, int>{};
+      return raw.map((key, value) {
+        final count = value is num
+            ? value.toInt()
+            : int.tryParse('$value') ?? 0;
+        return MapEntry(key.toString(), count);
+      });
+    });
 
 final studentUnreadMessagesCountProvider = FutureProvider.autoDispose<int>((
   ref,
@@ -65,6 +67,27 @@ final studentUnreadMessagesCountProvider = FutureProvider.autoDispose<int>((
   });
 });
 
+final studentStarsBalanceProvider = FutureProvider.autoDispose<int>((
+  ref,
+) async {
+  final data = await ref.watch(studentContentRepositoryProvider).stars();
+  final rawBalance = data['balance'];
+  final balance = rawBalance is Map
+      ? rawBalance.map((key, value) => MapEntry(key.toString(), value))
+      : const <String, dynamic>{};
+  final raw =
+      balance['available'] ??
+      balance['current'] ??
+      balance['balance'] ??
+      data['available'] ??
+      data['current'] ??
+      data['balance'] ??
+      data['stars'] ??
+      0;
+  if (raw is num) return raw.toInt();
+  return int.tryParse(raw.toString()) ?? 0;
+});
+
 class StudentShell extends ConsumerStatefulWidget {
   const StudentShell({
     super.key,
@@ -72,12 +95,18 @@ class StudentShell extends ConsumerStatefulWidget {
     required this.title,
     required this.child,
     this.floatingActionButton,
+    this.safeAreaBottom = true,
+    this.parentRoute,
+    this.onBackPressed,
   });
 
   final int currentIndex;
   final String title;
   final Widget child;
   final Widget? floatingActionButton;
+  final bool safeAreaBottom;
+  final String? parentRoute;
+  final Future<bool> Function()? onBackPressed;
 
   @override
   ConsumerState<StudentShell> createState() => _StudentShellState();
@@ -86,6 +115,7 @@ class StudentShell extends ConsumerStatefulWidget {
 class _StudentShellState extends ConsumerState<StudentShell>
     with WidgetsBindingObserver {
   Timer? _refreshTimer;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -115,6 +145,53 @@ class _StudentShellState extends ConsumerState<StudentShell>
     ref.invalidate(studentUnreadNotificationsCountProvider);
     ref.invalidate(studentUnreadScreenCountsProvider);
     ref.invalidate(studentUnreadMessagesCountProvider);
+    ref.invalidate(studentStarsBalanceProvider);
+  }
+
+  Future<void> _handleSystemBack() async {
+    final customBack = widget.onBackPressed;
+    if (customBack != null && await customBack()) {
+      return;
+    }
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    final parentRoute = widget.parentRoute;
+    if (parentRoute != null && parentRoute.isNotEmpty) {
+      context.go(parentRoute);
+      return;
+    }
+    if (widget.currentIndex != 0) {
+      context.go(StudentDashboardScreen.route);
+      return;
+    }
+    final close = await showMoeenConfirmDialog(
+      context: context,
+      title: 'إغلاق التطبيق',
+      message: 'هل تريد الخروج من تطبيق معين؟',
+      confirmLabel: 'إغلاق',
+      icon: Icons.power_settings_new_rounded,
+      color: AppColors.royalBlue,
+    );
+    if (close) await SystemNavigator.pop();
+  }
+
+  Future<void> _handleAppBarLeading() async {
+    final customBack = widget.onBackPressed;
+    if (customBack != null && await customBack()) {
+      return;
+    }
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    final parentRoute = widget.parentRoute;
+    if (parentRoute != null && parentRoute.isNotEmpty) {
+      context.go(parentRoute);
+      return;
+    }
+    _scaffoldKey.currentState?.openDrawer();
   }
 
   @override
@@ -122,38 +199,32 @@ class _StudentShellState extends ConsumerState<StudentShell>
     final session = ref.watch(authControllerProvider).valueOrNull;
     final unreadNotifications =
         ref.watch(studentUnreadNotificationsCountProvider).valueOrNull ?? 0;
+    final starsBalance =
+        ref.watch(studentStarsBalanceProvider).valueOrNull ?? 0;
+    final hasBackTarget =
+        context.canPop() ||
+        widget.onBackPressed != null ||
+        (widget.parentRoute != null && widget.parentRoute!.isNotEmpty);
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        if (context.canPop()) {
-          context.pop();
-          return;
-        }
-        if (widget.currentIndex != 0) {
-          context.go(StudentDashboardScreen.route);
-          return;
-        }
-        final close = await showMoeenConfirmDialog(
-          context: context,
-          title: 'إغلاق التطبيق',
-          message: 'هل تريد الخروج من تطبيق معين؟',
-          confirmLabel: 'إغلاق',
-          icon: Icons.power_settings_new_rounded,
-          color: AppColors.royalBlue,
-        );
-        if (close) await SystemNavigator.pop();
+        await _handleSystemBack();
       },
       child: Scaffold(
+        key: _scaffoldKey,
         extendBodyBehindAppBar: true,
         backgroundColor: AppColors.cream,
         appBar: _PremiumAppBar(
           title: widget.title,
           session: session,
           unreadNotifications: unreadNotifications,
+          starsBalance: starsBalance,
+          hasBackTarget: hasBackTarget,
+          onLeadingPressed: () => unawaited(_handleAppBarLeading()),
         ),
-        body: SafeArea(bottom: false, child: widget.child),
+        body: SafeArea(bottom: widget.safeAreaBottom, child: widget.child),
         floatingActionButton: widget.floatingActionButton,
         drawer: _StudentDrawer(currentIndex: widget.currentIndex),
       ),
@@ -166,10 +237,16 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     required this.session,
     required this.unreadNotifications,
+    required this.starsBalance,
+    required this.hasBackTarget,
+    required this.onLeadingPressed,
   });
   final String title;
   final AuthSession? session;
   final int unreadNotifications;
+  final int starsBalance;
+  final bool hasBackTarget;
+  final VoidCallback onLeadingPressed;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 8);
@@ -194,17 +271,13 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: IconButton(
-                onPressed: () => context.canPop()
-                    ? context.pop()
-                    : Scaffold.of(context).openDrawer(),
+                onPressed: onLeadingPressed,
                 icon: Icon(
-                  context.canPop()
-                      ? Icons.arrow_back_rounded
-                      : Icons.menu_rounded,
+                  hasBackTarget ? Icons.arrow_back_rounded : Icons.menu_rounded,
                   color: AppColors.royalBlue,
                   size: 22,
                 ),
-                tooltip: context.canPop() ? 'رجوع' : 'القائمة',
+                tooltip: hasBackTarget ? 'رجوع' : 'القائمة',
               ),
             ),
           ),
@@ -233,6 +306,43 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
             ],
           ),
           actions: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+              child: InkWell(
+                onTap: () => context.go(StudentStarsScreen.route),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  height: 42,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppColors.gold.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.stars_rounded,
+                        color: AppColors.goldDeep,
+                        size: 19,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        starsBalance > 999 ? '999+' : starsBalance.toString(),
+                        style: const TextStyle(
+                          color: AppColors.royalBlueDark,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
               child: Stack(
@@ -371,7 +481,7 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           Icons.qr_code_scanner_rounded,
           20,
           StudentQrScanScreen.route,
-          true,
+          false,
         ),
       ]),
       _DrawerGroup('حساب الطالب', [
@@ -456,13 +566,6 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
         ),
         _DrawerItem(
           'المكتبة المشتركة',
-          Icons.upload_file_rounded,
-          21,
-          StudentSubjectsScreen.route,
-          true,
-        ),
-        _DrawerItem(
-          'ط§ظ„ظ…ظƒطھط¨ط© ط§ظ„ظ…ط´طھط±ظƒط©',
           Icons.library_books_rounded,
           12,
           StudentLibraryScreen.route,
@@ -520,6 +623,13 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           Icons.stars_rounded,
           8,
           StudentStarsScreen.route,
+          true,
+        ),
+        _DrawerItem(
+          'مزرعة الأشجار',
+          Icons.park_rounded,
+          35,
+          StudentTreeFarmScreen.route,
           true,
         ),
       ]),
@@ -793,9 +903,6 @@ int _badgeForRoute(String route, Map<String, int> unreadByScreen) {
 }
 
 String _drawerLabel(_DrawerItem item) {
-  if (item.index == 21) {
-    return String.fromCharCodes([1585, 1601, 1593, 32, 1593, 1584, 1585]);
-  }
   if (item.index == 12) {
     return String.fromCharCodes([
       1575,
@@ -837,14 +944,15 @@ class _WorkspaceSwitchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final item = _DrawerItem(this.label, icon, 0, '', false);
-    final label = item.index == 21
-        ? 'رفع عذر'
-        : (item.index == 12 ? 'المكتبة المشتركة' : item.label);
+    final label = item.index == 12 ? 'المكتبة المشتركة' : item.label;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [color.withValues(alpha: 0.12), AppColors.gold.withValues(alpha: 0.12)],
+          colors: [
+            color.withValues(alpha: 0.12),
+            AppColors.gold.withValues(alpha: 0.12),
+          ],
         ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: color.withValues(alpha: 0.18)),
@@ -876,7 +984,10 @@ class _WorkspaceSwitchTile extends StatelessWidget {
             fontSize: 11,
           ),
         ),
-        trailing: const Icon(Icons.swap_horiz_rounded, color: AppColors.slate400),
+        trailing: const Icon(
+          Icons.swap_horiz_rounded,
+          color: AppColors.slate400,
+        ),
       ),
     );
   }
@@ -965,9 +1076,7 @@ class _DrawerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // ignore: unused_local_variable
-    final label = item.index == 21
-        ? 'رفع عذر'
-        : (item.index == 12 ? 'المكتبة المشتركة' : item.label);
+    final label = item.index == 12 ? 'المكتبة المشتركة' : item.label;
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(

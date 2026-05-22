@@ -191,6 +191,7 @@ class _StudentResourcesScreenState extends ConsumerState<StudentResourcesScreen>
               itemBuilder: (ctx, i) => _CourseResourceGridCard(
                 item: filtered[i],
                 onDownload: () => _downloadDirect(context, filtered[i]),
+                onOpen: () => _openDirect(context, filtered[i]),
               ),
             );
           }
@@ -202,6 +203,7 @@ class _StudentResourcesScreenState extends ConsumerState<StudentResourcesScreen>
             itemBuilder: (ctx, i) => _CourseResourceCard(
               item: filtered[i],
               onDownload: () => _downloadDirect(context, filtered[i]),
+              onOpen: () => _openDirect(context, filtered[i]),
             ),
           );
         }).toList(),
@@ -223,7 +225,46 @@ class _StudentResourcesScreenState extends ConsumerState<StudentResourcesScreen>
       context,
       url,
       text(item, 'title', fallback: 'resource'),
+      section: 'CourseResources',
     );
+  }
+
+  Future<void> _openDirect(
+    BuildContext context,
+    Map<String, dynamic> item,
+  ) async {
+    final path = text(item, 'file_path');
+    if (path.isEmpty) return;
+
+    final url = absoluteUrl(
+      path.startsWith('storage/') ? path : 'storage/$path',
+    );
+    final fileName = _downloadFileName(
+      url,
+      text(item, 'title', fallback: 'resource'),
+    );
+    String? opened;
+    try {
+      opened = await DownloadService.openMoeenFile(
+        fileName: fileName,
+        section: 'CourseResources',
+      );
+    } catch (_) {
+      opened = null;
+    }
+    if (!context.mounted || opened != null) return;
+
+    final downloadNow = await showMoeenConfirmDialog(
+      context: context,
+      title: 'الملف غير محمل',
+      message: 'هذا الملف غير موجود في جهازك. هل تريد تحميله الآن؟',
+      confirmLabel: 'تحميل الآن',
+      icon: Icons.download_rounded,
+      color: AppColors.royalBlue,
+    );
+    if (downloadNow && context.mounted) {
+      await _downloadDirect(context, item);
+    }
   }
 
   Future<void> _showAdvancedFilters(

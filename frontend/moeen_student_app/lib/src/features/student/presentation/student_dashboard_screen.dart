@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/moeen_dialogs.dart';
 import '../../auth/logic/auth_controller.dart';
 import '../data/models/student_dashboard.dart';
 import '../logic/student_controllers.dart';
@@ -800,12 +801,7 @@ class _FeedSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _FeedCategory(
-          title: 'آخر الإعلانات',
-          icon: Icons.campaign_rounded,
-          color: AppColors.orange,
-          items: feed.announcements.map((e) => (e.title, e.content)).toList(),
-        ),
+        _AnnouncementsPreview(items: feed.announcements.take(3).toList()),
         const SizedBox(height: 24),
         _FeedCategory(
           title: 'التذكيرات',
@@ -816,6 +812,155 @@ class _FeedSection extends StatelessWidget {
       ],
     );
   }
+}
+
+class _AnnouncementsPreview extends StatelessWidget {
+  const _AnnouncementsPreview({required this.items});
+
+  final List<DashboardAnnouncement> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.campaign_rounded,
+                color: AppColors.orange,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'آخر الإعلانات',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.midnight,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => context.go(StudentNewsScreen.route),
+                icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                label: const Text('رؤية المزيد'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (items.isEmpty)
+          const EmptyState(message: 'لا توجد إعلانات جديدة حاليًا.')
+        else
+          ...items.map((item) => _DashboardAnnouncementCard(item: item)),
+      ],
+    );
+  }
+}
+
+class _DashboardAnnouncementCard extends StatelessWidget {
+  const _DashboardAnnouncementCard({required this.item});
+
+  final DashboardAnnouncement item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.orange.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.midnight.withValues(alpha: 0.03),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ListTile(
+        onTap: () => _showDashboardAnnouncementDetails(context, item),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: AppColors.orange.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(Icons.campaign_rounded, color: AppColors.orange),
+        ),
+        title: Text(
+          item.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.midnight,
+            fontWeight: FontWeight.w900,
+            fontSize: 14,
+          ),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            item.content,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.slate500,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
+          ),
+        ),
+        trailing: const Icon(
+          Icons.chevron_left_rounded,
+          color: AppColors.slate400,
+        ),
+      ),
+    );
+  }
+}
+
+void _showDashboardAnnouncementDetails(
+  BuildContext context,
+  DashboardAnnouncement item,
+) {
+  showMoeenBottomSheet(
+    context: context,
+    title: item.title,
+    icon: Icons.campaign_rounded,
+    color: AppColors.orange,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          item.content,
+          style: const TextStyle(
+            color: AppColors.slate700,
+            height: 1.6,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        if (item.createdAt.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text(
+            item.createdAt,
+            style: const TextStyle(
+              color: AppColors.slate400,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
 }
 
 class _FeedCategory extends StatelessWidget {

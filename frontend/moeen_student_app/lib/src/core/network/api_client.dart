@@ -32,28 +32,31 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> post(String path, {Object? data}) async {
-    return _send(() => _dio.post<Object?>(path, data: data));
+    return _send(
+      () => _dio.post<Object?>(path, data: data),
+      writeOperation: true,
+    );
   }
 
-  Future<Map<String, dynamic>> put(
-    String path, {
-    Object? data,
-  }) async {
-    return _send(() => _dio.put<Object?>(path, data: data));
+  Future<Map<String, dynamic>> put(String path, {Object? data}) async {
+    return _send(
+      () => _dio.put<Object?>(path, data: data),
+      writeOperation: true,
+    );
   }
 
-  Future<Map<String, dynamic>> patch(
-    String path, {
-    Object? data,
-  }) async {
-    return _send(() => _dio.patch<Object?>(path, data: data));
+  Future<Map<String, dynamic>> patch(String path, {Object? data}) async {
+    return _send(
+      () => _dio.patch<Object?>(path, data: data),
+      writeOperation: true,
+    );
   }
 
-  Future<Map<String, dynamic>> delete(
-    String path, {
-    Object? data,
-  }) async {
-    return _send(() => _dio.delete<Object?>(path, data: data));
+  Future<Map<String, dynamic>> delete(String path, {Object? data}) async {
+    return _send(
+      () => _dio.delete<Object?>(path, data: data),
+      writeOperation: true,
+    );
   }
 
   Future<List<int>> getBytes(
@@ -100,11 +103,13 @@ class ApiClient {
           errors: data['errors'],
         );
       }
+      final isOffline = _isOfflineError(error);
       throw ApiException(
-        error.type == DioExceptionType.connectionError
-            ? 'تعذر الاتصال بالخادم. تحقق من الإنترنت أو رابط السيرفر.'
+        isOffline
+            ? 'تعذر الاتصال بالإنترنت. سيتم عرض البيانات المحفوظة إن وجدت.'
             : 'حدث خطأ أثناء تحميل الملف.',
         statusCode: error.response?.statusCode,
+        isOffline: isOffline,
       );
     }
   }
@@ -117,18 +122,21 @@ class ApiClient {
       );
       return response.data ?? const [];
     } on DioException catch (error) {
+      final isOffline = _isOfflineError(error);
       throw ApiException(
-        error.type == DioExceptionType.connectionError
-            ? 'تعذر الاتصال بالخادم. تحقق من الإنترنت أو رابط السيرفر.'
+        isOffline
+            ? 'يرجى الاتصال بالإنترنت لتنفيذ هذه العملية.'
             : 'حدث خطأ أثناء تحميل الملف.',
         statusCode: error.response?.statusCode,
+        isOffline: isOffline,
       );
     }
   }
 
   Future<Map<String, dynamic>> _send(
-    Future<Response<Object?>> Function() request,
-  ) async {
+    Future<Response<Object?>> Function() request, {
+    bool writeOperation = false,
+  }) async {
     try {
       final response = await request();
       final body = response.data;
@@ -145,12 +153,24 @@ class ApiClient {
           errors: data['errors'],
         );
       }
+      final isOffline = _isOfflineError(error);
       throw ApiException(
-        error.type == DioExceptionType.connectionError
-            ? 'تعذر الاتصال بالخادم. تحقق من الإنترنت أو رابط السيرفر.'
+        isOffline
+            ? (writeOperation
+                  ? 'يرجى الاتصال بالإنترنت لتنفيذ هذه العملية.'
+                  : 'تعذر الاتصال بالإنترنت. سيتم عرض البيانات المحفوظة إن وجدت.')
             : 'حدث خطأ أثناء الاتصال بالخادم.',
         statusCode: error.response?.statusCode,
+        isOffline: isOffline,
       );
     }
+  }
+
+  static bool _isOfflineError(DioException error) {
+    return error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.sendTimeout ||
+        error.type == DioExceptionType.unknown;
   }
 }

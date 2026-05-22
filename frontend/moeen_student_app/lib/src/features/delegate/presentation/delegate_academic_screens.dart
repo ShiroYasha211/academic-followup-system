@@ -525,35 +525,37 @@ class _AddScheduleFAB extends StatelessWidget {
     return Opacity(
       opacity: isEnabled ? 1.0 : 0.5,
       child: Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.35),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.35),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: isEnabled ? onPressed : onUnauthorized,
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-        ],
-      ),
-      child: FloatingActionButton.extended(
-        onPressed: isEnabled ? onPressed : onUnauthorized,
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
-        label: const Text(
-          'إضافة للجدول',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-            fontSize: 15,
-            letterSpacing: 0.5,
+          icon: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
+          label: const Text(
+            'إضافة للجدول',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 15,
+              letterSpacing: 0.5,
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 class _IconInfo extends StatelessWidget {
@@ -670,8 +672,7 @@ class DelegateExamSchedulesScreen extends ConsumerWidget {
                     canUpdate: canUpdate,
                     canDelete: canDelete,
                     onUnauthorized: () => _showNoPermissionSnackBar(context),
-                    onEdit: () =>
-                        _examSheet(context, ref, item: schedule),
+                    onEdit: () => _examSheet(context, ref, item: schedule),
                     onDelete: () => _delete(
                       context,
                       () => ref
@@ -719,8 +720,9 @@ class _AddExamFAB extends StatelessWidget {
           onPressed: isEnabled ? onPressed : onUnauthorized,
           backgroundColor: AppColors.danger,
           elevation: 0,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           icon: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
           label: const Text(
             'جدول اختبار',
@@ -1100,14 +1102,13 @@ class _AssignmentListView extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 100),
       itemCount: items.length,
-      itemBuilder: (context, i) =>
-          _DelegateAssignmentCard(
-            item: items[i],
-            ref: ref,
-            canUpdate: canUpdate,
-            canDelete: canDelete,
-            onUnauthorized: () => _showNoPermissionSnackBar(context),
-          ),
+      itemBuilder: (context, i) => _DelegateAssignmentCard(
+        item: items[i],
+        ref: ref,
+        canUpdate: canUpdate,
+        canDelete: canDelete,
+        onUnauthorized: () => _showNoPermissionSnackBar(context),
+      ),
     );
   }
 }
@@ -1350,15 +1351,18 @@ class DelegateResourcesScreen extends ConsumerStatefulWidget {
   static const route = DelegateRoutes.resources;
 
   @override
-  ConsumerState<DelegateResourcesScreen> createState() => _DelegateResourcesScreenState();
+  ConsumerState<DelegateResourcesScreen> createState() =>
+      _DelegateResourcesScreenState();
 }
 
-class _DelegateResourcesScreenState extends ConsumerState<DelegateResourcesScreen> with SingleTickerProviderStateMixin {
+class _DelegateResourcesScreenState
+    extends ConsumerState<DelegateResourcesScreen>
+    with SingleTickerProviderStateMixin {
   final _search = TextEditingController();
   late TabController _tabController;
   bool _isGrid = false;
   int? _subjectId;
-  
+
   final List<Map<String, String>> _categories = [
     {'value': 'all', 'label': 'الكل'},
     {'value': 'book', 'label': 'الكتب'},
@@ -1396,7 +1400,10 @@ class _DelegateResourcesScreenState extends ConsumerState<DelegateResourcesScree
         child: FloatingActionButton.extended(
           onPressed: () => _resourceSheet(context, ref),
           icon: const Icon(Icons.cloud_upload_rounded),
-          label: const Text('رفع ملف', style: TextStyle(fontWeight: FontWeight.bold)),
+          label: const Text(
+            'رفع ملف',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           backgroundColor: const Color(0xFF0D9488),
           foregroundColor: Colors.white,
         ),
@@ -1412,13 +1419,23 @@ class _DelegateResourcesScreenState extends ConsumerState<DelegateResourcesScree
           // Local Filtering
           final catValue = _categories[_tabController.index]['value'];
           final filtered = allResources.where((r) {
-            final matchesSearch = _search.text.isEmpty ||
-                text(r, 'title').toLowerCase().contains(_search.text.toLowerCase()) ||
-                text(asMap(r['subject']), 'name').toLowerCase().contains(_search.text.toLowerCase());
+            final matchesSearch =
+                _search.text.isEmpty ||
+                text(
+                  r,
+                  'title',
+                ).toLowerCase().contains(_search.text.toLowerCase()) ||
+                text(
+                  asMap(r['subject']),
+                  'name',
+                ).toLowerCase().contains(_search.text.toLowerCase());
 
-            final matchesSubject = _subjectId == null || number(r, 'subject_id').toInt() == _subjectId;
+            final matchesSubject =
+                _subjectId == null ||
+                number(r, 'subject_id').toInt() == _subjectId;
 
-            final matchesCategory = catValue == 'all' || text(r, 'category') == catValue;
+            final matchesCategory =
+                catValue == 'all' || text(r, 'category') == catValue;
 
             return matchesSearch && matchesSubject && matchesCategory;
           }).toList();
@@ -1473,14 +1490,21 @@ class _DelegateResourcesScreenState extends ConsumerState<DelegateResourcesScree
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF0D9488).withValues(alpha: 0.2),
+                              color: const Color(
+                                0xFF0D9488,
+                              ).withValues(alpha: 0.2),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
                           ],
                         ),
-                        labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
-                        tabs: _categories.map((c) => Tab(text: c['label'])).toList(),
+                        labelStyle: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                        tabs: _categories
+                            .map((c) => Tab(text: c['label']))
+                            .toList(),
                       ),
                     ),
                   ),
@@ -1495,9 +1519,19 @@ class _DelegateResourcesScreenState extends ConsumerState<DelegateResourcesScree
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.folder_open_rounded, size: 64, color: AppColors.slate300),
+                        Icon(
+                          Icons.folder_open_rounded,
+                          size: 64,
+                          color: AppColors.slate300,
+                        ),
                         SizedBox(height: 16),
-                        Text('لا توجد ملفات تطابق بحثك', style: TextStyle(color: AppColors.slate500, fontWeight: FontWeight.bold)),
+                        Text(
+                          'لا توجد ملفات تطابق بحثك',
+                          style: TextStyle(
+                            color: AppColors.slate500,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -1506,12 +1540,13 @@ class _DelegateResourcesScreenState extends ConsumerState<DelegateResourcesScree
                 if (_isGrid) {
                   return GridView.builder(
                     padding: const EdgeInsets.all(18),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 0.8,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio: 0.8,
+                        ),
                     itemCount: filtered.length,
                     itemBuilder: (ctx, i) => _DelegateResourceGridCard(
                       resource: filtered[i],
@@ -1543,7 +1578,10 @@ class _DelegateResourcesScreenState extends ConsumerState<DelegateResourcesScree
     );
   }
 
-  Future<void> _showFilterDialog(BuildContext context, List<Map<String, dynamic>> subjects) async {
+  Future<void> _showFilterDialog(
+    BuildContext context,
+    List<Map<String, dynamic>> subjects,
+  ) async {
     int? selected = _subjectId;
     final ok = await showMoeenBottomSheet<bool>(
       context: context,
@@ -1556,7 +1594,12 @@ class _DelegateResourcesScreenState extends ConsumerState<DelegateResourcesScree
             value: selected,
             items: [
               const DropdownMenuItem(value: null, child: Text('كل المواد')),
-              ...subjects.map((s) => DropdownMenuItem(value: number(s, 'id').toInt(), child: Text(text(s, 'name')))),
+              ...subjects.map(
+                (s) => DropdownMenuItem(
+                  value: number(s, 'id').toInt(),
+                  child: Text(text(s, 'name')),
+                ),
+              ),
             ],
             onChanged: (v) => selected = v,
             decoration: const InputDecoration(labelText: 'اختر المادة'),
@@ -1564,7 +1607,9 @@ class _DelegateResourcesScreenState extends ConsumerState<DelegateResourcesScree
           const SizedBox(height: 24),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0D9488)),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF0D9488),
+            ),
             child: const Text('تطبيق الفلترة'),
           ),
         ],
@@ -1597,17 +1642,38 @@ class _ResourcesStatsHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('المكتبة الرقمية 📚', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                const Text(
+                  'المكتبة الرقمية 📚',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                Text('إجمالي $total ملف متاح في $subjects مواد دراسية', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(
+                  'إجمالي $total ملف متاح في $subjects مواد دراسية',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
           Container(
             width: 50,
             height: 50,
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
-            child: const Icon(Icons.auto_stories_rounded, color: Colors.white, size: 26),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.auto_stories_rounded,
+              color: Colors.white,
+              size: 26,
+            ),
           ),
         ],
       ),
@@ -1639,14 +1705,23 @@ class _ResourceSearchRow extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: TextField(
               controller: controller,
               onSubmitted: (_) => onSearch(),
               decoration: const InputDecoration(
                 hintText: 'بحث في المصادر...',
-                prefixIcon: Icon(Icons.search_rounded, color: AppColors.slate400),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: AppColors.slate400,
+                ),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(vertical: 15),
               ),
@@ -1655,7 +1730,9 @@ class _ResourceSearchRow extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         _ResourceIconButton(
-          icon: isGrid ? Icons.format_list_bulleted_rounded : Icons.grid_view_rounded,
+          icon: isGrid
+              ? Icons.format_list_bulleted_rounded
+              : Icons.grid_view_rounded,
           onTap: onToggleView,
         ),
         const SizedBox(width: 8),
@@ -1680,7 +1757,13 @@ class _ResourceIconButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Icon(icon, color: AppColors.slate600, size: 24),
       ),
@@ -1716,14 +1799,33 @@ class _DelegateResourceCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () {}, // Download or preview
+        onTap: () => _showDelegateResourceDetails(
+          context,
+          resource,
+          section: 'DelegateCourseResources',
+          onEdit: canUpdate
+              ? () => _resourceSheet(context, ref, item: resource)
+              : onUnauthorized,
+          onDelete: canDelete
+              ? () => _delete(
+                  context,
+                  () => ref
+                      .read(delegateRepositoryProvider)
+                      .deleteResource(number(resource, 'id').toInt()),
+                  () => ref.invalidate(_delegateResourcesProvider),
+                )
+              : onUnauthorized,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 child: Icon(_getCategoryIcon(category), color: color, size: 24),
               ),
               const SizedBox(width: 16),
@@ -1731,9 +1833,23 @@ class _DelegateResourceCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(text(resource, 'title'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: AppColors.midnight)),
+                    Text(
+                      text(resource, 'title'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                        color: AppColors.midnight,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(text(subject, 'name', fallback: 'مادة'), style: const TextStyle(color: AppColors.slate500, fontSize: 11, fontWeight: FontWeight.w600)),
+                    Text(
+                      text(subject, 'name', fallback: 'مادة'),
+                      style: const TextStyle(
+                        color: AppColors.slate500,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1741,7 +1857,9 @@ class _DelegateResourceCard extends StatelessWidget {
                 onEdit: () => _resourceSheet(context, ref, item: resource),
                 onDelete: () => _delete(
                   context,
-                  () => ref.read(delegateRepositoryProvider).deleteResource(number(resource, 'id').toInt()),
+                  () => ref
+                      .read(delegateRepositoryProvider)
+                      .deleteResource(number(resource, 'id').toInt()),
                   () => ref.invalidate(_delegateResourcesProvider),
                 ),
                 canUpdate: canUpdate,
@@ -1781,54 +1899,97 @@ class _DelegateResourceGridCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.slate200),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-                  child: Icon(_getCategoryIcon(category), color: color, size: 32),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  text(resource, 'title'),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppColors.midnight),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  text(subject, 'name', fallback: 'مادة'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppColors.slate500, fontSize: 10, fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            top: 4,
-            left: 4,
-            child: _ActionMenu(
-              onEdit: () => _resourceSheet(context, ref, item: resource),
-              onDelete: () => _delete(
-                context,
-                () => ref.read(delegateRepositoryProvider).deleteResource(number(resource, 'id').toInt()),
-                () => ref.invalidate(_delegateResourcesProvider),
-              ),
-              canUpdate: canUpdate,
-              canDelete: canDelete,
-              onUnauthorized: onUnauthorized,
-            ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: () => _showDelegateResourceDetails(
+          context,
+          resource,
+          section: 'DelegateCourseResources',
+          onEdit: canUpdate
+              ? () => _resourceSheet(context, ref, item: resource)
+              : onUnauthorized,
+          onDelete: canDelete
+              ? () => _delete(
+                  context,
+                  () => ref
+                      .read(delegateRepositoryProvider)
+                      .deleteResource(number(resource, 'id').toInt()),
+                  () => ref.invalidate(_delegateResourcesProvider),
+                )
+              : onUnauthorized,
+        ),
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _getCategoryIcon(category),
+                      color: color,
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    text(resource, 'title'),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      color: AppColors.midnight,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    text(subject, 'name', fallback: 'مادة'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.slate500,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 4,
+              left: 4,
+              child: _ActionMenu(
+                onEdit: () => _resourceSheet(context, ref, item: resource),
+                onDelete: () => _delete(
+                  context,
+                  () => ref
+                      .read(delegateRepositoryProvider)
+                      .deleteResource(number(resource, 'id').toInt()),
+                  () => ref.invalidate(_delegateResourcesProvider),
+                ),
+                canUpdate: canUpdate,
+                canDelete: canDelete,
+                onUnauthorized: onUnauthorized,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

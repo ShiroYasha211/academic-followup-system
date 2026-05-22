@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/notifications/push_notification_service.dart';
 import '../../../core/router/landing_route.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/moeen_logo.dart';
@@ -44,6 +45,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (!mounted) return;
     final session = await ref.read(authControllerProvider.future);
     if (!mounted) return;
+    await PushNotificationService.initialize();
+    if (!mounted) return;
+
+    final pendingPath = PushNotificationService.takePendingNavigationPath();
+    if (pendingPath != null) {
+      if (session == null) {
+        PushNotificationService.storePendingNavigationPath(pendingPath);
+        context.go(LoginScreen.route);
+      } else {
+        context.go(pendingPath);
+      }
+      return;
+    }
+
     context.go(session == null ? LoginScreen.route : landingRouteFor(session));
   }
 

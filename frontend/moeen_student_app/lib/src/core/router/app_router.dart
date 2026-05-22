@@ -8,9 +8,11 @@ import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/delegate/presentation/delegate_screens.dart';
 import '../../features/delegate/presentation/widgets/delegate_shell.dart';
 import '../../features/home/presentation/home_placeholder_screen.dart';
-import '../../features/practical_delegate/presentation/practical_delegate_screens.dart' hide asMap;
+import '../../features/practical_delegate/presentation/practical_delegate_screens.dart'
+    hide asMap;
 import '../../features/student/presentation/student_dashboard_screen.dart';
-import '../../features/student/presentation/student_content_screens.dart' hide asMap;
+import '../../features/student/presentation/student_content_screens.dart'
+    hide asMap;
 import '../../features/student/presentation/student_ledger_screen.dart';
 import '../../features/student/presentation/student_placeholder_screen.dart';
 import '../../features/student/presentation/student_subscription_screen.dart';
@@ -106,6 +108,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: StudentStarsScreen.route,
         builder: (context, state) => const StudentStarsScreen(),
+      ),
+      GoRoute(
+        path: StudentTreeFarmScreen.route,
+        builder: (context, state) => const StudentTreeFarmScreen(),
       ),
       GoRoute(
         path: StudentNotificationsScreen.route,
@@ -293,9 +299,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: DelegateRoutes.attendanceTracking,
-        builder: (context, state) => DelegateAttendanceTrackingScreen(
-          subject: asMap(state.extra),
-        ),
+        builder: (context, state) =>
+            DelegateAttendanceTrackingScreen(subject: asMap(state.extra)),
       ),
       GoRoute(
         path: DelegateRoutes.attendanceForm,
@@ -313,9 +318,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: DelegateRoutes.qrSession,
-        builder: (context, state) => DelegateQrSessionScreen(
-          sessionData: asMap(state.extra),
-        ),
+        builder: (context, state) =>
+            DelegateQrSessionScreen(sessionData: asMap(state.extra)),
       ),
       GoRoute(
         path: DelegateRoutes.absenceAlerts,

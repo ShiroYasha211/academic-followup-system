@@ -587,10 +587,32 @@ class _LectureTile extends ConsumerWidget {
                         onChanged: (val) async {
                           final id = number(lecture, 'id').toInt();
                           if (id <= 0) return;
-                          await ref
-                              .read(studentContentRepositoryProvider)
-                              .toggleLectureListen(id);
-                          ref.invalidate(_subjectDetailsProvider(subjectId));
+                          try {
+                            await ref
+                                .read(studentContentRepositoryProvider)
+                                .toggleLectureListen(id);
+                            ref.invalidate(_subjectDetailsProvider(subjectId));
+                          } on ApiException catch (error) {
+                            if (!context.mounted) return;
+                            await showMoeenInfoDialog(
+                              context: context,
+                              title: 'تعذر تحديث المحاضرة',
+                              message: error.message,
+                              icon: error.isOffline
+                                  ? Icons.wifi_off_rounded
+                                  : Icons.error_outline_rounded,
+                              color: AppColors.danger,
+                            );
+                          } catch (_) {
+                            if (!context.mounted) return;
+                            await showMoeenInfoDialog(
+                              context: context,
+                              title: 'تعذر تحديث المحاضرة',
+                              message: 'حدث خطأ غير متوقع. حاول مرة أخرى.',
+                              icon: Icons.error_outline_rounded,
+                              color: AppColors.danger,
+                            );
+                          }
                         },
                       ),
                     ),
@@ -1839,11 +1861,17 @@ class _IconInfo extends StatelessWidget {
 }
 
 class _NewsCard extends StatelessWidget {
-  const _NewsCard(this.item, {this.isLast = false, this.isPinned = false});
+  const _NewsCard(
+    this.item, {
+    this.isLast = false,
+    this.isPinned = false,
+    this.onOpen,
+  });
 
   final Map<String, dynamic> item;
   final bool isLast;
   final bool isPinned;
+  final Future<void> Function(Map<String, dynamic> item)? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -1878,7 +1906,11 @@ class _NewsCard extends StatelessWidget {
                     ],
                   ),
                   child: isPinned
-                      ? const Icon(Icons.push_pin_rounded, size: 8, color: Colors.white)
+                      ? const Icon(
+                          Icons.push_pin_rounded,
+                          size: 8,
+                          color: Colors.white,
+                        )
                       : null,
                 ),
                 if (!isLast)
@@ -1932,7 +1964,10 @@ class _NewsCard extends StatelessWidget {
               ),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
-                onTap: () => _showNewsDetails(context, item),
+                onTap: () async {
+                  await onOpen?.call(item);
+                  if (context.mounted) _showNewsDetails(context, item);
+                },
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1940,7 +1975,10 @@ class _NewsCard extends StatelessWidget {
                     if (isPinned)
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -1951,7 +1989,11 @@ class _NewsCard extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.push_pin_rounded, size: 14, color: AppColors.royalBlue),
+                            const Icon(
+                              Icons.push_pin_rounded,
+                              size: 14,
+                              color: AppColors.royalBlue,
+                            ),
                             const SizedBox(width: 6),
                             const Text(
                               'إعلان مثبت',
@@ -2743,10 +2785,15 @@ class _AttemptTile extends StatelessWidget {
     );
     final subjectName = text(attempt, 'subject_name', fallback: '');
     final modelName = text(attempt, 'model_name', fallback: '');
+    final resultsHidden =
+        attempt['results_hidden'] == true ||
+        text(attempt, 'results_visibility', fallback: '') == 'hidden';
     final score = number(attempt, 'score').toDouble();
     final maxScore = number(attempt, 'max_score').toDouble();
     final pct = number(attempt, 'percentage').toDouble();
-    final Color barColor = pct >= 70
+    final Color barColor = resultsHidden
+        ? AppColors.slate400
+        : pct >= 70
         ? AppColors.success
         : pct >= 50
         ? const Color(0xFFF59E0B)
@@ -2780,7 +2827,9 @@ class _AttemptTile extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      pct >= 50
+                      resultsHidden
+                          ? Icons.visibility_off_rounded
+                          : pct >= 50
                           ? Icons.check_circle_rounded
                           : Icons.cancel_rounded,
                       color: barColor,
@@ -2817,37 +2866,50 @@ class _AttemptTile extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        '${score.toStringAsFixed(0)}/${maxScore.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          color: barColor,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
+                      if (resultsHidden) ...[
+                        const Text(
+                          'النتيجة مخفية',
+                          style: TextStyle(
+                            color: AppColors.slate500,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '${pct.toStringAsFixed(0)}%',
-                        style: const TextStyle(
-                          color: AppColors.slate400,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
+                      ] else ...[
+                        Text(
+                          '${score.toStringAsFixed(0)}/${maxScore.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            color: barColor,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                          ),
                         ),
-                      ),
+                        Text(
+                          '${pct.toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            color: AppColors.slate400,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
               ),
               const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(99),
-                child: LinearProgressIndicator(
-                  value: pct / 100,
-                  minHeight: 6,
-                  backgroundColor: AppColors.slate100,
-                  valueColor: AlwaysStoppedAnimation(barColor),
+              if (!resultsHidden) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: pct / 100,
+                    minHeight: 6,
+                    backgroundColor: AppColors.slate100,
+                    valueColor: AlwaysStoppedAnimation(barColor),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
+                const SizedBox(height: 6),
+              ],
               Text(
                 dateOnly(text(attempt, 'submitted_at')),
                 style: const TextStyle(
@@ -3411,10 +3473,15 @@ class _TimelineIconInfo extends StatelessWidget {
 }
 
 class _CourseResourceCard extends StatefulWidget {
-  const _CourseResourceCard({required this.item, required this.onDownload});
+  const _CourseResourceCard({
+    required this.item,
+    required this.onDownload,
+    required this.onOpen,
+  });
 
   final Map<String, dynamic> item;
   final VoidCallback onDownload;
+  final VoidCallback onOpen;
 
   @override
   State<_CourseResourceCard> createState() => _CourseResourceCardState();
@@ -3426,11 +3493,7 @@ class _CourseResourceCardState extends State<_CourseResourceCard> {
   @override
   Widget build(BuildContext context) {
     final subject = asMap(widget.item['subject']);
-    final fileType = text(
-      widget.item,
-      'file_type',
-      fallback: 'file',
-    ).toLowerCase();
+    final fileType = _displayFileType(widget.item).toLowerCase();
     final color = _fileColor(fileType);
     final size = text(widget.item, 'file_size', fallback: '---');
 
@@ -3448,7 +3511,12 @@ class _CourseResourceCardState extends State<_CourseResourceCard> {
         ],
       ),
       child: InkWell(
-        onTap: () => _showPreview(context, widget.item, widget.onDownload),
+        onTap: () => _showPreview(
+          context,
+          widget.item,
+          widget.onDownload,
+          widget.onOpen,
+        ),
         borderRadius: BorderRadius.circular(24),
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -3505,6 +3573,16 @@ class _CourseResourceCardState extends State<_CourseResourceCard> {
                 ),
               ),
               const SizedBox(width: 8),
+              IconButton.filledTonal(
+                onPressed: widget.onOpen,
+                style: IconButton.styleFrom(
+                  backgroundColor: color.withValues(alpha: 0.1),
+                  foregroundColor: color,
+                ),
+                icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                tooltip: 'فتح',
+              ),
+              const SizedBox(width: 6),
               IconButton.filledTonal(
                 onPressed: _isDownloading
                     ? null
@@ -3582,6 +3660,18 @@ IconData _fileIcon(String type) {
   if (lower.contains('ppt')) return Icons.slideshow_rounded;
   if (lower.contains('doc')) return Icons.description_rounded;
   if (lower.contains('xls')) return Icons.table_chart_rounded;
+  if (lower.contains('mp4') ||
+      lower.contains('mov') ||
+      lower.contains('video')) {
+    return Icons.movie_rounded;
+  }
+  if (lower.contains('mp3') ||
+      lower.contains('wav') ||
+      lower.contains('audio')) {
+    return Icons.audiotrack_rounded;
+  }
+  if (lower.contains('txt')) return Icons.notes_rounded;
+  if (lower.contains('csv')) return Icons.table_rows_rounded;
   if (lower.contains('zip') || lower.contains('rar')) {
     return Icons.archive_rounded;
   }
@@ -3599,10 +3689,30 @@ Color _fileColor(String type) {
   if (lower.contains('ppt')) return const Color(0xFFEA580C); // Orange 600
   if (lower.contains('doc')) return const Color(0xFF2563EB); // Blue 600
   if (lower.contains('xls')) return const Color(0xFF16A34A); // Green 600
+  if (lower.contains('mp4') ||
+      lower.contains('mov') ||
+      lower.contains('video')) {
+    return const Color(0xFFDB2777);
+  }
+  if (lower.contains('mp3') ||
+      lower.contains('wav') ||
+      lower.contains('audio')) {
+    return const Color(0xFF0891B2);
+  }
+  if (lower.contains('txt') || lower.contains('csv')) return AppColors.teal;
   if (lower.contains('zip') || lower.contains('rar')) {
     return const Color(0xFF7C3AED); // Violet 600
   }
   return AppColors.slate500;
+}
+
+String _displayFileType(Map<String, dynamic> item) {
+  final explicit = text(item, 'file_type').replaceAll('.', '').trim();
+  if (explicit.isNotEmpty) return explicit.toUpperCase();
+  final path = text(item, 'file_path');
+  final clean = path.split('?').first;
+  final ext = clean.contains('.') ? clean.split('.').last : '';
+  return ext.isEmpty ? 'FILE' : ext.toUpperCase();
 }
 
 // ignore: unused_element
@@ -3709,9 +3819,14 @@ class _EntryAnimation extends StatelessWidget {
 }
 
 class _CourseResourceGridCard extends StatefulWidget {
-  const _CourseResourceGridCard({required this.item, required this.onDownload});
+  const _CourseResourceGridCard({
+    required this.item,
+    required this.onDownload,
+    required this.onOpen,
+  });
   final Map<String, dynamic> item;
   final VoidCallback onDownload;
+  final VoidCallback onOpen;
 
   @override
   State<_CourseResourceGridCard> createState() =>
@@ -3723,11 +3838,7 @@ class _CourseResourceGridCardState extends State<_CourseResourceGridCard> {
 
   @override
   Widget build(BuildContext context) {
-    final fileType = text(
-      widget.item,
-      'file_type',
-      fallback: 'file',
-    ).toLowerCase();
+    final fileType = _displayFileType(widget.item).toLowerCase();
     final color = _fileColor(fileType);
 
     return Container(
@@ -3744,7 +3855,12 @@ class _CourseResourceGridCardState extends State<_CourseResourceGridCard> {
         ],
       ),
       child: InkWell(
-        onTap: () => _showPreview(context, widget.item, widget.onDownload),
+        onTap: () => _showPreview(
+          context,
+          widget.item,
+          widget.onDownload,
+          widget.onOpen,
+        ),
         borderRadius: BorderRadius.circular(24),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -3784,31 +3900,49 @@ class _CourseResourceGridCardState extends State<_CourseResourceGridCard> {
                 ),
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.tonal(
-                  onPressed: _isDownloading
-                      ? null
-                      : () async {
-                          setState(() => _isDownloading = true);
-                          widget.onDownload();
-                          await Future.delayed(const Duration(seconds: 2));
-                          if (mounted) setState(() => _isDownloading = false);
-                        },
-                  style: FilledButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.tonal(
+                      onPressed: widget.onOpen,
+                      style: FilledButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Icon(Icons.open_in_new_rounded, size: 16),
                     ),
                   ),
-                  child: _isDownloading
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.download_rounded, size: 16),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.tonal(
+                      onPressed: _isDownloading
+                          ? null
+                          : () async {
+                              setState(() => _isDownloading = true);
+                              widget.onDownload();
+                              await Future.delayed(const Duration(seconds: 2));
+                              if (mounted) {
+                                setState(() => _isDownloading = false);
+                              }
+                            },
+                      style: FilledButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: _isDownloading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.download_rounded, size: 16),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -3847,9 +3981,11 @@ void _showPreview(
   BuildContext context,
   Map<String, dynamic> item,
   VoidCallback onDownload,
+  VoidCallback onOpen,
 ) {
   final fileType = text(item, 'file_type', fallback: 'file');
-  final color = _fileColor(fileType);
+  final displayType = _displayFileType(item);
+  final color = _fileColor(displayType);
   final subject = asMap(item['subject']);
   final uploader = asMap(item['uploader']);
 
@@ -3910,6 +4046,11 @@ void _showPreview(
           const SizedBox(height: 20),
         ],
         _PreviewInfoTile(
+          icon: _fileIcon(displayType),
+          label: 'نوع الملف',
+          value: displayType,
+        ),
+        _PreviewInfoTile(
           icon: Icons.category_rounded,
           label: 'تصنيف الملف',
           value: _categoryLabel(text(item, 'category')),
@@ -3930,20 +4071,42 @@ void _showPreview(
           value: text(item, 'downloads_count', fallback: '0'),
         ),
         const SizedBox(height: 30),
-        FilledButton.icon(
-          onPressed: () {
-            Navigator.pop(context);
-            onDownload();
-          },
-          style: FilledButton.styleFrom(
-            backgroundColor: color,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-          ),
-          icon: const Icon(Icons.download_rounded),
-          label: const Text(
-            'تحميل الملف الآن',
-            style: TextStyle(fontWeight: FontWeight.w900),
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  onOpen();
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: color.withValues(alpha: 0.1),
+                  foregroundColor: color,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                icon: const Icon(Icons.open_in_new_rounded),
+                label: const Text('فتح'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  onDownload();
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: color,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                icon: const Icon(Icons.download_rounded),
+                label: const Text(
+                  'تحميل',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
       ],

@@ -208,6 +208,7 @@ class PracticalLogbookScreen extends ConsumerWidget {
     return StudentShell(
       currentIndex: 31,
       title: 'السجل العملي',
+      parentRoute: PracticalDelegateHomeScreen.route,
       child: _AsyncClinicalBody(
         state: state,
         onRetry: () => ref.invalidate(_practicalLogbookProvider),
@@ -259,6 +260,7 @@ class PracticalCasesScreen extends ConsumerWidget {
     return StudentShell(
       currentIndex: 32,
       title: 'مراجعة الحالات',
+      parentRoute: PracticalDelegateHomeScreen.route,
       child: _AsyncClinicalBody(
         state: state,
         onRetry: () => ref.invalidate(_practicalCasesProvider),
@@ -317,6 +319,7 @@ class PracticalDelegationsScreen extends ConsumerWidget {
     return StudentShell(
       currentIndex: 33,
       title: 'تفويض مساعدين',
+      parentRoute: PracticalDelegateHomeScreen.route,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _delegationSheet(context, ref),
         icon: const Icon(Icons.add_rounded),
@@ -795,7 +798,7 @@ class _ClinicalStatsGrid extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 1.35,
+        mainAxisExtent: 142,
       ),
       itemBuilder: (context, index) {
         final item = items[index];
@@ -803,22 +806,33 @@ class _ClinicalStatsGrid extends StatelessWidget {
           margin: EdgeInsets.zero,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _IconBubble(item.icon, item.color),
+              const Spacer(),
               Text(
                 item.value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 24,
+                  fontSize: 22,
                   fontWeight: FontWeight.w900,
                   color: AppColors.midnight,
+                  height: 1,
                 ),
               ),
-              Text(
-                item.label,
-                style: const TextStyle(
-                  color: AppColors.slate600,
-                  fontWeight: FontWeight.w800,
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 32,
+                child: Text(
+                  item.label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.slate600,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    height: 1.25,
+                  ),
                 ),
               ),
             ],

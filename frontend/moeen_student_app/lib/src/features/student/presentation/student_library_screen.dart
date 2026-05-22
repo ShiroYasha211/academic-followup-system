@@ -194,6 +194,7 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
               itemBuilder: (ctx, i) => _CourseResourceGridCard(
                 item: filtered[i],
                 onDownload: () => _download(context, filtered[i]),
+                onOpen: () => _open(context, filtered[i]),
               ),
             );
           }
@@ -205,6 +206,7 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
             itemBuilder: (ctx, i) => _CourseResourceCard(
               item: filtered[i],
               onDownload: () => _download(context, filtered[i]),
+              onOpen: () => _open(context, filtered[i]),
             ),
           );
         }).toList(),
@@ -226,19 +228,15 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
           .libraryDownloadUrl(id);
       if (!context.mounted) return;
 
-      final savedPath = await DownloadService.downloadUrlCached(
+      final fileName = _safeFileName(item);
+      final savedPath = await DownloadService.downloadUrlToMoeenFolder(
         url: url,
-        fileName: _safeFileName(item),
-        cacheKey: 'library_$id',
+        fileName: fileName,
+        section: 'SharedLibrary',
       );
 
       if (context.mounted && savedPath != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تم حفظ الملف في: $savedPath'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        await _showDownloadCompletedDialog(context, savedPath, fileName);
       }
       ref.invalidate(_libraryProvider(_query));
     } on ApiException catch (error) {
@@ -252,6 +250,26 @@ class _StudentLibraryScreenState extends ConsumerState<StudentLibraryScreen>
       }
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _open(BuildContext context, Map<String, dynamic> item) async {
+    final opened = await DownloadService.openMoeenFile(
+      fileName: _safeFileName(item),
+      section: 'SharedLibrary',
+    );
+    if (!context.mounted || opened != null) return;
+
+    final downloadNow = await showMoeenConfirmDialog(
+      context: context,
+      title: 'الملف غير محمل',
+      message: 'هذا الملف غير موجود في جهازك. هل تريد تحميله الآن؟',
+      confirmLabel: 'تحميل الآن',
+      icon: Icons.download_rounded,
+      color: AppColors.royalBlue,
+    );
+    if (downloadNow && context.mounted) {
+      await _download(context, item);
     }
   }
 

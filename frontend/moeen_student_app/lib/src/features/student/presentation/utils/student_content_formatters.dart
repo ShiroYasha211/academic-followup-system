@@ -266,7 +266,10 @@ class _ReminderScheduleDraft {
     final legacyReminderAt = DateTime.tryParse(text(item, 'reminder_at'));
     if ((type.isEmpty || type == 'none') && legacyReminderAt != null) {
       type = 'dates';
-      time = TimeOfDay(hour: legacyReminderAt.hour, minute: legacyReminderAt.minute);
+      time = TimeOfDay(
+        hour: legacyReminderAt.hour,
+        minute: legacyReminderAt.minute,
+      );
       dates.add(legacyReminderAt);
     }
 
@@ -301,11 +304,12 @@ class _ReminderScheduleDraft {
       final chosenDates = dates.isEmpty && selectedDate != null
           ? [selectedDate]
           : dates;
-      payload['reminder_dates'] = chosenDates
-          .map((date) => date.toIso8601String().substring(0, 10))
-          .toSet()
-          .toList()
-        ..sort();
+      payload['reminder_dates'] =
+          chosenDates
+              .map((date) => date.toIso8601String().substring(0, 10))
+              .toSet()
+              .toList()
+            ..sort();
     }
 
     return payload;
@@ -532,7 +536,6 @@ String _formatTimeOfDayLabel(TimeOfDay time) {
   return '$hour12:$minute $period';
 }
 
-
 TimeOfDay _parseReminderTime(String value) {
   final parts = value.split(':');
   if (parts.length >= 2) {
@@ -584,24 +587,41 @@ void _showNewsDetails(BuildContext context, Map<String, dynamic> item) {
                   Image.network(
                     attachment,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const _NewsImageFallback(height: 200),
+                    errorBuilder: (_, _, _) =>
+                        const _NewsImageFallback(height: 200),
                   ),
                   Positioned(
                     right: 12,
                     bottom: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: const [
-                          Icon(Icons.zoom_out_map_rounded, color: Colors.white, size: 16),
+                          Icon(
+                            Icons.zoom_out_map_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
                           SizedBox(width: 8),
-                          Text('تكبير وعرض', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                          Text(
+                            'تكبير وعرض',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -963,28 +983,80 @@ Future<void> _runSnack(
 Future<void> _downloadUrlToFile(
   BuildContext context,
   String url,
-  String title,
-) async {
+  String title, {
+  String section = 'StudentFiles',
+}) async {
   try {
-    final extension = url.split('?').first.split('.').last;
-    final safe = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
-    final savedPath = await DownloadService.downloadUrl(
+    final fileName = _downloadFileName(url, title);
+    final savedPath = await DownloadService.downloadUrlToMoeenFolder(
       url: url,
-      fileName: '${safe.isEmpty ? 'resource' : safe}.$extension',
+      fileName: fileName,
+      section: section,
     );
     if (!context.mounted || savedPath == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('تم حفظ الملف في: $savedPath'),
-        backgroundColor: AppColors.success,
-      ),
-    );
+    await _showDownloadCompletedDialog(context, savedPath, fileName);
   } on ApiException catch (error) {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(error.message), backgroundColor: AppColors.danger),
+    await showMoeenInfoDialog(
+      context: context,
+      title: 'تعذر تحميل الملف',
+      message: error.message,
+      icon: Icons.error_rounded,
+      color: AppColors.danger,
     );
   }
+}
+
+String _downloadFileName(String url, String title) {
+  final cleanUrl = url.split('?').first;
+  String uriPath;
+  try {
+    uriPath = Uri.tryParse(cleanUrl)?.path ?? cleanUrl;
+  } catch (_) {
+    uriPath = cleanUrl;
+  }
+  final rawExtension = uriPath.contains('.') ? uriPath.split('.').last : '';
+  final extension = rawExtension.isEmpty || rawExtension.length > 8
+      ? 'file'
+      : rawExtension.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toLowerCase();
+  final safe = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+  return '${safe.isEmpty ? 'resource' : safe}.$extension';
+}
+
+Future<void> _showDownloadCompletedDialog(
+  BuildContext context,
+  String savedPath,
+  String fileName,
+) async {
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('تم تحميل الملف'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('اسم الملف: $fileName'),
+          const SizedBox(height: 8),
+          Text('المسار: $savedPath'),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('إغلاق'),
+        ),
+        FilledButton.icon(
+          onPressed: () {
+            Navigator.pop(dialogContext);
+            DownloadService.openPath(savedPath);
+          },
+          icon: const Icon(Icons.open_in_new_rounded),
+          label: const Text('فتح الملف'),
+        ),
+      ],
+    ),
+  );
 }
 
 String humanKey(String key) {
@@ -1106,7 +1178,7 @@ String timeAgo(String value) {
 
 String timeOnly(String value) {
   if (value.isEmpty) return '-';
-  
+
   // Try parsing as full DateTime first
   final date = DateTime.tryParse(value)?.toLocal();
   if (date != null) {
@@ -1116,7 +1188,7 @@ String timeOnly(String value) {
     final hour12 = hour % 12 == 0 ? 12 : hour % 12;
     return '$hour12:$minute $period';
   }
-  
+
   // Handle time-only strings (HH:mm or HH:mm:ss) from API
   if (value.contains(':') && value.length <= 8) {
     final parts = value.split(':');
@@ -1149,7 +1221,8 @@ bool isImageUrl(String url) {
 String absoluteUrl(String url) {
   final trimmed = url.trim();
   if (trimmed.isEmpty) return '';
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://'))
+    return trimmed;
   final base = AppConfig.apiBaseUrl.replaceFirst(RegExp(r'/api/?$'), '');
   if (trimmed.startsWith('/')) return '$base$trimmed';
   return '$base/$trimmed';
