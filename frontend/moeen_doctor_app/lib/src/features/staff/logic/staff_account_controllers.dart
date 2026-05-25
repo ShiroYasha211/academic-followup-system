@@ -2,22 +2,32 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers.dart';
+import '../../../core/refresh/staff_refresh_coordinator.dart';
 import '../../auth/data/staff_auth_session.dart';
 import '../../auth/logic/auth_controller.dart';
 import '../data/staff_account_models.dart';
 import '../data/staff_account_repository.dart';
 
 final staffAccountRepositoryProvider = Provider<StaffAccountRepository>((ref) {
-  return StaffAccountRepository(ref.watch(authenticatedApiClientProvider));
+  final session = ref.watch(authControllerProvider).valueOrNull;
+  final cachePrefix =
+      'staff.account.${session?.email ?? 'guest'}.${session?.workspace.name ?? 'doctor'}';
+  return StaffAccountRepository(
+    ref.watch(authenticatedApiClientProvider),
+    cache: ref.watch(offlineCacheProvider),
+    cachePrefix: cachePrefix,
+  );
 });
 
 final staffDashboardProvider = FutureProvider.autoDispose
     .family<StaffDashboardData, StaffWorkspace>((ref, workspace) {
-      return ref.watch(staffAccountRepositoryProvider).dashboard(workspace);
+      ref.watch(staffRefreshCoordinatorProvider.select((state) => state.version));
+      return _dashboardWithOfflineFallback(ref, workspace);
     });
 
 final staffProfileProvider = FutureProvider.autoDispose
     .family<StaffProfile, StaffWorkspace>((ref, workspace) {
+      ref.watch(staffRefreshCoordinatorProvider.select((state) => state.version));
       return ref.watch(staffAccountRepositoryProvider).profile(workspace);
     });
 
@@ -41,10 +51,26 @@ final staffAdministrativeSettingsProvider =
       StaffAdministrativeSettings
     >(StaffAdministrativeSettingsController.new);
 
+Future<StaffDashboardData> _dashboardWithOfflineFallback(
+  Ref ref,
+  StaffWorkspace workspace,
+) async {
+  try {
+    return await ref.watch(staffAccountRepositoryProvider).dashboard(workspace);
+  } on ApiException catch (error) {
+    if (error.statusCode == 401 ||
+        (error.statusCode == 403 && error.code != 'subscription_required')) {
+      await _handleAuthError(ref, error);
+    }
+    rethrow;
+  }
+}
+
 class StaffSubscriptionController
     extends FamilyAsyncNotifier<StaffSubscriptionOverview, StaffWorkspace> {
   @override
   Future<StaffSubscriptionOverview> build(StaffWorkspace workspace) {
+    ref.watch(staffRefreshCoordinatorProvider.select((state) => state.version));
     return _guard(
       () => ref.watch(staffAccountRepositoryProvider).subscription(workspace),
     );
@@ -85,7 +111,10 @@ class StaffLedgerController
   int get page => _page;
 
   @override
-  Future<StaffFinancialLedger> build(StaffWorkspace workspace) => _fetch(1);
+  Future<StaffFinancialLedger> build(StaffWorkspace workspace) {
+    ref.watch(staffRefreshCoordinatorProvider.select((state) => state.version));
+    return _fetch(1);
+  }
 
   Future<void> goToPage(int page) async {
     if (page < 1) return;
@@ -120,6 +149,7 @@ class StaffAdministrativeSettingsController
     extends AsyncNotifier<StaffAdministrativeSettings> {
   @override
   Future<StaffAdministrativeSettings> build() {
+    ref.watch(staffRefreshCoordinatorProvider.select((state) => state.version));
     return _guard(
       () => ref.read(staffAccountRepositoryProvider).administrativeSettings(),
     );

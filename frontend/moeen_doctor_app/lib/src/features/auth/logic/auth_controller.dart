@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/notifications/push_notification_service.dart';
 import '../../../core/providers.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/data/staff_auth_session.dart';
@@ -21,8 +22,10 @@ class AuthController extends AsyncNotifier<StaffAuthSession?> {
     try {
       final refreshed = await ref.read(authRepositoryProvider).refresh(session);
       await ref.read(sessionStorageProvider).save(refreshed);
+      await StaffPushNotificationService.registerDevice(refreshed);
       return refreshed;
     } catch (_) {
+      await StaffPushNotificationService.registerDevice(session);
       return session;
     }
   }
@@ -34,6 +37,7 @@ class AuthController extends AsyncNotifier<StaffAuthSession?> {
           .read(authRepositoryProvider)
           .login(email: email, password: password);
       await ref.read(sessionStorageProvider).save(session);
+      await StaffPushNotificationService.registerDevice(session);
       return session;
     });
   }
@@ -59,6 +63,7 @@ class AuthController extends AsyncNotifier<StaffAuthSession?> {
   Future<void> logout() async {
     final session = state.valueOrNull;
     if (session != null) {
+      await StaffPushNotificationService.unregisterDevice(session);
       try {
         await ref
             .read(authRepositoryProvider)

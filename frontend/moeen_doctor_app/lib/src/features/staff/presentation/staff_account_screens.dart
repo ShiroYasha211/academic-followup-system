@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/downloads/download_service.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/refresh/staff_refresh_coordinator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimensions.dart';
 import '../../../shared/widgets/moeen_dialogs.dart';
@@ -24,6 +25,7 @@ class StaffAccountDashboardScreen extends ConsumerWidget {
     final session = ref.watch(authControllerProvider).valueOrNull;
     final workspace = session?.workspace ?? StaffWorkspace.doctor;
     final state = ref.watch(staffDashboardProvider(workspace));
+    final refreshState = ref.watch(staffRefreshCoordinatorProvider);
 
     return StaffShell(
       title: 'لوحة التحكم',
@@ -35,11 +37,95 @@ class StaffAccountDashboardScreen extends ConsumerWidget {
           onRefresh: () async =>
               ref.invalidate(staffDashboardProvider(workspace)),
           child: dashboard.isAdministrative
-              ? _AdministrativeDashboardView(data: dashboard.raw)
-              : _DoctorDashboardView(data: dashboard.raw),
+              ? _AdministrativeDashboardView(
+                  data: dashboard.raw,
+                  offlineBanner: _DashboardOfflineBanner(
+                    dashboard: dashboard,
+                    online: refreshState.online,
+                    refreshing: refreshState.refreshing,
+                  ),
+                )
+              : _DoctorDashboardView(
+                  data: dashboard.raw,
+                  offlineBanner: _DashboardOfflineBanner(
+                    dashboard: dashboard,
+                    online: refreshState.online,
+                    refreshing: refreshState.refreshing,
+                  ),
+                ),
         ),
       ),
     );
+  }
+}
+
+class _DashboardOfflineBanner extends StatelessWidget {
+  const _DashboardOfflineBanner({
+    required this.dashboard,
+    required this.online,
+    required this.refreshing,
+  });
+
+  final StaffDashboardData dashboard;
+  final bool online;
+  final bool refreshing;
+
+  @override
+  Widget build(BuildContext context) {
+    if (online && !dashboard.fromCache && !refreshing) {
+      return const SizedBox.shrink();
+    }
+    final color = dashboard.fromCache || !online
+        ? AppColors.warning
+        : AppColors.royalBlue;
+    final message = dashboard.fromCache
+        ? 'تعمل الآن على آخر بيانات محفوظة${_cachedAtText(dashboard.cachedAt)}'
+        : refreshing
+        ? 'جاري تحديث بيانات الصفحة...'
+        : 'لا يوجد اتصال بالإنترنت';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            dashboard.fromCache || !online
+                ? Icons.cloud_off_rounded
+                : Icons.sync_rounded,
+            color: color,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w900,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _cachedAtText(DateTime? value) {
+    if (value == null ||
+        value.millisecondsSinceEpoch == 0 ||
+        value.year < 2001) {
+      return '';
+    }
+    final diff = DateTime.now().difference(value);
+    if (diff.inMinutes < 1) return ' منذ لحظات';
+    if (diff.inHours < 1) return ' منذ ${diff.inMinutes} دقيقة';
+    if (diff.inDays < 1) return ' منذ ${diff.inHours} ساعة';
+    return ' منذ ${diff.inDays} يوم';
   }
 }
 
@@ -353,6 +439,7 @@ class _StaffAdministrativeSettingsScreenState
                   subtitle:
                       'تحديد قواعد الحضور، الأعذار، وتجدد رموز QR الخاصة بالكلية.',
                   icon: Icons.settings_rounded,
+                  compact: false,
                 ),
                 const SizedBox(height: 20),
                 Wrap(
@@ -770,26 +857,27 @@ class StaffAccountProfileScreen extends ConsumerWidget {
   }
 }
 
-class _DoctorDashboardView extends StatelessWidget {
-  const _DoctorDashboardView({required this.data});
+class _DoctorDashboardView extends ConsumerWidget {
+  const _DoctorDashboardView({required this.data, required this.offlineBanner});
 
   final Map<String, dynamic> data;
+  final Widget offlineBanner;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final subjects = _listOfMaps(data['subjects']);
     final todaySchedule = _listOfMaps(data['today_schedule']);
     final activities = _listOfMaps(data['recent_activities']);
     final announcements = _listOfMaps(data['admin_announcements']);
+
+    final session = ref.watch(authControllerProvider).valueOrNull;
+    final doctorName = session?.name ?? 'دكتورنا العزيز';
+
     return ListView(
       padding: AppDimensions.pagePadding,
       children: [
-        const _DashboardHero(
-          title: 'مرحبًا بك في لوحة الدكتور',
-          subtitle: 'نظرة مركزة على المقررات والمتابعة الأكاديمية الحالية.',
-          icon: Icons.school_rounded,
-          compact: true,
-        ),
+        offlineBanner,
+        _DoctorWelcomeBanner(doctorName: doctorName),
         const SizedBox(height: AppDimensions.sectionGapLarge),
         // Premium Quick Actions Panel
         const _DoctorQuickActions(compact: true),
@@ -882,9 +970,13 @@ class _DoctorDashboardView extends StatelessWidget {
 }
 
 class _AdministrativeDashboardView extends StatelessWidget {
-  const _AdministrativeDashboardView({required this.data});
+  const _AdministrativeDashboardView({
+    required this.data,
+    required this.offlineBanner,
+  });
 
   final Map<String, dynamic> data;
+  final Widget offlineBanner;
 
   @override
   Widget build(BuildContext context) {
@@ -893,10 +985,12 @@ class _AdministrativeDashboardView extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
       children: [
+        offlineBanner,
         _DashboardHero(
           title: college['name']?.toString() ?? 'لوحة الكلية',
           subtitle: 'إدارة بيانات الكلية ومتابعة مؤشرات التشغيل الأساسية.',
           icon: Icons.apartment_rounded,
+          compact: false,
         ),
         const SizedBox(height: 20),
         Wrap(
@@ -1978,6 +2072,127 @@ class _PasswordField extends StatelessWidget {
   }
 }
 
+class _DoctorWelcomeBanner extends StatelessWidget {
+  const _DoctorWelcomeBanner({required this.doctorName});
+
+  final String doctorName;
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'صباح الخير';
+    if (hour < 17) return 'طاب يومك';
+    return 'مساء الخير';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.royalBlue,
+            AppColors.royalBlueDark,
+            Color(0xFF1E3A8A),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.royalBlue.withValues(alpha: 0.3),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
+          ),
+        ],
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: -20,
+            bottom: -30,
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              size: 140,
+              color: Colors.white.withValues(alpha: 0.05),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${_getGreeting()}،',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'د. $doctorName',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.stars_rounded,
+                      color: AppColors.gold,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'شكراً لعطائك المستمر وتوجيهك لطلابنا الأعزاء.',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DashboardHero extends StatelessWidget {
   const _DashboardHero({
     required this.title,
@@ -2158,11 +2373,9 @@ class _StatCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: compact
-                  ? AppColors.slate200.withValues(alpha: 0.22)
-                  : Colors.black.withValues(alpha: 0.01),
-              blurRadius: compact ? 18 : 12,
-              offset: Offset(0, compact ? 10 : 6),
+              color: color.withValues(alpha: compact ? 0.08 : 0.06),
+              blurRadius: compact ? 16 : 12,
+              offset: Offset(0, compact ? 8 : 6),
             ),
           ],
         ),
@@ -2357,104 +2570,124 @@ class _DoctorQuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actions = [
+      _QuickActionData(
+        label: 'تحضير',
+        icon: Icons.qr_code_2_rounded,
+        color: AppColors.teal,
+        route: '/doctor/attendance',
+      ),
+      _QuickActionData(
+        label: 'إعلان جديد',
+        icon: Icons.campaign_rounded,
+        color: AppColors.rose,
+        route: '/doctor/announcements',
+      ),
+      _QuickActionData(
+        label: 'الأعذار المعلقة',
+        icon: Icons.verified_user_rounded,
+        color: AppColors.warning,
+        route: '/doctor/excuses',
+      ),
+      _QuickActionData(
+        label: 'رصد الدرجات',
+        icon: Icons.grade_rounded,
+        color: AppColors.goldDeep,
+        route: '/doctor/grades',
+      ),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionTitle(title: 'إجراءات سريعة', icon: Icons.bolt_rounded),
-        SizedBox(height: compact ? 10 : 14),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _QuickActionCircleButton(
-              label: 'تحضير QR',
-              icon: Icons.qr_code_2_rounded,
-              color: AppColors.teal,
-              compact: compact,
-              onTap: () => context.go('/doctor/attendance'),
-            ),
-            _QuickActionCircleButton(
-              label: 'إعلان جديد',
-              icon: Icons.campaign_rounded,
-              color: AppColors.rose,
-              compact: compact,
-              onTap: () => context.go('/doctor/announcements'),
-            ),
-            _QuickActionCircleButton(
-              label: 'الأعذار المعلقة',
-              icon: Icons.verified_user_rounded,
-              color: AppColors.warning,
-              compact: compact,
-              onTap: () => context.go('/doctor/excuses'),
-            ),
-            _QuickActionCircleButton(
-              label: 'رصد الدرجات',
-              icon: Icons.grade_rounded,
-              color: AppColors.goldDeep,
-              compact: compact,
-              onTap: () => context.go('/doctor/grades'),
-            ),
-          ],
+        const SizedBox(height: 14),
+        GridView.builder(
+          itemCount: actions.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 2.1,
+          ),
+          itemBuilder: (context, index) {
+            final action = actions[index];
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppColors.slate100),
+                boxShadow: [
+                  BoxShadow(
+                    color: action.color.withValues(alpha: 0.05),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => context.go(action.route),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: action.color.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Icon(
+                              action.icon,
+                              color: action.color,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              action.label,
+                              style: const TextStyle(
+                                color: AppColors.midnight,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
   }
 }
 
-class _QuickActionCircleButton extends StatelessWidget {
-  const _QuickActionCircleButton({
+class _QuickActionData {
+  const _QuickActionData({
     required this.label,
     required this.icon,
     required this.color,
-    required this.onTap,
-    this.compact = false,
+    required this.route,
   });
-
   final String label;
   final IconData icon;
   final Color color;
-  final VoidCallback onTap;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Column(
-          children: [
-            Container(
-              width: compact ? AppDimensions.quickActionIconBox : 56,
-              height: compact ? AppDimensions.quickActionIconBox : 56,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: color.withValues(alpha: 0.2),
-                  width: 1.5,
-                ),
-              ),
-              child: Icon(
-                icon,
-                color: color,
-                size: compact ? AppDimensions.quickActionIcon : 26,
-              ),
-            ),
-            SizedBox(height: compact ? 6 : 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.midnight,
-                fontSize: compact ? AppDimensions.quickActionLabel : 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  final String route;
 }
 
 class _DoctorTodaySchedule extends StatelessWidget {

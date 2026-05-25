@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
@@ -12,6 +13,7 @@ import 'package:dio/dio.dart';
 import '../../../core/downloads/download_service.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers.dart';
+import '../../../core/refresh/staff_refresh_coordinator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/moeen_dialogs.dart';
 import '../../../shared/widgets/status_message.dart';
@@ -25,9 +27,26 @@ import 'staff_account_screens.dart';
 import 'staff_shell.dart';
 
 part 'doctor_academic_screens.dart';
+part 'doctor_assignments.dart';
+part 'doctor_library.dart';
+part 'doctor_announcements.dart';
+part 'doctor_grades.dart';
+part 'doctor_quizzes.dart';
+part 'doctor_stars.dart';
+part 'doctor_inquiries.dart';
+part 'doctor_messages.dart';
+part 'doctor_news_notifications.dart';
+part 'doctor_clinical.dart';
 
 final staffRepositoryProvider = Provider<StaffRepository>((ref) {
-  return StaffRepository(ref.watch(authenticatedApiClientProvider));
+  final session = ref.watch(authControllerProvider).valueOrNull;
+  final cachePrefix =
+      'staff.${session?.email ?? 'guest'}.${session?.workspace.name ?? 'doctor'}';
+  return StaffRepository(
+    ref.watch(authenticatedApiClientProvider),
+    cache: ref.watch(offlineCacheProvider),
+    cachePrefix: cachePrefix,
+  );
 });
 
 bool staffIsSubscriptionRequired(Object? error) {
@@ -65,6 +84,7 @@ Future<void> showStaffSubscriptionRequiredDialog(
 
 final _resourceProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, StaffMenuItem>((ref, item) {
+      ref.watch(staffRefreshCoordinatorProvider.select((state) => state.version));
       return ref.watch(staffRepositoryProvider).get(item.endpoint);
     });
 
@@ -117,6 +137,12 @@ final staffRoutes = <GoRoute>[
     builder: (context, state) => const DoctorReportsScreen(),
   ),
   GoRoute(
+    path: DoctorSubjectReportScreen.route,
+    builder: (context, state) => DoctorSubjectReportScreen(
+      subjectId: int.parse(state.pathParameters['subjectId']!),
+    ),
+  ),
+  GoRoute(
     path: DoctorAssignmentsScreen.route,
     builder: (context, state) => const DoctorAssignmentsScreen(),
   ),
@@ -131,6 +157,15 @@ final staffRoutes = <GoRoute>[
     builder: (context, state) => const DoctorGradesScreen(),
   ),
   GoRoute(
+    path: DoctorGradeSubjectScreen.route,
+    builder: (context, state) => DoctorGradeSubjectScreen(
+      subjectId: int.parse(state.pathParameters['subjectId']!),
+      subject: state.extra is Map
+          ? Map<String, dynamic>.from(state.extra as Map)
+          : null,
+    ),
+  ),
+  GoRoute(
     path: DoctorLibraryScreen.route,
     builder: (context, state) => const DoctorLibraryScreen(),
   ),
@@ -143,6 +178,35 @@ final staffRoutes = <GoRoute>[
     builder: (context, state) => const DoctorQuizzesScreen(),
   ),
   GoRoute(
+    path: DoctorQuizFormScreen.createRoute,
+    builder: (context, state) => DoctorQuizFormScreen(
+      subjects: state.extra is Map
+          ? _docList((state.extra as Map)['subjects'])
+          : const [],
+    ),
+  ),
+  GoRoute(
+    path: DoctorQuizFormScreen.editRoute,
+    builder: (context, state) => DoctorQuizFormScreen(
+      quizId: int.parse(state.pathParameters['quizId']!),
+      subjects: state.extra is Map
+          ? _docList((state.extra as Map)['subjects'])
+          : const [],
+      quizDetails: state.extra is Map
+          ? _docMap((state.extra as Map)['details'])
+          : const {},
+    ),
+  ),
+  GoRoute(
+    path: DoctorQuizDetailsScreen.route,
+    builder: (context, state) => DoctorQuizDetailsScreen(
+      quizId: int.parse(state.pathParameters['quizId']!),
+      subjects: state.extra is Map
+          ? _docList((state.extra as Map)['subjects'])
+          : const [],
+    ),
+  ),
+  GoRoute(
     path: DoctorStarsScreen.route,
     builder: (context, state) => const DoctorStarsScreen(),
   ),
@@ -151,8 +215,24 @@ final staffRoutes = <GoRoute>[
     builder: (context, state) => const DoctorInquiriesScreen(),
   ),
   GoRoute(
+    path: DoctorInquiryDetailsScreen.route,
+    builder: (context, state) => DoctorInquiryDetailsScreen(
+      inquiryId: int.parse(state.pathParameters['inquiryId']!),
+    ),
+  ),
+  GoRoute(
     path: DoctorMessagesScreen.route,
     builder: (context, state) => const DoctorMessagesScreen(),
+  ),
+  GoRoute(
+    path: DoctorStartConversationScreen.route,
+    builder: (context, state) => const DoctorStartConversationScreen(),
+  ),
+  GoRoute(
+    path: DoctorConversationScreen.route,
+    builder: (context, state) => DoctorConversationScreen(
+      conversationId: int.parse(state.pathParameters['conversationId']!),
+    ),
   ),
   GoRoute(
     path: DoctorNewsScreen.route,
@@ -165,6 +245,12 @@ final staffRoutes = <GoRoute>[
   GoRoute(
     path: DoctorClinicalScreen.route,
     builder: (context, state) => const DoctorClinicalScreen(),
+  ),
+  GoRoute(
+    path: DoctorClinicalSectionScreen.route,
+    builder: (context, state) => DoctorClinicalSectionScreen(
+      section: state.pathParameters['section']!,
+    ),
   ),
   GoRoute(
     path: '/administrative/subscription',
@@ -650,6 +736,7 @@ class StaffDashboardScreen extends ConsumerWidget {
 
 final _dashboardProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, String>((ref, path) {
+      ref.watch(staffRefreshCoordinatorProvider.select((state) => state.version));
       return ref.watch(staffRepositoryProvider).get(path);
     });
 

@@ -194,10 +194,17 @@ class StaffAdministrativeSettings {
 }
 
 class StaffDashboardData {
-  const StaffDashboardData({required this.raw, required this.isAdministrative});
+  const StaffDashboardData({
+    required this.raw,
+    required this.isAdministrative,
+    this.fromCache = false,
+    this.cachedAt,
+  });
 
   final Map<String, dynamic> raw;
   final bool isAdministrative;
+  final bool fromCache;
+  final DateTime? cachedAt;
 }
 
 Map<String, dynamic> _map(Object? value) {

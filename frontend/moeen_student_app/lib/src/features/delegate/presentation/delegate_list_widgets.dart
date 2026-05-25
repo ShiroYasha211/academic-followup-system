@@ -1,5 +1,5 @@
 part of 'delegate_screens.dart';
- 
+
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   _SliverAppBarDelegate({required this.child, this.height = 64});
   final Widget child;
@@ -20,8 +20,6 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
 }
-
-
 
 class _ListScaffold extends StatelessWidget {
   const _ListScaffold({
@@ -177,7 +175,7 @@ class _ActionGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     const canDoQr = true;
-    // For others, we assume view permission is enough for navigation, 
+    // For others, we assume view permission is enough for navigation,
     // but we can gate based on the resource name if needed.
 
     return GridView.count(
@@ -189,7 +187,7 @@ class _ActionGrid extends ConsumerWidget {
       childAspectRatio: 0.85,
       children: [
         _ActionItem(
-          label: 'تحضير QR',
+          label: 'تحضير',
           icon: Icons.qr_code_scanner_rounded,
           color: AppColors.success,
           onTap: onQrTap,
@@ -464,11 +462,18 @@ class _NewsCard extends ConsumerWidget {
                     children: [
                       Text(
                         text(map, 'title', fallback: 'خبر جديد'),
-                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
                       ),
                       Text(
                         'من: ${text(sender, 'name', fallback: 'الإدارة')}',
-                        style: const TextStyle(color: AppColors.slate500, fontWeight: FontWeight.w700, fontSize: 11),
+                        style: const TextStyle(
+                          color: AppColors.slate500,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
@@ -477,16 +482,27 @@ class _NewsCard extends ConsumerWidget {
                   Container(
                     width: 8,
                     height: 8,
-                    decoration: const BoxDecoration(color: AppColors.rose, shape: BoxShape.circle),
+                    decoration: const BoxDecoration(
+                      color: AppColors.rose,
+                      shape: BoxShape.circle,
+                    ),
                   ),
               ],
             ),
-            const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(height: 1),
+            ),
             Text(
               text(map, 'message', fallback: text(map, 'content')),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(height: 1.5, fontWeight: FontWeight.w600, color: AppColors.slate700, fontSize: 13),
+              style: const TextStyle(
+                height: 1.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.slate700,
+                fontSize: 13,
+              ),
             ),
             const SizedBox(height: 14),
             Row(
@@ -494,11 +510,19 @@ class _NewsCard extends ConsumerWidget {
               children: [
                 Text(
                   timeText(map),
-                  style: const TextStyle(color: AppColors.slate400, fontSize: 11, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: AppColors.slate400,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 Text(
                   'قراءة المزيد ←',
-                  style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11),
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
@@ -510,34 +534,50 @@ class _NewsCard extends ConsumerWidget {
 
   IconData _typeIcon(String type) {
     switch (type) {
-      case 'poll': return Icons.poll_rounded;
-      case 'exam': return Icons.fact_check_rounded;
-      case 'assignment': return Icons.assignment_rounded;
-      case 'attendance': return Icons.how_to_reg_rounded;
-      default: return Icons.campaign_rounded;
+      case 'poll':
+        return Icons.poll_rounded;
+      case 'exam':
+        return Icons.fact_check_rounded;
+      case 'assignment':
+        return Icons.assignment_rounded;
+      case 'attendance':
+        return Icons.how_to_reg_rounded;
+      default:
+        return Icons.campaign_rounded;
     }
   }
 
   Color _typeColor(String type) {
     switch (type) {
-      case 'poll': return AppColors.violet;
-      case 'exam': return AppColors.danger;
-      case 'assignment': return AppColors.warning;
-      case 'attendance': return AppColors.success;
-      default: return AppColors.orange;
+      case 'poll':
+        return AppColors.violet;
+      case 'exam':
+        return AppColors.danger;
+      case 'assignment':
+        return AppColors.warning;
+      case 'attendance':
+        return AppColors.success;
+      default:
+        return AppColors.orange;
     }
   }
 }
 
-Future<void> _showNewsDetails(BuildContext context, WidgetRef ref, String batchId) async {
+Future<void> _showNewsDetails(
+  BuildContext context,
+  WidgetRef ref,
+  String batchId,
+) async {
   if (batchId.isEmpty) return;
 
   final messenger = ScaffoldMessenger.of(context);
-  
+
   try {
-    final data = await ref.read(delegateRepositoryProvider).newsDetails(batchId);
+    final data = await ref
+        .read(delegateRepositoryProvider)
+        .newsDetails(batchId);
     if (!context.mounted) return;
-    
+
     final notification = asMap(data['notification']);
     final sender = asMap(notification['sender']);
     final type = text(notification, 'type');
@@ -559,44 +599,84 @@ Future<void> _showNewsDetails(BuildContext context, WidgetRef ref, String batchI
               children: [
                 CircleAvatar(
                   backgroundColor: AppColors.slate100,
-                  child: const Icon(Icons.person_rounded, color: AppColors.slate400),
+                  child: const Icon(
+                    Icons.person_rounded,
+                    color: AppColors.slate400,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(text(sender, 'name'), style: const TextStyle(fontWeight: FontWeight.w900)),
-                    Text(text(sender, 'role'), style: const TextStyle(fontSize: 11, color: AppColors.slate500)),
+                    Text(
+                      text(sender, 'name'),
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      text(sender, 'role'),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.slate500,
+                      ),
+                    ),
                   ],
                 ),
                 const Spacer(),
-                Text(timeText(notification), style: const TextStyle(fontSize: 11, color: AppColors.slate400)),
+                Text(
+                  timeText(notification),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.slate400,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
             Text(
               text(notification, 'title'),
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.midnight),
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+                color: AppColors.midnight,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               text(notification, 'message'),
-              style: const TextStyle(height: 1.6, fontSize: 14, color: AppColors.slate700, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                height: 1.6,
+                fontSize: 14,
+                color: AppColors.slate700,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             if (type == 'poll') ...[
-              const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider()),
-              const Text('شاركنا برأيك:', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.violet)),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Divider(),
+              ),
+              const Text(
+                'شاركنا برأيك:',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.violet,
+                ),
+              ),
               const SizedBox(height: 12),
               for (final opt in pollOptions)
                 _PollOptionTile(
                   option: asMap(opt),
-                  isSelected: number(userVote, 'poll_option_id').toInt() == number(opt, 'id').toInt(),
+                  isSelected:
+                      number(userVote, 'poll_option_id').toInt() ==
+                      number(opt, 'id').toInt(),
                   hasVoted: hasVoted,
                   onTap: () async {
                     if (hasVoted) return;
                     await _run(
                       context,
-                      () => ref.read(delegateRepositoryProvider).voteNews(
+                      () => ref
+                          .read(delegateRepositoryProvider)
+                          .voteNews(
                             batchId: batchId,
                             optionId: number(opt, 'id').toInt(),
                           ),
@@ -615,7 +695,9 @@ Future<void> _showNewsDetails(BuildContext context, WidgetRef ref, String batchI
     // Mark as read locally after showing
     ref.invalidate(_delegateNewsProvider);
   } catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: AppColors.danger));
+    messenger.showSnackBar(
+      SnackBar(content: Text('خطأ: $e'), backgroundColor: AppColors.danger),
+    );
   }
 }
 
@@ -635,7 +717,7 @@ class _PollOptionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = isSelected ? AppColors.violet : AppColors.slate200;
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
@@ -646,7 +728,9 @@ class _PollOptionTile extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border.all(color: color, width: 2),
             borderRadius: BorderRadius.circular(12),
-            color: isSelected ? color.withValues(alpha: 0.05) : Colors.transparent,
+            color: isSelected
+                ? color.withValues(alpha: 0.05)
+                : Colors.transparent,
           ),
           child: Row(
             children: [
@@ -659,7 +743,12 @@ class _PollOptionTile extends StatelessWidget {
                   ),
                 ),
               ),
-              if (isSelected) const Icon(Icons.check_circle_rounded, color: AppColors.violet, size: 20),
+              if (isSelected)
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: AppColors.violet,
+                  size: 20,
+                ),
             ],
           ),
         ),
@@ -868,7 +957,9 @@ class _StudentsStrip extends StatelessWidget {
         if (items.isEmpty)
           _EmptyState(empty)
         else
-          ...items.take(3).map((raw) => _StudentStatusCard(item: asMap(raw), color: color)),
+          ...items
+              .take(3)
+              .map((raw) => _StudentStatusCard(item: asMap(raw), color: color)),
       ],
     );
   }
@@ -883,7 +974,9 @@ class _StudentStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final student = asMap(item['student']);
     final studentName = text(student, 'name', fallback: text(item, 'name'));
-    final initials = studentName.isNotEmpty ? studentName.trim().split(' ').map((e) => e[0]).take(2).join() : '?';
+    final initials = studentName.isNotEmpty
+        ? studentName.trim().split(' ').map((e) => e[0]).take(2).join()
+        : '?';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -921,7 +1014,11 @@ class _StudentStatusCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  text(asMap(item['subject']), 'name', fallback: 'مادة غير محددة'),
+                  text(
+                    asMap(item['subject']),
+                    'name',
+                    fallback: 'مادة غير محددة',
+                  ),
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -938,7 +1035,11 @@ class _StudentStatusCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              value(item, 'absence_count', fallback: value(item, 'absence_rate')),
+              value(
+                item,
+                'absence_count',
+                fallback: value(item, 'absence_rate'),
+              ),
               style: TextStyle(
                 color: color,
                 fontWeight: FontWeight.w900,

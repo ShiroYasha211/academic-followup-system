@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "145788857928",
+    "project_id": "moeen-f0149",
+    "storage_bucket": "moeen-f0149.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:145788857928:android:aff06c08235c367caaf27d",
+        "android_client_info": {
+          "package_name": "com.mohammed.moeen.moeen_doctor_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcIjVhyvtZJc0YK2GME31j60TkH5FQPdQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:145788857928:android:6f5b2fcba60acd83aaf27d",
+        "android_client_info": {
+          "package_name": "com.mohammed.moeen.moeen_student_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcIjVhyvtZJc0YK2GME31j60TkH5FQPdQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

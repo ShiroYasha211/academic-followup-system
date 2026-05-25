@@ -1,24 +1,33 @@
+import 'dart:convert';
+
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../core/offline/offline_cache_service.dart';
 import '../../auth/data/staff_auth_session.dart';
 import 'staff_account_models.dart';
 
 class StaffAccountRepository {
-  const StaffAccountRepository(this._api);
+  const StaffAccountRepository(this._api, {this.cache, this.cachePrefix});
 
   final ApiClient _api;
+  final OfflineCacheService? cache;
+  final String? cachePrefix;
 
   Future<StaffDashboardData> dashboard(StaffWorkspace workspace) async {
-    final response = await _api.get('/${workspace.name}/dashboard');
+    final response = await _cachedGet('/${workspace.name}/dashboard');
+    final cacheMeta = _cacheMeta(response);
     return StaffDashboardData(
       raw: _data(response),
       isAdministrative: workspace == StaffWorkspace.administrative,
+      fromCache: cacheMeta != null,
+      cachedAt: cacheMeta,
     );
   }
 
   Future<StaffSubscriptionOverview> subscription(
     StaffWorkspace workspace,
   ) async {
-    final response = await _api.get('/${workspace.name}/subscription');
+    final response = await _cachedGet('/${workspace.name}/subscription');
     return StaffSubscriptionOverview.fromJson(_data(response));
   }
 
@@ -50,9 +59,9 @@ class StaffAccountRepository {
     StaffWorkspace workspace, {
     int page = 1,
   }) async {
-    final response = await _api.get(
+    final response = await _cachedGet(
       '/${workspace.name}/ledger',
-      queryParameters: {'page': page},
+      query: {'page': page},
     );
     return StaffFinancialLedger.fromJson(_data(response));
   }
@@ -62,12 +71,12 @@ class StaffAccountRepository {
   }
 
   Future<StaffProfile> profile(StaffWorkspace workspace) async {
-    final response = await _api.get('/${workspace.name}/me');
+    final response = await _cachedGet('/${workspace.name}/me');
     return StaffProfile.fromJson(_data(response));
   }
 
   Future<StaffAdministrativeSettings> administrativeSettings() async {
-    final response = await _api.get('/administrative/settings');
+    final response = await _cachedGet('/administrative/settings');
     return StaffAdministrativeSettings.fromJson(_data(response));
   }
 
@@ -128,5 +137,68 @@ class StaffAccountRepository {
       return data.map((key, value) => MapEntry(key.toString(), value));
     }
     return const {};
+  }
+
+  Future<Map<String, dynamic>> _cachedGet(
+    String path, {
+    Map<String, dynamic>? query,
+  }) async {
+    final cacheKey = _cacheKey(path, query);
+    try {
+      final response = await _api.get(path, queryParameters: query);
+      await _saveCache(cacheKey, response);
+      return response;
+    } on ApiException catch (error) {
+      if (!_canUseCache(error)) rethrow;
+      final cached = await _readCache(cacheKey);
+      if (cached == null) rethrow;
+      return {
+        ...cached.data,
+        '_offline_cache': {
+          'from_cache': true,
+          'cached_at': cached.cachedAt.toIso8601String(),
+        },
+      };
+    }
+  }
+
+  Future<void> _saveCache(String key, Map<String, dynamic> response) async {
+    try {
+      await cache?.saveJson(key, response);
+    } catch (_) {}
+  }
+
+  Future<OfflineCacheEntry?> _readCache(String key) async {
+    try {
+      return await cache?.readJson(key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool _canUseCache(ApiException error) {
+    final status = error.statusCode;
+    return status == null || status >= 500;
+  }
+
+  String _cacheKey(String path, Map<String, dynamic>? query) {
+    final keys = query?.keys.toList() ?? <String>[];
+    keys.sort();
+    final normalizedQuery = <String, dynamic>{
+      for (final key in keys)
+        if (query![key] != null) key: query[key],
+    };
+    return [
+      cachePrefix ?? 'staff.account',
+      'get',
+      path,
+      if (normalizedQuery.isNotEmpty) jsonEncode(normalizedQuery),
+    ].join('|');
+  }
+
+  DateTime? _cacheMeta(Map<String, dynamic> response) {
+    final meta = response['_offline_cache'];
+    if (meta is! Map) return null;
+    return DateTime.tryParse(meta['cached_at']?.toString() ?? '');
   }
 }

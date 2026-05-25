@@ -52,15 +52,7 @@ class _DoctorExcusesScreenState extends ConsumerState<DoctorExcusesScreen> {
   Future<Map<String, dynamic>> _fetch() {
     return ref
         .read(staffRepositoryProvider)
-        .get(
-          '/doctor/excuses',
-          query: {
-            'status': _status,
-            if (_subjectId != null) 'subject_id': _subjectId,
-            if (_searchController.text.trim().isNotEmpty)
-              'search': _searchController.text.trim(),
-          },
-        );
+        .get('/doctor/excuses', query: const {'all': true});
   }
 
   void _reload() {
@@ -72,20 +64,70 @@ class _DoctorExcusesScreenState extends ConsumerState<DoctorExcusesScreen> {
   void _applyStatus(String status) {
     setState(() {
       _status = status;
-      _future = _fetch();
     });
   }
 
   void _applySubject(int subjectId) {
     setState(() {
       _subjectId = subjectId == 0 ? null : subjectId;
-      _future = _fetch();
     });
+  }
+
+  List<Map<String, dynamic>> _filteredExcuses(
+    List<Map<String, dynamic>> source, {
+    bool includeStatus = true,
+  }) {
+    final query = _searchController.text.trim().toLowerCase();
+    return source.where((excuse) {
+      if (includeStatus &&
+          _status != 'all' &&
+          _text(excuse, 'status') != _status) {
+        return false;
+      }
+
+      if (_subjectId != null) {
+        final attendance = _map(excuse['attendance']);
+        final subject = _map(attendance['subject']);
+        final subjectId = _int(attendance['subject_id']);
+        final nestedSubjectId = _int(subject['id']);
+        if (subjectId != _subjectId && nestedSubjectId != _subjectId) {
+          return false;
+        }
+      }
+
+      if (query.isNotEmpty) {
+        final student = _map(excuse['student']);
+        final haystack = [
+          _text(student, 'name'),
+          _text(student, 'student_number'),
+          _text(excuse, 'reason'),
+        ].join(' ').toLowerCase();
+        if (!haystack.contains(query)) return false;
+      }
+
+      return true;
+    }).toList();
+  }
+
+  Map<String, int> _localExcuseStats(List<Map<String, dynamic>> excuses) {
+    return {
+      'total': excuses.length,
+      'pending': excuses
+          .where((item) => _text(item, 'status') == 'pending')
+          .length,
+      'accepted': excuses
+          .where((item) => _text(item, 'status') == 'accepted')
+          .length,
+      'rejected': excuses
+          .where((item) => _text(item, 'status') == 'rejected')
+          .length,
+    };
   }
 
   @override
   Widget build(BuildContext context) {
     const statusFilters = [
+      ('all', 'الكل', Icons.apps_rounded, AppColors.royalBlue),
       (
         'pending',
         'قيد المراجعة',
@@ -94,7 +136,6 @@ class _DoctorExcusesScreenState extends ConsumerState<DoctorExcusesScreen> {
       ),
       ('accepted', 'مقبول', Icons.check_circle_rounded, AppColors.success),
       ('rejected', 'مرفوض', Icons.cancel_rounded, AppColors.danger),
-      ('all', 'الكل', Icons.apps_rounded, AppColors.royalBlue),
     ];
 
     return StaffShell(
@@ -111,124 +152,178 @@ class _DoctorExcusesScreenState extends ConsumerState<DoctorExcusesScreen> {
           }
 
           final data = _map(snapshot.data?['data']);
-          final stats = _map(data['stats']);
           final workflow = _map(data['workflow']);
-          final excuses = _list(data['excuses']);
+          final allExcuses = _list(data['excuses']);
+          final scopedExcuses = _filteredExcuses(
+            allExcuses,
+            includeStatus: false,
+          );
+          final stats = _localExcuseStats(scopedExcuses);
+          final excuses = _filteredExcuses(allExcuses);
           final subjects = _list(data['subjects']);
 
           return RefreshIndicator(
             onRefresh: () async => _reload(),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
               children: [
+                // Premium Unified Page Header Box
                 _WorkflowHero(
                   icon: Icons.verified_user_rounded,
-                  title: 'مراجعة الأعذار',
-                  subtitle:
-                      'راجع الأعذار الموجهة إليك واتخذ القرار النهائي لكل طلب.',
+                  title: 'أعذار الغياب',
+                  subtitle: 'راجع الأعذار الموجهة إليك واتخذ القرار النهائي.',
                 ),
                 const SizedBox(height: 18),
 
-                // Premium Metric Cards
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    _MetricCard(
-                      label: 'الإجمالي',
-                      value: _int(stats['total']),
-                      color: AppColors.royalBlue,
-                    ),
-                    _MetricCard(
-                      label: 'قيد المراجعة',
-                      value: _int(stats['pending']),
-                      color: AppColors.warning,
-                    ),
-                    _MetricCard(
-                      label: 'مقبول',
-                      value: _int(stats['accepted']),
-                      color: AppColors.success,
-                    ),
-                    _MetricCard(
-                      label: 'مرفوض',
-                      value: _int(stats['rejected']),
-                      color: AppColors.danger,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-
-                // Glassmorphic Search Bar
+                // Unified Filter & Search Control Bento Panel
                 Container(
                   decoration: BoxDecoration(
-                    color: AppColors.slate50,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.slate200),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppColors.slate100),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  child: TextField(
-                    controller: _searchController,
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => _reload(),
-                    style: const TextStyle(
-                      fontFamily: 'Cairo',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: AppColors.midnight,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'بحث باسم الطالب أو رقم القيد...',
-                      hintStyle: const TextStyle(
-                        fontFamily: 'Cairo',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: AppColors.slate400,
-                      ),
-                      prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        color: AppColors.slate400,
-                      ),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              onPressed: () {
-                                _searchController.clear();
-                                _reload();
-                              },
-                              icon: const Icon(
-                                Icons.close_rounded,
-                                color: AppColors.slate400,
-                                size: 20,
-                              ),
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: Colors.transparent,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(
-                          color: AppColors.royalBlue,
-                          width: 1.5,
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      // Premium Rounded Search Input
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.slate50,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.slate100),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          textInputAction: TextInputAction.search,
+                          onChanged: (_) => setState(() {}),
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                            color: AppColors.midnight,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'بحث باسم الطالب أو رقم القيد...',
+                            hintStyle: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12.5,
+                              color: AppColors.slate400,
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.search_rounded,
+                              color: AppColors.slate400,
+                              size: 20,
+                            ),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {});
+                                    },
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      color: AppColors.slate400,
+                                      size: 18,
+                                    ),
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: Colors.transparent,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
                         ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
+                      const SizedBox(height: 12),
+
+                      // Premium Subject Selection Capsule Dropdown
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.slate50,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.slate100),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 2,
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<int>(
+                            value: _subjectId ?? 0,
+                            isExpanded: true,
+                            icon: const Icon(
+                              Icons.arrow_drop_down_rounded,
+                              color: AppColors.slate500,
+                              size: 28,
+                            ),
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5,
+                              color: AppColors.midnight,
+                            ),
+                            items: [
+                              const DropdownMenuItem<int>(
+                                value: 0,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.menu_book_rounded,
+                                      color: AppColors.royalBlue,
+                                      size: 18,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('كل المواد الدراسية'),
+                                  ],
+                                ),
+                              ),
+                              ...subjects.map(
+                                (subject) => DropdownMenuItem<int>(
+                                  value: _int(subject['id']),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.menu_book_rounded,
+                                        color: AppColors.royalBlue,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _text(subject, 'name'),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                            onChanged: (value) => _applySubject(value ?? 0),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
 
-                // Horizontal Interactive Status Filter Chips
+                // Horizontal Interactive Status Filters with Integrated Statistic Counts
                 SizedBox(
-                  height: 42,
+                  height: 44,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: statusFilters.length,
@@ -238,14 +333,22 @@ class _DoctorExcusesScreenState extends ConsumerState<DoctorExcusesScreen> {
                       final filter = statusFilters[index];
                       final isSelected = _status == filter.$1;
                       final chipColor = filter.$4;
+
+                      final count = switch (filter.$1) {
+                        'pending' => _int(stats['pending']),
+                        'accepted' => _int(stats['accepted']),
+                        'rejected' => _int(stats['rejected']),
+                        _ => _int(stats['total']),
+                      };
+
                       return InkWell(
                         onTap: () => _applyStatus(filter.$1),
                         borderRadius: BorderRadius.circular(99),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
+                            horizontal: 16,
+                            vertical: 10,
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
@@ -280,13 +383,13 @@ class _DoctorExcusesScreenState extends ConsumerState<DoctorExcusesScreen> {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                filter.$2,
+                                '${filter.$2} ($count)',
                                 style: TextStyle(
                                   fontFamily: 'Cairo',
                                   fontWeight: isSelected
                                       ? FontWeight.w900
                                       : FontWeight.w700,
-                                  fontSize: 12.5,
+                                  fontSize: 12,
                                   color: isSelected
                                       ? chipColor
                                       : AppColors.slate600,
@@ -299,76 +402,10 @@ class _DoctorExcusesScreenState extends ConsumerState<DoctorExcusesScreen> {
                     },
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 24),
 
-                // Premium Subject Selector Capsule
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.slate200),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<int>(
-                      value: _subjectId ?? 0,
-                      isExpanded: true,
-                      icon: const Icon(
-                        Icons.arrow_drop_down_rounded,
-                        color: AppColors.slate500,
-                        size: 28,
-                      ),
-                      style: const TextStyle(
-                        fontFamily: 'Cairo',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: AppColors.midnight,
-                      ),
-                      items: [
-                        const DropdownMenuItem<int>(
-                          value: 0,
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.menu_book_rounded,
-                                color: AppColors.royalBlue,
-                                size: 20,
-                              ),
-                              SizedBox(width: 10),
-                              Text('كل المواد'),
-                            ],
-                          ),
-                        ),
-                        ...subjects.map(
-                          (subject) => DropdownMenuItem<int>(
-                            value: _int(subject['id']),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.menu_book_rounded,
-                                  color: AppColors.royalBlue,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    _text(subject, 'name'),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                      onChanged: (value) => _applySubject(value ?? 0),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 22),
                 _WorkflowSectionTitle(
-                  title: 'الطلبات',
+                  title: 'طلبات الغياب المرفوعة',
                   icon: Icons.assignment_late_rounded,
                 ),
                 const SizedBox(height: 12),
@@ -824,7 +861,9 @@ class _DoctorAttendanceTrackingScreenState
           if (snapshot.hasError) {
             return _WorkflowError(
               error: snapshot.error!,
-              onRetry: () => setState(() => _future = _fetch()),
+              onRetry: () => setState(() {
+                _future = _fetch();
+              }),
             );
           }
 
@@ -1567,7 +1606,9 @@ class _DoctorReportsScreenState extends ConsumerState<DoctorReportsScreen> {
                   ...subjects.map(
                     (subject) => _ReportSubjectCard(
                       subject: subject,
-                      onTap: () => _showSubjectReport(context, subject),
+                      onTap: () => context.push(
+                        DoctorSubjectReportScreen.path(_int(subject['id'])),
+                      ),
                     ),
                   ),
               ],
@@ -1577,34 +1618,369 @@ class _DoctorReportsScreenState extends ConsumerState<DoctorReportsScreen> {
       ),
     );
   }
+}
 
-  Future<void> _showSubjectReport(
-    BuildContext context,
-    Map<String, dynamic> subject,
-  ) async {
-    final subjectId = _int(subject['id']);
-    await showMoeenBottomSheet(
-      context: context,
+class DoctorSubjectReportScreen extends ConsumerStatefulWidget {
+  const DoctorSubjectReportScreen({super.key, required this.subjectId});
+
+  static const route = '/doctor/reports/:subjectId';
+
+  final int subjectId;
+
+  static String path(int subjectId) => '/doctor/reports/$subjectId';
+
+  @override
+  ConsumerState<DoctorSubjectReportScreen> createState() =>
+      _DoctorSubjectReportScreenState();
+}
+
+class _DoctorSubjectReportScreenState
+    extends ConsumerState<DoctorSubjectReportScreen> {
+  late Future<Map<String, dynamic>> _future = _fetch();
+  bool _downloading = false;
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _sortBy = 'name'; // 'name', 'rate_asc', 'rate_desc'
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<Map<String, dynamic>> _fetch() {
+    return ref
+        .read(staffRepositoryProvider)
+        .get('/doctor/reports/${widget.subjectId}');
+  }
+
+  void _reload() => setState(() {
+    _future = _fetch();
+  });
+
+  Future<void> _downloadPdf() async {
+    if (_downloading) return;
+    setState(() => _downloading = true);
+    try {
+      final bytes = await ref
+          .read(staffRepositoryProvider)
+          .download('/doctor/reports/${widget.subjectId}/pdf');
+      final result = await DownloadService.saveBytes(
+        bytes: bytes,
+        fileName:
+            'doctor_subject_report_${widget.subjectId}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+        section: 'DoctorReports',
+      );
+      if (!mounted) return;
+      await showMoeenInfoDialog(
+        context: context,
+        title: 'تم تحميل التقرير',
+        message: result.opened
+            ? 'تم حفظ وفتح التقرير بنجاح.\n${result.path}'
+            : 'تم حفظ التقرير، لكن تعذر فتحه تلقائيًا.\n${result.path}',
+        icon: result.opened
+            ? Icons.check_circle_rounded
+            : Icons.file_download_done_rounded,
+        color: AppColors.success,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      await showMoeenInfoDialog(
+        context: context,
+        title: 'تعذر تحميل التقرير',
+        message: error is ApiException ? error.message : error.toString(),
+        icon: Icons.error_outline_rounded,
+        color: AppColors.danger,
+      );
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  Widget _buildCompactMetricCard({
+    required BuildContext context,
+    required String label,
+    required String value,
+    required Color color,
+    required IconData icon,
+  }) {
+    final width = (MediaQuery.sizeOf(context).width - 50) / 2;
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withValues(alpha: 0.12),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    color: AppColors.slate500,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    color: AppColors.midnight,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSortChip({required String label, required String value}) {
+    final isSelected = _sortBy == value;
+    return ChoiceChip(
+      selected: isSelected,
+      label: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Cairo',
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+          color: isSelected ? Colors.white : AppColors.slate700,
+        ),
+      ),
+      selectedColor: AppColors.royalBlue,
+      backgroundColor: AppColors.slate50,
+      elevation: 0,
+      pressElevation: 0,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(99),
+        side: BorderSide(
+          color: isSelected ? AppColors.royalBlue : AppColors.slate200,
+          width: 1,
+        ),
+      ),
+      onSelected: (selected) {
+        if (selected) {
+          setState(() => _sortBy = value);
+        }
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StaffShell(
       title: 'تفاصيل التقرير',
-      icon: Icons.analytics_rounded,
-      color: _rateColor(_int(subject['attendance_rate'])),
-      fullScreen: true,
+      currentRoute: DoctorReportsScreen.route,
       child: FutureBuilder<Map<String, dynamic>>(
-        future: ref
-            .read(staffRepositoryProvider)
-            .get('/doctor/reports/$subjectId'),
+        future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Padding(
-              padding: EdgeInsets.all(28),
-              child: Center(child: CircularProgressIndicator()),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return _WorkflowError(error: snapshot.error!, onRetry: () {});
+            return _WorkflowError(error: snapshot.error!, onRetry: _reload);
           }
           final data = _map(snapshot.data?['data']);
-          return _SubjectReportView(data: data);
+          final subject = _map(data['subject']);
+          final students = _list(data['students']);
+
+          final averageRate = students.isEmpty
+              ? 0
+              : (students
+                            .map((student) => _int(student['attendance_rate']))
+                            .fold<int>(0, (sum, value) => sum + value) /
+                        students.length)
+                    .round();
+
+          final totalLectures = students.isNotEmpty ? _int(students.first['total']) : 0;
+          final atRiskCount = students.where((student) => _int(student['attendance_rate']) < 50).length;
+
+          // تصفية الطلاب محلياً
+          final query = _searchQuery.trim().toLowerCase();
+          var filteredStudents = students.where((student) {
+            final name = _text(student, 'name').toLowerCase();
+            final number = _text(student, 'student_number').toLowerCase();
+            return name.contains(query) || number.contains(query);
+          }).toList();
+
+          // فرز وترتيب الطلاب محلياً
+          if (_sortBy == 'name') {
+            filteredStudents.sort((a, b) => _text(a, 'name').compareTo(_text(b, 'name')));
+          } else if (_sortBy == 'rate_asc') {
+            filteredStudents.sort((a, b) => _int(a['attendance_rate']).compareTo(_int(b['attendance_rate'])));
+          } else if (_sortBy == 'rate_desc') {
+            filteredStudents.sort((a, b) => _int(b['attendance_rate']).compareTo(_int(a['attendance_rate'])));
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async => _reload(),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+              children: [
+                _WorkflowHero(
+                  icon: Icons.analytics_rounded,
+                  title: _text(subject, 'name', fallback: 'تقرير المادة'),
+                  subtitle:
+                      '${_text(subject, 'major', fallback: '-')} - ${_text(subject, 'level', fallback: '-')}',
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _buildCompactMetricCard(
+                      context: context,
+                      label: 'الطلاب',
+                      value: '${students.length}',
+                      color: AppColors.info,
+                      icon: Icons.groups_rounded,
+                    ),
+                    _buildCompactMetricCard(
+                      context: context,
+                      label: 'المحاضرات',
+                      value: '$totalLectures',
+                      color: AppColors.royalBlue,
+                      icon: Icons.menu_book_rounded,
+                    ),
+                    _buildCompactMetricCard(
+                      context: context,
+                      label: 'متوسط الحضور',
+                      value: '$averageRate%',
+                      color: _rateColor(averageRate),
+                      icon: Icons.analytics_rounded,
+                    ),
+                    _buildCompactMetricCard(
+                      context: context,
+                      label: 'المتعثرين (<50%)',
+                      value: '$atRiskCount',
+                      color: AppColors.danger,
+                      icon: Icons.warning_amber_rounded,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: _downloading ? null : _downloadPdf,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.royalBlue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  icon: _downloading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.picture_as_pdf_rounded, size: 20),
+                  label: const Text('تحميل تقرير الحضور PDF'),
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _searchController,
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    color: AppColors.midnight,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'البحث عن طالب أو رقم القيد...',
+                    hintStyle: const TextStyle(
+                      fontFamily: 'Cairo',
+                      color: AppColors.slate400,
+                      fontSize: 13,
+                    ),
+                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.royalBlue, size: 20),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, color: AppColors.slate400, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: AppColors.slate50,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.slate200, width: 1.2),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.royalBlue, width: 1.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildSortChip(label: 'أبجدياً بالاسم', value: 'name'),
+                      const SizedBox(width: 8),
+                      _buildSortChip(label: 'الأقل حضوراً', value: 'rate_asc'),
+                      const SizedBox(width: 8),
+                      _buildSortChip(label: 'الأعلى حضوراً', value: 'rate_desc'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _SubjectReportView(subject: subject, students: filteredStudents),
+              ],
+            ),
+          );
         },
       ),
     );
@@ -1640,10 +2016,28 @@ class _ExcuseDetailsSheetState extends ConsumerState<_ExcuseDetailsSheet> {
     super.dispose();
   }
 
-  Future<void> _downloadFile(String url, String fileName) async {
+  Future<void> _openOrDownloadFile({
+    required String url,
+    required String fileName,
+    required String originalName,
+  }) async {
+    if (url.isEmpty) return;
     if (_downloadingFiles[url] == true) return;
     setState(() => _downloadingFiles[url] = true);
     try {
+      for (final candidate in {fileName, originalName}) {
+        final path = await DownloadService.openMoeenFile(
+          fileName: candidate,
+          section: 'Excuses',
+        );
+        if (path == null) continue;
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم فتح المستند من التخزين الداخلي.')),
+        );
+        return;
+      }
+
       final result = await DownloadService.downloadUrlToMoeenFolder(
         url: url,
         fileName: fileName,
@@ -1672,6 +2066,17 @@ class _ExcuseDetailsSheetState extends ConsumerState<_ExcuseDetailsSheet> {
     }
   }
 
+  String _excuseAttachmentFileName(Map<String, dynamic> item, String name) {
+    final excuseId = _int(widget.excuse['id']);
+    final attachmentId = _int(item['id']);
+    final prefix = [
+      if (excuseId > 0) 'excuse_$excuseId',
+      if (attachmentId > 0) 'attachment_$attachmentId',
+    ].join('_');
+    return prefix.isEmpty ? name : '${prefix}_$name';
+  }
+
+  // ignore: unused_element
   Widget _buildDetailRow({
     required IconData icon,
     required String label,
@@ -1729,107 +2134,204 @@ class _ExcuseDetailsSheetState extends ConsumerState<_ExcuseDetailsSheet> {
     final status = _text(excuse, 'status');
     final color = _statusColor(status);
 
-    // Auto-select resolution if not set and accepted is selected
     if (_decision == 'accepted' &&
         _resolution == null &&
         resolutions.isNotEmpty) {
       _resolution = _text(resolutions.first, 'value');
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Premium Academic Ticket Document layout
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.slate200),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: Column(
-              children: [
-                // Ticket Header - Student Profile Info
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  color: AppColors.royalBlue.withValues(alpha: 0.06),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: const BoxDecoration(
-                          gradient: AppColors.primaryGradient,
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          _getInitials(_text(student, 'name')),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontFamily: 'Cairo',
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
-                          ),
-                        ),
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Premium Case File Bento Board
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: AppColors.slate100),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.royalBlue.withValues(alpha: 0.03),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: Column(
+                children: [
+                  // Elegant Top Banner - Student ID Profile
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppColors.royalBlue.withValues(alpha: 0.04),
+                      border: Border(
+                        bottom: BorderSide(color: AppColors.slate100),
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _text(student, 'name'),
+                    ),
+                    child: Row(
+                      children: [
+                        // Avatar with glowing colored border
+                        Container(
+                          width: 56,
+                          height: 56,
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.royalBlue.withValues(alpha: 0.2),
+                              width: 2,
+                            ),
+                          ),
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              _getInitials(_text(student, 'name')),
                               style: const TextStyle(
+                                color: Colors.white,
                                 fontFamily: 'Cairo',
                                 fontWeight: FontWeight.w900,
-                                fontSize: 14.5,
-                                color: AppColors.midnight,
+                                fontSize: 16,
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'رقم القيد: ${_text(student, 'student_number')}',
-                              style: const TextStyle(
-                                fontFamily: 'Cairo',
-                                fontWeight: FontWeight.w700,
-                                fontSize: 11,
-                                color: AppColors.slate500,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _text(student, 'name'),
+                                style: const TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 16,
+                                  color: AppColors.midnight,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              // Student number capsule
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.royalBlue.withValues(
+                                    alpha: 0.06,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'رقم القيد: ${_text(student, 'student_number')}',
+                                  style: const TextStyle(
+                                    fontFamily: 'Cairo',
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 11,
+                                    color: AppColors.royalBlue,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Diagnostic Info Row
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _BentoInfoTile(
+                            icon: Icons.menu_book_rounded,
+                            label: 'المادة الدراسية',
+                            value: _text(subject, 'name', fallback: '-'),
+                            color: AppColors.royalBlue,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _BentoInfoTile(
+                            icon: Icons.calendar_month_rounded,
+                            label: 'تاريخ الغياب',
+                            value: _formatCompactDate(
+                              _text(attendance, 'date'),
+                            ),
+                            color: AppColors.info,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Beautiful Excuse Reason Quote Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.02),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: AppColors.warning.withValues(alpha: 0.1),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.format_quote_rounded,
+                    color: AppColors.warning,
+                    size: 22,
                   ),
                 ),
-
-                // Dashed Divider
-                const _DashedDivider(),
-
-                // Ticket Body - Details
-                Padding(
-                  padding: const EdgeInsets.all(16),
+                const SizedBox(width: 16),
+                Expanded(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildDetailRow(
-                        icon: Icons.menu_book_rounded,
-                        label: 'المادة الدراسية',
-                        value: _text(subject, 'name', fallback: '-'),
+                      const Text(
+                        'شرح عذر الغياب المقدم:',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.warning,
+                        ),
                       ),
-                      const SizedBox(height: 12),
-                      _buildDetailRow(
-                        icon: Icons.calendar_month_rounded,
-                        label: 'تاريخ الغياب المطلوب',
-                        value: _text(attendance, 'date', fallback: '-'),
+                      const SizedBox(height: 6),
+                      Text(
+                        _text(excuse, 'reason', fallback: '-'),
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 13.5,
+                          color: AppColors.midnight,
+                          height: 1.6,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ],
                   ),
@@ -1837,522 +2339,539 @@ class _ExcuseDetailsSheetState extends ConsumerState<_ExcuseDetailsSheet> {
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 16),
 
-        // Beautiful Excuse Reason Warning Card
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.warning.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: AppColors.warning.withValues(alpha: 0.15),
+          // Medical Document Cards
+          if (attachments.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            const _WorkflowSectionTitle(
+              title: 'المستندات والمرفقات الطبية',
+              icon: Icons.attach_file_rounded,
             ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
+            const SizedBox(height: 10),
+            ...attachments.map((item) {
+              final url = _text(item, 'file_url');
+              final name = _text(item, 'file_name', fallback: 'مستند طبي');
+              final localName = _excuseAttachmentFileName(item, name);
+              final isDownloading = _downloadingFiles[url] ?? false;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.slate100),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.royalBlue.withValues(alpha: 0.02),
+                      blurRadius: 15,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
-                child: const Icon(
-                  Icons.format_quote_rounded,
-                  color: AppColors.warning,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.royalBlue.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.description_rounded,
+                        color: AppColors.royalBlue,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13.5,
+                              color: AppColors.midnight,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.slate50,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: AppColors.slate100),
+                            ),
+                            child: const Text(
+                              'مستند رسمي • اضغط للتحميل',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.slate500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    isDownloading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: AppColors.royalBlue,
+                            ),
+                          )
+                        : Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.royalBlue.withValues(
+                                alpha: 0.08,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              tooltip: 'فتح أو تحميل المستند',
+                              onPressed: () => _openOrDownloadFile(
+                                url: url,
+                                fileName: localName,
+                                originalName: name,
+                              ),
+                              icon: const Icon(
+                                Icons.open_in_new_rounded,
+                                color: AppColors.royalBlue,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                  ],
+                ),
+              );
+            }),
+          ],
+
+          const SizedBox(height: 18),
+
+          if (!pending) ...[
+            const SizedBox(height: 16),
+            // Approved/Rejected Elegant Container Card
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: color.withValues(alpha: 0.12)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        status == 'accepted'
+                            ? Icons.check_circle_rounded
+                            : Icons.cancel_rounded,
+                        color: color,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        status == 'accepted'
+                            ? 'تم قبول هذا العذر'
+                            : 'تم رفض هذا العذر',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14.5,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_text(excuse, 'resolution').isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: color.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: Text(
+                        'الإجراء المتخذ: ${_text(excuse, 'resolution')}',
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12.5,
+                          color: AppColors.midnight,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (_text(excuse, 'doctor_comment').isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Divider(color: AppColors.slate200, height: 1),
+                    const SizedBox(height: 10),
                     const Text(
-                      'شرح عذر الغياب المقدم:',
+                      'تعليق وملاحظة الدكتور:',
                       style: TextStyle(
                         fontFamily: 'Cairo',
-                        fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.warning,
+                        fontSize: 11,
+                        color: AppColors.slate400,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _text(excuse, 'reason', fallback: '-'),
+                      _text(excuse, 'doctor_comment'),
                       style: const TextStyle(
                         fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w700,
                         fontSize: 13,
                         color: AppColors.midnight,
-                        height: 1.5,
-                        fontWeight: FontWeight.w700,
+                        height: 1.4,
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
-        ),
-
-        // Medical Document Cards
-        if (attachments.isNotEmpty) ...[
-          const SizedBox(height: 18),
-          const _WorkflowSectionTitle(
-            title: 'المستندات والمرفقات الطبية',
-            icon: Icons.attach_file_rounded,
-          ),
-          const SizedBox(height: 10),
-          ...attachments.map((item) {
-            final url = _text(item, 'file_url');
-            final name = _text(item, 'file_name', fallback: 'مستند طبي');
-            final isDownloading = _downloadingFiles[url] ?? false;
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ] else ...[
+            // Choice Actions Board: Unified Premium Bento Control Card
+            Container(
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.slate200),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: AppColors.slate100),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 25,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: AppColors.royalBlue.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.description_rounded,
-                      color: AppColors.royalBlue,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: 'Cairo',
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                            color: AppColors.midnight,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'مستند رسمي • اضغط للتحميل',
-                          style: TextStyle(
-                            fontFamily: 'Cairo',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.slate400,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  isDownloading
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.royalBlue,
-                          ),
-                        )
-                      : IconButton(
-                          onPressed: () => _downloadFile(url, name),
-                          icon: const Icon(
-                            Icons.cloud_download_rounded,
-                            color: AppColors.royalBlue,
-                          ),
-                        ),
-                ],
-              ),
-            );
-          }),
-        ],
-
-        const SizedBox(height: 14),
-
-        if (!pending) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: color.withValues(alpha: 0.15)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      status == 'accepted'
-                          ? Icons.check_circle_rounded
-                          : Icons.cancel_rounded,
-                      color: color,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      status == 'accepted'
-                          ? 'تم قبول هذا العذر'
-                          : 'تم رفض هذا العذر',
-                      style: TextStyle(
-                        fontFamily: 'Cairo',
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14,
-                        color: color,
-                      ),
-                    ),
-                  ],
-                ),
-                if (_text(excuse, 'resolution').isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    'الإجراء المتخذ: ${_text(excuse, 'resolution')}',
-                    style: const TextStyle(
-                      fontFamily: 'Cairo',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12.5,
-                      color: AppColors.midnight,
-                    ),
-                  ),
-                ],
-                if (_text(excuse, 'doctor_comment').isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  const Divider(color: AppColors.slate200),
-                  const SizedBox(height: 4),
                   const Text(
-                    'تعليق وملاحظة الدكتور:',
+                    'اتخاذ القرار المناسب:',
                     style: TextStyle(
                       fontFamily: 'Cairo',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 11,
-                      color: AppColors.slate400,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _text(excuse, 'doctor_comment'),
-                    style: const TextStyle(
-                      fontFamily: 'Cairo',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
                       color: AppColors.midnight,
                     ),
                   ),
-                ],
-              ],
-            ),
-          ),
-        ] else ...[
-          // Choice Buttons (Accept / Reject)
-          const Text(
-            'اتخاذ القرار المناسب:',
-            style: TextStyle(
-              fontFamily: 'Cairo',
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.midnight,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      _decision = 'accepted';
-                      if (resolutions.isNotEmpty && _resolution == null) {
-                        _resolution = _text(resolutions.first, 'value');
-                      }
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(16),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: _decision == 'accepted'
-                          ? AppColors.success.withValues(alpha: 0.12)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _decision == 'accepted'
-                            ? AppColors.success
-                            : AppColors.slate200,
-                        width: _decision == 'accepted' ? 2 : 1,
-                      ),
-                      boxShadow: _decision == 'accepted'
-                          ? [
-                              BoxShadow(
-                                color: AppColors.success.withValues(
-                                  alpha: 0.15,
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              _decision = 'accepted';
+                              if (resolutions.isNotEmpty &&
+                                  _resolution == null) {
+                                _resolution = _text(resolutions.first, 'value');
+                              }
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(18),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              color: _decision == 'accepted'
+                                  ? AppColors.success.withValues(alpha: 0.08)
+                                  : AppColors.slate50,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: _decision == 'accepted'
+                                    ? AppColors.success
+                                    : AppColors.slate200,
+                                width: _decision == 'accepted' ? 2 : 1,
+                              ),
+                              boxShadow: _decision == 'accepted'
+                                  ? [
+                                      BoxShadow(
+                                        color: AppColors.success.withValues(
+                                          alpha: 0.12,
+                                        ),
+                                        blurRadius: 15,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.check_circle_rounded,
+                                  color: _decision == 'accepted'
+                                      ? AppColors.success
+                                      : AppColors.slate400,
+                                  size: 20,
                                 ),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.check_circle_rounded,
-                          color: _decision == 'accepted'
-                              ? AppColors.success
-                              : AppColors.slate400,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'قبول العذر',
-                          style: TextStyle(
-                            fontFamily: 'Cairo',
-                            fontWeight: FontWeight.w900,
-                            fontSize: 14,
-                            color: _decision == 'accepted'
-                                ? AppColors.success
-                                : AppColors.slate600,
+                                const SizedBox(width: 8),
+                                Text(
+                                  'قبول العذر',
+                                  style: TextStyle(
+                                    fontFamily: 'Cairo',
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 13.5,
+                                    color: _decision == 'accepted'
+                                        ? AppColors.success
+                                        : AppColors.slate600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      _decision = 'rejected';
-                      _resolution = null;
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(16),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: _decision == 'rejected'
-                          ? AppColors.danger.withValues(alpha: 0.12)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _decision == 'rejected'
-                            ? AppColors.danger
-                            : AppColors.slate200,
-                        width: _decision == 'rejected' ? 2 : 1,
                       ),
-                      boxShadow: _decision == 'rejected'
-                          ? [
-                              BoxShadow(
-                                color: AppColors.danger.withValues(alpha: 0.15),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              _decision = 'rejected';
+                              _resolution = null;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(18),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              color: _decision == 'rejected'
+                                  ? AppColors.danger.withValues(alpha: 0.08)
+                                  : AppColors.slate50,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: _decision == 'rejected'
+                                    ? AppColors.danger
+                                    : AppColors.slate200,
+                                width: _decision == 'rejected' ? 2 : 1,
                               ),
-                            ]
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.cancel_rounded,
-                          color: _decision == 'rejected'
-                              ? AppColors.danger
-                              : AppColors.slate400,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'رفض العذر',
-                          style: TextStyle(
-                            fontFamily: 'Cairo',
-                            fontWeight: FontWeight.w900,
-                            fontSize: 14,
-                            color: _decision == 'rejected'
-                                ? AppColors.danger
-                                : AppColors.slate600,
+                              boxShadow: _decision == 'rejected'
+                                  ? [
+                                      BoxShadow(
+                                        color: AppColors.danger.withValues(
+                                          alpha: 0.12,
+                                        ),
+                                        blurRadius: 15,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.cancel_rounded,
+                                  color: _decision == 'rejected'
+                                      ? AppColors.danger
+                                      : AppColors.slate400,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'رفض العذر',
+                                  style: TextStyle(
+                                    fontFamily: 'Cairo',
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 13.5,
+                                    color: _decision == 'rejected'
+                                        ? AppColors.danger
+                                        : AppColors.slate600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-            ],
-          ),
 
-          if (_decision == 'accepted' && resolutions.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            const Text(
-              'نتيجة المعالجة بعد القبول:',
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.midnight,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.slate200),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButtonFormField<String>(
-                  initialValue:
-                      _resolution ??
-                      (resolutions.isNotEmpty
-                          ? _text(resolutions.first, 'value')
-                          : null),
-                  icon: const Icon(
-                    Icons.arrow_drop_down_rounded,
-                    color: AppColors.slate500,
-                    size: 28,
-                  ),
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(
-                      Icons.handyman_rounded,
-                      color: AppColors.success,
+                  if (_decision == 'accepted' && resolutions.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'نتيجة المعالجة بعد القبول:',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.midnight,
+                      ),
                     ),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 8),
-                  ),
-                  style: const TextStyle(
-                    fontFamily: 'Cairo',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.midnight,
-                  ),
-                  items: resolutions
-                      .map(
-                        (item) => DropdownMenuItem<String>(
-                          value: _text(item, 'value'),
-                          child: Text(_text(item, 'label')),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.slate50,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.slate100),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 2,
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButtonFormField<String>(
+                          initialValue:
+                              _resolution ??
+                              (resolutions.isNotEmpty
+                                  ? _text(resolutions.first, 'value')
+                                  : null),
+                          icon: const Icon(
+                            Icons.arrow_drop_down_rounded,
+                            color: AppColors.slate500,
+                            size: 28,
+                          ),
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(
+                              Icons.handyman_rounded,
+                              color: AppColors.success,
+                              size: 20,
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.midnight,
+                          ),
+                          items: resolutions
+                              .map(
+                                (item) => DropdownMenuItem<String>(
+                                  value: _text(item, 'value'),
+                                  child: Text(_text(item, 'label')),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) =>
+                              setState(() => _resolution = value),
                         ),
-                      )
-                      .toList(),
-                  onChanged: (value) => setState(() => _resolution = value),
-                ),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+
+                  TextField(
+                    controller: _commentController,
+                    maxLines: 2,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.midnight,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'ملاحظة للطالب (اختياري)',
+                      labelStyle: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.slate400,
+                      ),
+                      alignLabelWithHint: true,
+                      filled: true,
+                      fillColor: AppColors.slate50,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: AppColors.royalBlue,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton(
+                      onPressed: _saving ? null : _save,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _decision == 'accepted'
+                            ? AppColors.success
+                            : AppColors.danger,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                        shadowColor: Colors.transparent,
+                      ),
+                      child: _saving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _decision == 'accepted'
+                                      ? 'اعتماد وقبول العذر'
+                                      : 'اعتماد ورفض العذر',
+                                  style: const TextStyle(
+                                    fontFamily: 'Cairo',
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
-
-          const SizedBox(height: 16),
-
-          TextField(
-            controller: _commentController,
-            maxLines: 3,
-            style: const TextStyle(
-              fontFamily: 'Cairo',
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.midnight,
-            ),
-            decoration: InputDecoration(
-              labelText: 'ملاحظة للطالب (اختياري)',
-              labelStyle: const TextStyle(
-                fontFamily: 'Cairo',
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.slate400,
-              ),
-              alignLabelWithHint: true,
-              filled: true,
-              fillColor: AppColors.slate50.withValues(alpha: 0.5),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: AppColors.slate200),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: AppColors.slate200),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(
-                  color: AppColors.royalBlue,
-                  width: 2,
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: FilledButton(
-              onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(
-                backgroundColor: _decision == 'accepted'
-                    ? AppColors.success
-                    : AppColors.danger,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 0,
-              ),
-              child: _saving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.check_circle_outline_rounded,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _decision == 'accepted'
-                              ? 'اعتماد وقبول العذر'
-                              : 'اعتماد ورفض العذر',
-                          style: const TextStyle(
-                            fontFamily: 'Cairo',
-                            fontWeight: FontWeight.w900,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
         ],
-      ],
+      ),
     );
   }
 
@@ -2450,11 +2969,12 @@ class _DoctorAttendanceReportPanelState
             '/doctor/attendance/$_subjectId/$_date/report-pdf',
             query: {if (_lectureId != null) 'lecture_id': _lectureId},
           );
-      final result = await DownloadService.saveBytesWithPicker(
+      final result = await DownloadService.saveBytes(
         bytes: bytes,
         fileName: 'attendance_report_${_subjectId}_$_date.pdf',
+        section: 'AttendanceReports',
       );
-      if (!mounted || result.cancelled) return;
+      if (!mounted) return;
       await showMoeenInfoDialog(
         context: context,
         title: 'تم تحميل التقرير',
@@ -2535,7 +3055,9 @@ class _DoctorAttendanceReportPanelState
         if (snapshot.hasError) {
           return _WorkflowError(
             error: snapshot.error!,
-            onRetry: () => setState(() => _future = _fetch()),
+            onRetry: () => setState(() {
+              _future = _fetch();
+            }),
           );
         }
 
@@ -4625,75 +5147,228 @@ class _StatusToggle extends StatelessWidget {
 }
 
 class _SubjectReportView extends StatelessWidget {
-  const _SubjectReportView({required this.data});
+  const _SubjectReportView({required this.subject, required this.students});
 
-  final Map<String, dynamic> data;
+  final Map<String, dynamic> subject;
+  final List<dynamic> students;
 
   @override
   Widget build(BuildContext context) {
-    final subject = _map(data['subject']);
-    final students = _list(data['students']);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          _text(subject, 'name', fallback: 'تقرير المادة'),
-          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
-        ),
-        const SizedBox(height: 14),
-        ...students.map(
-          (student) => Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: _workflowCard(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _text(student, 'name'),
-                        style: const TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                    Text(
-                      '${_int(student['attendance_rate'])}%',
-                      style: TextStyle(
-                        color: _rateColor(_int(student['attendance_rate'])),
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _TinyStat(
-                      'حاضر',
-                      _int(student['present']),
-                      AppColors.success,
-                    ),
-                    _TinyStat(
-                      'غائب',
-                      _int(student['absent']),
-                      AppColors.danger,
-                    ),
-                    _TinyStat('بعذر', _int(student['excused']), AppColors.info),
-                    _TinyStat(
-                      'الإجمالي',
-                      _int(student['total']),
-                      AppColors.royalBlue,
-                    ),
-                  ],
-                ),
-              ],
+    if (students.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 30),
+        child: Center(
+          child: Text(
+            'لا توجد نتائج مطابقة للبحث.',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              color: AppColors.slate500,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 18,
+              decoration: BoxDecoration(
+                color: AppColors.royalBlue,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'سجل الطلاب (${students.length})',
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w900,
+                color: AppColors.midnight,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        ...students.map(
+          (student) {
+            final rate = _int(student['attendance_rate']);
+            final name = _text(student, 'name');
+            final number = _text(student, 'student_number');
+            final rateColor = _rateColor(rate);
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: AppColors.slate200),
+                boxShadow: [
+                  BoxShadow(
+                    color: rateColor.withValues(alpha: 0.02),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      // Avatar
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              rateColor.withValues(alpha: 0.8),
+                              rateColor,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          _getInitials(name),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Name & Student Number
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                                color: AppColors.midnight,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'رقم القيد: $number',
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                color: AppColors.slate500,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Attendance Rate Circle or Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: rateColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: rateColor.withValues(alpha: 0.18),
+                          ),
+                        ),
+                        child: Text(
+                          '$rate%',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            color: rateColor,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Bento stats row
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildTinyStatChip('حاضر', _int(student['present']), AppColors.success),
+                        const SizedBox(width: 6),
+                        _buildTinyStatChip('غائب', _int(student['absent']), AppColors.danger),
+                        const SizedBox(width: 6),
+                        _buildTinyStatChip('بعذر', _int(student['excused']), AppColors.info),
+                        const SizedBox(width: 6),
+                        _buildTinyStatChip('المحاضرات', _int(student['total']), AppColors.royalBlue),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ],
+    );
+  }
+
+  Widget _buildTinyStatChip(String label, int value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.slate200, width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontFamily: 'Cairo',
+              color: AppColors.slate500,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(
+            '$value',
+            style: const TextStyle(
+              fontFamily: 'Cairo',
+              color: AppColors.midnight,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -4766,8 +5441,9 @@ class _WorkflowHero extends StatelessWidget {
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
+class MetricCard extends StatelessWidget {
+  const MetricCard({
+    super.key,
     required this.label,
     required this.value,
     required this.color,
@@ -4952,200 +5628,193 @@ class _ExcuseCard extends StatelessWidget {
     final color = _statusColor(status);
     final reason = _text(excuse, 'reason');
 
-    IconData statusIcon() => switch (status) {
-      'accepted' => Icons.check_rounded,
-      'rejected' => Icons.close_rounded,
-      _ => Icons.hourglass_empty_rounded,
-    };
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.slate100),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Vertical Status Stripe
-                Container(
-                  width: 5,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: const BorderRadius.only(
-                      topRight: Radius.circular(20),
-                      bottomRight: Radius.circular(20),
-                    ),
-                  ),
-                ),
-
-                // Card Content
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Top Row: Avatar + Name + Status
-                        Row(
-                          children: [
-                            // Gradient Initials Avatar with micro badge
-                            Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Container(
-                                  width: 42,
-                                  height: 42,
-                                  decoration: const BoxDecoration(
-                                    gradient: AppColors.primaryGradient,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    _getInitials(_text(student, 'name')),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontFamily: 'Cairo',
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                                // Micro status badge
-                                Positioned(
-                                  bottom: -2,
-                                  left: -2,
-                                  child: Container(
-                                    width: 18,
-                                    height: 18,
-                                    decoration: BoxDecoration(
-                                      color: color,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      statusIcon(),
-                                      color: Colors.white,
-                                      size: 10,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _text(student, 'name'),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontFamily: 'Cairo',
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 14,
-                                      color: AppColors.midnight,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  // Meta Capsules Row
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 4,
-                                    children: [
-                                      _ExcuseMetaCapsule(
-                                        icon: Icons.menu_book_rounded,
-                                        text: _text(
-                                          subject,
-                                          'name',
-                                          fallback: '-',
-                                        ),
-                                      ),
-                                      _ExcuseMetaCapsule(
-                                        icon: Icons.calendar_month_rounded,
-                                        text: _text(
-                                          attendance,
-                                          'date',
-                                          fallback: '-',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.03),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header Row: Avatar + Info + Status Badge
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: AppColors.primaryGradient,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.royalBlue.withValues(
+                                alpha: 0.15,
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            Icon(
-                              Icons.chevron_left_rounded,
-                              color: AppColors.slate300,
-                              size: 22,
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          _getInitials(_text(student, 'name')),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _text(student, 'name'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14.5,
+                                color: AppColors.midnight,
+                              ),
+                            ),
+                            Text(
+                              'رقم القيد: ${_text(student, 'student_number', fallback: '-')}',
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
+                                color: AppColors.slate400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Premium Status Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: color.withValues(alpha: 0.15),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              switch (status) {
+                                'accepted' => Icons.check_circle_rounded,
+                                'rejected' => Icons.cancel_rounded,
+                                _ => Icons.hourglass_empty_rounded,
+                              },
+                              color: color,
+                              size: 12,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _statusLabel(status),
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w900,
+                                fontSize: 10,
+                                color: color,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
-                        // Reason Quote Preview
-                        if (reason.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.slate50,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.format_quote_rounded,
-                                  color: AppColors.slate400,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    reason,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontFamily: 'Cairo',
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.slate500,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                  // Horizontal Bento Capsules Wrap
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _ExcuseMetaCapsule(
+                        icon: Icons.menu_book_rounded,
+                        text: _text(subject, 'name', fallback: '-'),
+                      ),
+                      _ExcuseMetaCapsule(
+                        icon: Icons.calendar_month_rounded,
+                        text: _formatCompactDate(_text(attendance, 'date')),
+                      ),
+                    ],
+                  ),
+
+                  // Reason Quote Preview
+                  if (reason.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.format_quote_rounded,
+                            color: AppColors.warning,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              reason,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.slate600,
+                                height: 1.4,
+                              ),
                             ),
                           ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              ],
+                  ],
+                ],
+              ),
             ),
           ),
         ),
@@ -5163,16 +5832,17 @@ class _ExcuseMetaCapsule extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: AppColors.slate50,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.slate100),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: AppColors.slate400),
-          const SizedBox(width: 4),
+          Icon(icon, size: 13, color: AppColors.royalBlue),
+          const SizedBox(width: 6),
           Flexible(
             child: Text(
               text,
@@ -5180,10 +5850,72 @@ class _ExcuseMetaCapsule extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontFamily: 'Cairo',
-                fontSize: 10.5,
+                fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: AppColors.slate500,
+                color: AppColors.midnight,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BentoInfoTile extends StatelessWidget {
+  const _BentoInfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: AppColors.slate400,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              color: AppColors.midnight,
+              height: 1.3,
             ),
           ),
         ],
@@ -5735,9 +6467,20 @@ class _ReportSubjectCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(18),
-        decoration: _workflowCard(),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.slate200),
+          boxShadow: [
+            BoxShadow(
+              color: _rateColor(rate).withValues(alpha: 0.03),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
@@ -5745,78 +6488,139 @@ class _ReportSubjectCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: AppColors.royalBlue.withValues(alpha: 0.12),
+                    color: AppColors.royalBlue.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Icon(
                     Icons.menu_book_rounded,
                     color: AppColors.royalBlue,
+                    size: 22,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _text(subject, 'name'),
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.midnight,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${_text(subject, 'major')} • ${_text(subject, 'level')}',
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.slate500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _rateColor(rate).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _rateColor(rate).withValues(alpha: 0.18)),
+                  ),
                   child: Text(
-                    _text(subject, 'name'),
-                    style: const TextStyle(
-                      fontSize: 16,
+                    '$rate%',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      color: _rateColor(rate),
+                      fontSize: 15,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
-                Text(
-                  '$rate%',
-                  style: TextStyle(
-                    color: _rateColor(rate),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
               ],
             ),
-            const SizedBox(height: 14),
-            LinearProgressIndicator(
-              minHeight: 9,
+            const SizedBox(height: 16),
+            ClipRRect(
               borderRadius: BorderRadius.circular(99),
-              value: rate / 100,
-              color: _rateColor(rate),
-              backgroundColor: AppColors.slate100,
+              child: LinearProgressIndicator(
+                minHeight: 8,
+                value: rate / 100,
+                color: _rateColor(rate),
+                backgroundColor: AppColors.slate100,
+              ),
             ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _TinyStat(
-                  'طلاب',
-                  _int(subject['students_count']),
-                  AppColors.info,
-                ),
-                _TinyStat(
-                  'محاضرات',
-                  _int(subject['lectures_count']),
-                  AppColors.royalBlue,
-                ),
-                _TinyStat(
-                  'حاضر',
-                  _int(subject['present_count']),
-                  AppColors.success,
-                ),
-                _TinyStat(
-                  'غائب',
-                  _int(subject['absent_count']),
-                  AppColors.danger,
-                ),
-              ],
+            const SizedBox(height: 16),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildSubjectStatPill('طلاب', _int(subject['students_count']), AppColors.info),
+                  const SizedBox(width: 6),
+                  _buildSubjectStatPill('محاضرات', _int(subject['lectures_count']), AppColors.royalBlue),
+                  const SizedBox(width: 6),
+                  _buildSubjectStatPill('حاضر', _int(subject['present_count']), AppColors.success),
+                  const SizedBox(width: 6),
+                  _buildSubjectStatPill('غائب', _int(subject['absent_count']), AppColors.danger),
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildSubjectStatPill(String label, int value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.slate200, width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontFamily: 'Cairo',
+              color: AppColors.slate500,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(
+            '$value',
+            style: const TextStyle(
+              fontFamily: 'Cairo',
+              color: AppColors.midnight,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _TinyStat extends StatelessWidget {
-  const _TinyStat(this.label, this.value, this.color);
+class TinyStat extends StatelessWidget {
+  const TinyStat(this.label, this.value, this.color, {super.key});
 
   final String label;
   final int value;
