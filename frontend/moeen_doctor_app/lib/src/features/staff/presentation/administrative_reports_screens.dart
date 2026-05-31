@@ -573,18 +573,42 @@ class _AdministrativeSubjectReportViewState
             ],
           ),
           const SizedBox(height: 14),
-          _ReportInfoGrid(
-            items: [
-              _ReportInfo('المادة الدراسية', subject['name']),
-              _ReportInfo('التخصص', major['name']),
-              _ReportInfo('المستوى الأكاديمي', level['name']),
-              _ReportInfo('أستاذ المقرر', doctor['name'] ?? 'غير محدد'),
-              _ReportInfo('حد الغياب', '${subject['max_absences'] ?? '-'} محاضرات'),
-              _ReportInfo('الفترة الزمنية', _range.label),
+          _SubjectIdentityCard(
+            subject: subject,
+            major: major,
+            level: level,
+            doctor: doctor,
+            range: _range,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _SearchBox(
+                  controller: _search,
+                  onSearch: () => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.royalBlue.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.royalBlue.withValues(alpha: 0.16)),
+                ),
+                child: Text(
+                  '${rows.length} طالب',
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                    color: AppColors.royalBlue,
+                  ),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 14),
-          _SearchBox(controller: _search, onSearch: () => setState(() {})),
           const SizedBox(height: 14),
           if (rows.isEmpty)
             const _EmptyState()
@@ -710,6 +734,9 @@ class _AdministrativeThresholdReportViewState
       return text.contains(_query.toLowerCase());
     }).toList();
 
+    final criticalCount = _int(summary['critical_count']);
+    final warningCount = _int(summary['warning_count']);
+
     return RefreshIndicator(
       onRefresh: () async => setState(() => _future = _fetch()),
       child: ListView(
@@ -746,23 +773,53 @@ class _AdministrativeThresholdReportViewState
               _SummaryItem('أعلى نسبة', '${summary['highest_percentage'] ?? 0}%', Icons.trending_up_rounded),
             ],
           ),
-          const SizedBox(height: 12),
-          _ReportInfoGrid(
-            items: [
-              _ReportInfo('التخصص', major['name']),
-              _ReportInfo('المستوى', level['name']),
-              _ReportInfo('عتبة الغياب', '${widget.threshold}%'),
-              _ReportInfo('الفترة الزمنية', _range.label),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _AdminActionButton(
-            icon: Icons.campaign_rounded,
-            label: _notifying ? 'جاري إرسال التنبيهات...' : 'إرسال تنبيهات تلقائية للطلاب',
-            onPressed: _notifying || alerts.isEmpty ? null : _sendNotifications,
+          const SizedBox(height: 14),
+          // Level identity card
+          _LevelIdentityCard(
+            major: major,
+            level: level,
+            threshold: widget.threshold,
+            range: _range,
           ),
           const SizedBox(height: 14),
-          _SearchBox(controller: _search, onSearch: () => setState(() {})),
+          // Notification action card
+          _ThresholdNotificationCard(
+            criticalCount: criticalCount,
+            warningCount: warningCount,
+            alertsCount: alerts.length,
+            loading: _notifying,
+            onSend: _notifying || alerts.isEmpty ? null : _sendNotifications,
+          ),
+          const SizedBox(height: 14),
+          // Search + count row
+          Row(
+            children: [
+              Expanded(
+                child: _SearchBox(
+                  controller: _search,
+                  onSearch: () => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.danger.withValues(alpha: 0.16)),
+                ),
+                child: Text(
+                  '${alerts.length} حالة',
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                    color: AppColors.danger,
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 14),
           if (alerts.isEmpty)
             const _AdminEmptyDetailsNote(
@@ -901,6 +958,13 @@ class _AdministrativeLevelSummaryReportViewState
     final summary = _map(data['summary']);
     final subjectStats = _list(data['subject_stats']);
 
+    final avgRate = double.tryParse('${summary['average_attendance_rate'] ?? 0}') ?? 0;
+    final avgColor = avgRate >= 70
+        ? AppColors.success
+        : avgRate >= 45
+            ? AppColors.goldDeep
+            : AppColors.danger;
+
     return RefreshIndicator(
       onRefresh: () async => setState(() => _future = _fetch()),
       child: ListView(
@@ -931,20 +995,74 @@ class _AdministrativeLevelSummaryReportViewState
           _ExecutiveSummaryPanel(
             color: AppColors.teal,
             items: [
-              _SummaryItem('الطلاب', summary['students_count'] ?? 0, Icons.groups_rounded),
-              _SummaryItem('المواد', summary['subjects_count'] ?? subjectStats.length, Icons.menu_book_rounded),
-              _SummaryItem('متوسط الحضور', '${summary['average_attendance_rate'] ?? 0}%', Icons.trending_up_rounded),
-              _SummaryItem('المندوب', delegate['name'] ?? 'غير معين', Icons.verified_user_rounded),
+              _SummaryItem('\u0627\u0644\u0637\u0644\u0627\u0628', summary['students_count'] ?? 0, Icons.groups_rounded),
+              _SummaryItem('\u0627\u0644\u0645\u0648\u0627\u062f', summary['subjects_count'] ?? subjectStats.length, Icons.menu_book_rounded),
+              _SummaryItem('\u0645\u062a\u0648\u0633\u0637 \u0627\u0644\u062d\u0636\u0648\u0631', '${summary['average_attendance_rate'] ?? 0}%', Icons.trending_up_rounded),
+              _SummaryItem('\u0625\u0646\u0630\u0627\u0631\u0627\u062a', summary['warning_count'] ?? 0, Icons.warning_rounded),
             ],
           ),
+          const SizedBox(height: 14),
+          // Level identity card
+          _LevelSummaryIdentityCard(
+            major: major,
+            level: level,
+            delegate: delegate,
+            range: _range,
+            avgRate: avgRate,
+            avgColor: avgColor,
+          ),
           const SizedBox(height: 16),
-          const _SectionTitle('مصفوفة أداء المواد', Icons.stacked_bar_chart_rounded),
+          // Section header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.teal.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.stacked_bar_chart_rounded, color: AppColors.teal, size: 18),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  '\u0645\u0635\u0641\u0648\u0641\u0629 \u0623\u062f\u0627\u0621 \u0627\u0644\u0645\u0648\u0627\u062f',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                    color: AppColors.midnight,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.teal.withValues(alpha: 0.09),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.teal.withValues(alpha: 0.16)),
+                ),
+                child: Text(
+                  '${subjectStats.length} \u0645\u0627\u062f\u0629',
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 11.5,
+                    color: AppColors.teal,
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           if (subjectStats.isEmpty)
             const _EmptyState()
           else
-            ...subjectStats.map(
-              (stat) => _LevelSubjectPerformanceCard(stat: stat),
+            ...subjectStats.asMap().entries.map(
+              (entry) => _LevelSubjectPerformanceCard(
+                stat: entry.value,
+                index: entry.key + 1,
+              ),
             ),
         ],
       ),
@@ -1068,7 +1186,12 @@ class _AdministrativeDoctorPerformanceReportViewState
           if (doctors.isEmpty)
             const _EmptyState()
           else
-            ...doctors.map((doctor) => _DoctorPerformanceCard(doctor: doctor)),
+            ...doctors.asMap().entries.map(
+                  (entry) => _DoctorPerformanceCard(
+                    index: entry.key + 1,
+                    doctor: entry.value,
+                  ),
+                ),
         ],
       ),
     );
@@ -1218,9 +1341,13 @@ class _AdministrativeComparisonReportViewState
           if (items.isEmpty)
             const _EmptyState()
           else
-            ...items.map(
-              (item) => _ComparisonCard(item: item, type: _type),
-            ),
+            ...items.asMap().entries.map(
+                  (entry) => _ComparisonCard(
+                    index: entry.key + 1,
+                    item: entry.value,
+                    type: _type,
+                  ),
+                ),
         ],
       ),
     );
@@ -1536,7 +1663,7 @@ class _ExecutiveSummaryPanel extends StatelessWidget {
           const SizedBox(height: 12),
           _ReportMetricStrip(
             metrics: items
-                .map((item) => _ReportMetric(item.label, item.value, color))
+                .map((item) => _ReportMetric(item.label, item.value, color, item.icon))
                 .toList(),
           ),
         ],
@@ -1553,43 +1680,7 @@ class _SummaryItem {
   final IconData icon;
 }
 
-class _AdminActionButton extends StatelessWidget {
-  const _AdminActionButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
 
-  final IconData icon;
-  final String label;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: FilledButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        label: Text(
-          label,
-          style: const TextStyle(
-            fontFamily: 'Cairo',
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.danger,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _ReportChoiceSection extends StatelessWidget {
   const _ReportChoiceSection({
@@ -1680,22 +1771,18 @@ class _ReportChoiceChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.royalBlue : AppColors.slate500;
+    const color = AppColors.royalBlue;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.royalBlue.withValues(alpha: 0.10)
-              : AppColors.slate50,
+          color: selected ? color : AppColors.slate50,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected
-                ? AppColors.royalBlue.withValues(alpha: 0.24)
-                : AppColors.slate100,
+            color: selected ? color : AppColors.slate100,
           ),
         ),
         child: Text(
@@ -1706,7 +1793,7 @@ class _ReportChoiceChip extends StatelessWidget {
             fontFamily: 'Cairo',
             fontWeight: FontWeight.w900,
             fontSize: 12,
-            color: color,
+            color: selected ? Colors.white : AppColors.slate500,
           ),
         ),
       ),
@@ -1736,6 +1823,543 @@ class _SubjectSelectorCard extends StatelessWidget {
           '${major['name'] ?? '-'} • ${level['name'] ?? '-'}${doctor.isEmpty ? '' : ' • ${doctor['name'] ?? ''}'}',
       actionLabel: 'فتح التقرير',
       onTap: onTap,
+    );
+  }
+}
+
+class _SubjectIdentityCard extends StatelessWidget {
+  const _SubjectIdentityCard({
+    required this.subject,
+    required this.major,
+    required this.level,
+    required this.doctor,
+    required this.range,
+  });
+
+  final Map<String, dynamic> subject;
+  final Map<String, dynamic> major;
+  final Map<String, dynamic> level;
+  final Map<String, dynamic> doctor;
+  final _ReportDateRange range;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxAbsences = subject['max_absences'];
+    final items = [
+      _SubjectInfoItem(Icons.account_tree_rounded, '\u0627\u0644\u062a\u062e\u0635\u0635', (major['name'] ?? '-').toString(), AppColors.violet),
+      _SubjectInfoItem(Icons.layers_rounded, '\u0627\u0644\u0645\u0633\u062a\u0648\u0649', (level['name'] ?? '-').toString(), AppColors.teal),
+      _SubjectInfoItem(Icons.person_rounded, '\u0623\u0633\u062a\u0627\u0630 \u0627\u0644\u0645\u0642\u0631\u0631', (doctor['name'] ?? '\u063a\u064a\u0631 \u0645\u062d\u062f\u062f').toString(), AppColors.royalBlue),
+      _SubjectInfoItem(Icons.block_rounded, '\u062d\u062f \u0627\u0644\u063a\u064a\u0627\u0628', maxAbsences != null ? '$maxAbsences \u0645\u062d\u0627\u0636\u0631\u0627\u062a' : '-', AppColors.danger),
+      _SubjectInfoItem(Icons.date_range_rounded, '\u0627\u0644\u0641\u062a\u0631\u0629 \u0627\u0644\u0632\u0645\u0646\u064a\u0629', range.label, AppColors.goldDeep),
+      _SubjectInfoItem(Icons.menu_book_rounded, '\u0627\u0633\u0645 \u0627\u0644\u0645\u0627\u062f\u0629', (subject['name'] ?? '-').toString(), AppColors.royalBlue),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.royalBlue.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header strip
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.royalBlue.withValues(alpha: 0.05),
+                border: Border(
+                  bottom: BorderSide(color: AppColors.royalBlue.withValues(alpha: 0.10)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.royalBlue.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.info_rounded, color: AppColors.royalBlue, size: 17),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    '\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u0627\u062f\u0629 \u0627\u0644\u062f\u0631\u0627\u0633\u064a\u0629',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      color: AppColors.midnight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Info grid
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = (constraints.maxWidth - 10) / 2;
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: items.take(5).map((item) {
+                      return SizedBox(
+                        width: width,
+                        child: _SubjectInfoTile(item: item),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SubjectInfoItem {
+  const _SubjectInfoItem(this.icon, this.label, this.value, this.color);
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+}
+
+class _SubjectInfoTile extends StatelessWidget {
+  const _SubjectInfoTile({required this.item});
+  final _SubjectInfoItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: item.color.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: item.color.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: item.color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(item.icon, color: item.color, size: 16),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.label,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                    color: AppColors.slate500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  item.value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12.5,
+                    color: AppColors.midnight,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LevelIdentityCard extends StatelessWidget {
+  const _LevelIdentityCard({
+    required this.major,
+    required this.level,
+    required this.threshold,
+    required this.range,
+  });
+
+  final Map<String, dynamic> major;
+  final Map<String, dynamic> level;
+  final int threshold;
+  final _ReportDateRange range;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.danger.withValues(alpha: 0.07),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.danger.withValues(alpha: 0.05),
+                border: Border(
+                  bottom: BorderSide(color: AppColors.danger.withValues(alpha: 0.10)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.layers_rounded, color: AppColors.danger, size: 17),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    '\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u062a\u0642\u0631\u064a\u0631',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      color: AppColors.midnight,
+                    ),
+                  ),
+                  const Spacer(),
+                  // Threshold badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '\u0639\u062a\u0628\u0629 $threshold%',
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11.5,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = (constraints.maxWidth - 10) / 2;
+                  final items = [
+                    _SubjectInfoItem(Icons.account_tree_rounded, '\u0627\u0644\u062a\u062e\u0635\u0635', (major['name'] ?? '-').toString(), AppColors.violet),
+                    _SubjectInfoItem(Icons.layers_rounded, '\u0627\u0644\u0645\u0633\u062a\u0648\u0649 \u0627\u0644\u062f\u0631\u0627\u0633\u064a', (level['name'] ?? '-').toString(), AppColors.teal),
+                    _SubjectInfoItem(Icons.percent_rounded, '\u0639\u062a\u0628\u0629 \u0627\u0644\u063a\u064a\u0627\u0628', '$threshold\u066a \u0641\u0623\u0643\u062b\u0631', AppColors.danger),
+                    _SubjectInfoItem(Icons.date_range_rounded, '\u0627\u0644\u0641\u062a\u0631\u0629 \u0627\u0644\u0632\u0645\u0646\u064a\u0629', range.label, AppColors.goldDeep),
+                  ];
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: items.map((item) {
+                      return SizedBox(
+                        width: width,
+                        child: _SubjectInfoTile(item: item),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ThresholdNotificationCard extends StatelessWidget {
+  const _ThresholdNotificationCard({
+    required this.criticalCount,
+    required this.warningCount,
+    required this.alertsCount,
+    required this.loading,
+    required this.onSend,
+  });
+
+  final int criticalCount;
+  final int warningCount;
+  final int alertsCount;
+  final bool loading;
+  final VoidCallback? onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.14)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.danger.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+              decoration: BoxDecoration(
+                color: AppColors.danger.withValues(alpha: 0.05),
+                border: Border(
+                  bottom: BorderSide(color: AppColors.danger.withValues(alpha: 0.10)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: const Icon(Icons.campaign_rounded, color: AppColors.danger, size: 17),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      '\u0625\u0634\u0639\u0627\u0631\u0627\u062a \u062a\u0644\u0642\u0627\u0626\u064a\u0629',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Stats row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ThresholdStatBadge(
+                          label: '\u062d\u0631\u0645\u0627\u0646',
+                          value: criticalCount,
+                          icon: Icons.block_rounded,
+                          color: AppColors.danger,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _ThresholdStatBadge(
+                          label: '\u0625\u0646\u0630\u0627\u0631',
+                          value: warningCount,
+                          icon: Icons.warning_rounded,
+                          color: AppColors.goldDeep,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _ThresholdStatBadge(
+                          label: '\u0625\u062c\u0645\u0627\u0644\u064a',
+                          value: alertsCount,
+                          icon: Icons.people_rounded,
+                          color: AppColors.royalBlue,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    alertsCount == 0
+                        ? '\u0644\u0627 \u062a\u0648\u062c\u062f \u062d\u0627\u0644\u0627\u062a \u062a\u0633\u062a\u062d\u0642 \u0627\u0644\u0625\u0634\u0639\u0627\u0631.'
+                        : '\u0633\u064a\u062a\u0645 \u0625\u0631\u0633\u0627\u0644 \u062a\u0646\u0628\u064a\u0647 \u062f\u0627\u062e\u0644 \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0644\u0640 $alertsCount \u0637\u0627\u0644\u0628 \u062a\u062c\u0627\u0648\u0632\u0648\u0627 \u0639\u062a\u0628\u0629 \u0627\u0644\u063a\u064a\u0627\u0628.',
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11.5,
+                      color: AppColors.slate500,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: loading
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            decoration: BoxDecoration(
+                              color: AppColors.danger.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.danger,
+                                  ),
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  '\u062c\u0627\u0631\u064a \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u062a\u0646\u0628\u064a\u0647\u0627\u062a...',
+                                  style: TextStyle(
+                                    fontFamily: 'Cairo',
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12.5,
+                                    color: AppColors.danger,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: onSend != null ? AppColors.danger : AppColors.slate200,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: InkWell(
+                              onTap: onSend,
+                              borderRadius: BorderRadius.circular(14),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.send_rounded,
+                                      size: 16,
+                                      color: onSend != null ? Colors.white : AppColors.slate500,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '\u0625\u0631\u0633\u0627\u0644 \u062a\u0646\u0628\u064a\u0647\u0627\u062a \u062a\u0644\u0642\u0627\u0626\u064a\u0629 \u0644\u0644\u0637\u0644\u0627\u0628',
+                                      style: TextStyle(
+                                        fontFamily: 'Cairo',
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 13,
+                                        color: onSend != null ? Colors.white : AppColors.slate500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ThresholdStatBadge extends StatelessWidget {
+  const _ThresholdStatBadge({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final int value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(height: 6),
+          Text(
+            '$value',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.w900,
+              fontSize: 20,
+              color: color,
+              letterSpacing: -0.5,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.w700,
+              fontSize: 10,
+              color: AppColors.slate500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1792,105 +2416,46 @@ class _NavigationCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: _cardDecoration(),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Icon(icon, color: color),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.slate200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.035),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: 'Cairo',
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.midnight,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: 'Cairo',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 11.5,
-                      color: AppColors.slate500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            _AdminChip(label: actionLabel, color: color),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ReportInfo {
-  const _ReportInfo(this.label, this.value);
-
-  final String label;
-  final Object? value;
-}
-
-class _ReportInfoGrid extends StatelessWidget {
-  const _ReportInfoGrid({required this.items});
-
-  final List<_ReportInfo> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth < 520 ? 1 : 2;
-        final width = (constraints.maxWidth - ((columns - 1) * 10)) / columns;
-        return Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: items.map((item) {
-            return SizedBox(
-              width: width,
-              child: Container(
-                padding: const EdgeInsets.all(14),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Row(
+            children: [
+              // Left accent strip
+              Container(
+                width: 4,
+                height: 68,
+                color: color,
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: AppColors.slate50,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.slate100),
+                  color: color.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(14),
                 ),
+                child: Icon(icon, color: color, size: 21),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.label,
-                      style: const TextStyle(
-                        fontFamily: 'Cairo',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                        color: AppColors.slate500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      (item.value ?? '-').toString(),
-                      maxLines: 2,
+                      title,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontFamily: 'Cairo',
@@ -1899,16 +2464,36 @@ class _ReportInfoGrid extends StatelessWidget {
                         color: AppColors.midnight,
                       ),
                     ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11.5,
+                        color: AppColors.slate500,
+                      ),
+                    ),
                   ],
                 ),
               ),
-            );
-          }).toList(),
-        );
-      },
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: _AdminChip(label: actionLabel, color: color),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
+
+
+
 
 class _SubjectStudentReportCard extends StatelessWidget {
   const _SubjectStudentReportCard({
@@ -1930,57 +2515,117 @@ class _SubjectStudentReportCard extends StatelessWidget {
         : decision == 'إنذار'
             ? AppColors.goldDeep
             : AppColors.success;
+    final absencePercentage = double.tryParse('${row['absence_percentage'] ?? 0}') ?? 0;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _ReportIndexBadge(index: index, color: color),
-              const SizedBox(width: 10),
-              Expanded(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: decision == 'محروم'
+              ? AppColors.danger.withValues(alpha: 0.18)
+              : AppColors.slate200,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Left accent strip colored by decision
+            Container(
+              width: 4,
+              color: color,
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      (student['name'] ?? '-').toString(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontFamily: 'Cairo',
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.midnight,
-                      ),
+                    Row(
+                      children: [
+                        _ReportIndexBadge(index: index, color: color),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                (student['name'] ?? '-').toString(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.midnight,
+                                ),
+                              ),
+                              Text(
+                                (student['student_number'] ?? '-').toString(),
+                                style: const TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11,
+                                  color: AppColors.slate500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        _AdminChip(label: decision == '-' ? 'سليم' : decision, color: color),
+                      ],
                     ),
-                    Text(
-                      (student['student_number'] ?? '-').toString(),
-                      style: const TextStyle(
-                        fontFamily: 'Cairo',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                        color: AppColors.slate500,
-                      ),
+                    const SizedBox(height: 12),
+                    _ReportMetricStrip(
+                      metrics: [
+                        _ReportMetric('حاضر', row['present'], AppColors.success, Icons.check_circle_rounded),
+                        _ReportMetric('غائب', row['absent'], AppColors.danger, Icons.cancel_rounded),
+                        _ReportMetric('متأخر', row['late'], AppColors.goldDeep, Icons.schedule_rounded),
+                        _ReportMetric('أعذار', row['excused'], AppColors.royalBlue, Icons.verified_rounded),
+                        _ReportMetric('النسبة', '${row['absence_percentage'] ?? 0}%', color, Icons.percent_rounded),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // Absence progress bar
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: LinearProgressIndicator(
+                              value: (absencePercentage / 100).clamp(0.0, 1.0),
+                              minHeight: 7,
+                              color: color,
+                              backgroundColor: AppColors.slate100,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'غياب ${absencePercentage.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 10.5,
+                            color: color,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              _AdminChip(label: decision == '-' ? 'سليم' : decision, color: color),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _ReportMetricStrip(
-            metrics: [
-              _ReportMetric('حاضر', row['present'], AppColors.success),
-              _ReportMetric('غائب', row['absent'], AppColors.danger),
-              _ReportMetric('متأخر', row['late'], AppColors.goldDeep),
-              _ReportMetric('أعذار', row['excused'], AppColors.royalBlue),
-              _ReportMetric('النسبة', '${row['absence_percentage'] ?? 0}%', color),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1999,84 +2644,633 @@ class _ThresholdAlertCard extends StatelessWidget {
     final percentage = double.tryParse('${row['absence_percentage'] ?? 0}') ?? 0;
     final severe = (row['severity'] ?? '') == 'critical' || percentage >= 25;
     final color = severe ? AppColors.danger : AppColors.goldDeep;
+    final label = row['action_label'] ?? (severe ? 'حرمان' : 'إنذار');
+    final absentCount = _int(row['absent_count']);
+    final totalSessions = _int(row['total_sessions']);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _ReportIndexBadge(index: index, color: color),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  (student['name'] ?? '-').toString(),
-                  style: const TextStyle(
-                    fontFamily: 'Cairo',
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.midnight,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${subject['name'] ?? '-'} • ${student['student_number'] ?? '-'}',
-                  style: const TextStyle(
-                    fontFamily: 'Cairo',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 11.5,
-                    color: AppColors.slate500,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                _ReportMetricStrip(
-                  metrics: [
-                    _ReportMetric('الغيابات', row['absent_count'], AppColors.danger),
-                    _ReportMetric('الجلسات', row['total_sessions'], AppColors.royalBlue),
-                    _ReportMetric('النسبة', '$percentage%', color),
-                  ],
-                ),
-              ],
-            ),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: severe ? AppColors.danger.withValues(alpha: 0.03) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: severe
+              ? AppColors.danger.withValues(alpha: 0.22)
+              : AppColors.slate200,
+          width: severe ? 1.2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.09),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
-          const SizedBox(width: 8),
-          _AdminChip(label: row['action_label'] ?? (severe ? 'حرمان' : 'إنذار'), color: color),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ─── Top color strip ───
+            Container(
+              height: 4,
+              width: double.infinity,
+              color: color,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ─── Header: index + name + verdict badge ───
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Index circle
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$index',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                              color: color,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              (student['name'] ?? '-').toString(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                                color: AppColors.midnight,
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              (student['student_number'] ?? '-').toString(),
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11.5,
+                                color: AppColors.slate500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Verdict badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // ─── Subject row ───
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: AppColors.slate50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.slate100),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.menu_book_rounded, size: 14, color: AppColors.slate500),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            (subject['name'] ?? '-').toString(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                              color: AppColors.midnight,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // ─── Percentage progress bar (centrepiece) ───
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'نسبة الغياب',
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 10.5,
+                                color: AppColors.slate500,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(99),
+                              child: LinearProgressIndicator(
+                                value: (percentage / 100).clamp(0.0, 1.0),
+                                minHeight: 10,
+                                color: color,
+                                backgroundColor: color.withValues(alpha: 0.12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Large percentage number
+                      Text(
+                        '${percentage.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 22,
+                          color: color,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // ─── Bottom metrics strip ───
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _AlertMetricTile(
+                          icon: Icons.cancel_rounded,
+                          label: 'غياب',
+                          value: '$absentCount',
+                          color: AppColors.danger,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _AlertMetricTile(
+                          icon: Icons.event_note_rounded,
+                          label: 'جلسات',
+                          value: '$totalSessions',
+                          color: AppColors.royalBlue,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _AlertMetricTile(
+                          icon: Icons.stacked_bar_chart_rounded,
+                          label: 'حضور',
+                          value: '${totalSessions - absentCount}',
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AlertMetricTile extends StatelessWidget {
+  const _AlertMetricTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 15),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w900,
+                  fontSize: 15,
+                  color: color,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 10,
+                  color: AppColors.slate500,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
+
+
+class _LevelSummaryIdentityCard extends StatelessWidget {
+  const _LevelSummaryIdentityCard({
+    required this.major,
+    required this.level,
+    required this.delegate,
+    required this.range,
+    required this.avgRate,
+    required this.avgColor,
+  });
+
+  final Map<String, dynamic> major;
+  final Map<String, dynamic> level;
+  final Map<String, dynamic> delegate;
+  final _ReportDateRange range;
+  final double avgRate;
+  final Color avgColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final delegateName = (delegate['name'] ?? '\u063a\u064a\u0631 \u0645\u0639\u064a\u0646').toString();
+    final items = [
+      _SubjectInfoItem(Icons.account_tree_rounded, '\u0627\u0644\u062a\u062e\u0635\u0635', (major['name'] ?? '-').toString(), AppColors.violet),
+      _SubjectInfoItem(Icons.layers_rounded, '\u0627\u0644\u062f\u0641\u0639\u0629 / \u0627\u0644\u0645\u0633\u062a\u0648\u0649', (level['name'] ?? '-').toString(), AppColors.teal),
+      _SubjectInfoItem(Icons.verified_user_rounded, '\u0645\u0646\u062f\u0648\u0628 \u0627\u0644\u0645\u0633\u062a\u0648\u0649', delegateName, AppColors.royalBlue),
+      _SubjectInfoItem(Icons.date_range_rounded, '\u0627\u0644\u0641\u062a\u0631\u0629 \u0627\u0644\u0632\u0645\u0646\u064a\u0629', range.label, AppColors.goldDeep),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.teal.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.teal.withValues(alpha: 0.07),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.teal.withValues(alpha: 0.05),
+                border: Border(
+                  bottom: BorderSide(color: AppColors.teal.withValues(alpha: 0.10)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.teal.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.layers_rounded, color: AppColors.teal, size: 17),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      '\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u062f\u0641\u0639\u0629',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                  ),
+                  // Avg rate badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: avgColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '\u062d\u0636\u0648\u0631 ${avgRate.toStringAsFixed(1)}%',
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11.5,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = (constraints.maxWidth - 10) / 2;
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: items.map((item) {
+                      return SizedBox(
+                        width: width,
+                        child: _SubjectInfoTile(item: item),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _LevelSubjectPerformanceCard extends StatelessWidget {
-  const _LevelSubjectPerformanceCard({required this.stat});
+  const _LevelSubjectPerformanceCard({
+    required this.stat,
+    required this.index,
+  });
 
   final Map<String, dynamic> stat;
+  final int index;
 
   @override
   Widget build(BuildContext context) {
     final subject = _map(stat['subject']);
     final doctor = _map(subject['doctor']);
     final rate = double.tryParse('${stat['attendance_rate'] ?? 0}') ?? 0;
+    final totalRecords = _int(stat['total_records']);
     final color = rate >= 70
         ? AppColors.success
         : rate >= 45
             ? AppColors.goldDeep
             : AppColors.danger;
-    return _RateCard(
-      title: (subject['name'] ?? '-').toString(),
-      subtitle:
-          'أستاذ المقرر: ${doctor['name'] ?? '-'} • سجلات الرصد: ${stat['total_records'] ?? 0}',
-      rate: rate,
-      color: color,
+
+    final rateLabel = rate >= 70 ? '\u062c\u064a\u062f' : rate >= 45 ? '\u0645\u062a\u0648\u0633\u0637' : '\u0645\u0646\u062e\u0641\u0636';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.07),
+            blurRadius: 16,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top accent strip
+            Container(height: 4, width: double.infinity, color: color),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header row: index + name + rate badge
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Index
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: AppColors.teal.withValues(alpha: 0.10),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$index',
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                              color: AppColors.teal,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              (subject['name'] ?? '-').toString(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                                color: AppColors.midnight,
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '$totalRecords \u0633\u062c\u0644 \u0631\u0635\u062f',
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11.5,
+                                color: AppColors.slate500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // Rate display
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${rate.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 26,
+                              color: color,
+                              letterSpacing: -1,
+                              height: 1,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              rateLabel,
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w900,
+                                fontSize: 10,
+                                color: color,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // Doctor row
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: AppColors.slate50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.slate100),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person_rounded, size: 14, color: AppColors.slate500),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            (doctor['name'] ?? '\u063a\u064a\u0631 \u0645\u062d\u062f\u062f').toString(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                              color: AppColors.midnight,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Progress bar
+                  Row(
+                    children: [
+                      const Text(
+                        '\u0646\u0633\u0628\u0629 \u0627\u0644\u062d\u0636\u0648\u0631',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10.5,
+                          color: AppColors.slate500,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${(100 - rate).toStringAsFixed(1)}% \u063a\u064a\u0627\u0628',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10.5,
+                          color: AppColors.slate500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      value: (rate / 100).clamp(0.0, 1.0),
+                      minHeight: 12,
+                      color: color,
+                      backgroundColor: color.withValues(alpha: 0.10),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _DoctorPerformanceCard extends StatelessWidget {
-  const _DoctorPerformanceCard({required this.doctor});
 
+class _DoctorPerformanceCard extends StatelessWidget {
+  const _DoctorPerformanceCard({required this.index, required this.doctor});
+
+  final int index;
   final Map<String, dynamic> doctor;
 
   @override
@@ -2087,19 +3281,207 @@ class _DoctorPerformanceCard extends StatelessWidget {
         : rate >= 50
             ? AppColors.goldDeep
             : AppColors.danger;
-    return _RateCard(
-      title: (doctor['name'] ?? '-').toString(),
-      subtitle:
-          '${doctor['email'] ?? 'عضو هيئة تدريس'} • جلسات مكتملة: ${doctor['qr_sessions_count'] ?? 0} • مواد: ${doctor['subjects_count'] ?? 0}',
-      rate: rate,
-      color: color,
+
+    final email = doctor['email'] ?? 'عضو هيئة تدريس';
+    final qrSessionsCount = doctor['qr_sessions_count'] ?? 0;
+    final subjectsCount = doctor['subjects_count'] ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.slate200, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.slate300.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: color, width: 4),
+            ),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _ReportIndexBadge(index: index, color: color),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          (doctor['name'] ?? '-').toString(),
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                            color: AppColors.midnight,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                            color: AppColors.slate500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${rate.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 22,
+                          color: color,
+                          height: 1.1,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          rate >= 75
+                              ? 'ممتاز'
+                              : rate >= 50
+                                  ? 'متوسط'
+                                  : 'ضعيف',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 9,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _infoChip(
+                    icon: Icons.menu_book_rounded,
+                    label: 'المواد: $subjectsCount',
+                    color: AppColors.royalBlue,
+                  ),
+                  const SizedBox(width: 8),
+                  _infoChip(
+                    icon: Icons.qr_code_scanner_rounded,
+                    label: 'جلسات التحضير: $qrSessionsCount',
+                    color: AppColors.violet,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'متوسط حضور الطلاب',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 10,
+                      color: AppColors.slate500,
+                    ),
+                  ),
+                  Text(
+                    '${(100 - rate).toStringAsFixed(1)}% غياب',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 10,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: LinearProgressIndicator(
+                  value: (rate / 100).clamp(0.0, 1.0),
+                  minHeight: 10,
+                  color: color,
+                  backgroundColor: AppColors.slate100,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _infoChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.slate200),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              color: AppColors.midnight,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _ComparisonCard extends StatelessWidget {
-  const _ComparisonCard({required this.item, required this.type});
+  const _ComparisonCard({
+    required this.index,
+    required this.item,
+    required this.type,
+  });
 
+  final int index;
   final Map<String, dynamic> item;
   final String type;
 
@@ -2111,80 +3493,218 @@ class _ComparisonCard extends StatelessWidget {
         : rate >= 50
             ? AppColors.goldDeep
             : AppColors.danger;
+
     final major = _map(item['major']);
     final level = _map(item['level']);
     final doctor = _map(item['doctor']);
-    final subtitle = type == 'levels'
-        ? '${major['name'] ?? '-'} • مواد: ${item['subjects_count'] ?? 0} • سجلات: ${item['total_records'] ?? 0}'
-        : '${major['name'] ?? '-'} • ${level['name'] ?? '-'} • ${doctor['name'] ?? '-'}';
-    return _RateCard(
-      title: (item['name'] ?? '-').toString(),
-      subtitle: subtitle,
-      rate: rate,
-      color: color,
-    );
-  }
-}
 
-class _RateCard extends StatelessWidget {
-  const _RateCard({
-    required this.title,
-    required this.subtitle,
-    required this.rate,
-    required this.color,
-  });
-
-  final String title;
-  final String subtitle;
-  final double rate;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontFamily: 'Cairo',
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.midnight,
-                  ),
-                ),
-              ),
-              _AdminChip(label: '${rate.toStringAsFixed(1)}%', color: color),
-            ],
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.slate200, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.slate300.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-          const SizedBox(height: 5),
-          Text(
-            subtitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: 'Cairo',
-              fontWeight: FontWeight.w700,
-              fontSize: 11.5,
-              color: AppColors.slate500,
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: color, width: 4),
             ),
           ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: LinearProgressIndicator(
-              value: (rate / 100).clamp(0, 1),
-              minHeight: 8,
-              color: color,
-              backgroundColor: AppColors.slate100,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _ReportIndexBadge(index: index, color: color),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          (item['name'] ?? '-').toString(),
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                            color: AppColors.midnight,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          major['name'] ?? '-',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                            color: AppColors.slate500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${rate.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 22,
+                          color: color,
+                          height: 1.1,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          rate >= 75
+                              ? 'مرتفع'
+                              : rate >= 50
+                                  ? 'متوسط'
+                                  : 'منخفض',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 9,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (type == 'levels') ...[
+                Row(
+                  children: [
+                    _infoChip(
+                      icon: Icons.menu_book_rounded,
+                      label: 'المواد: ${item['subjects_count'] ?? 0}',
+                      color: AppColors.royalBlue,
+                    ),
+                    const SizedBox(width: 8),
+                    _infoChip(
+                      icon: Icons.analytics_rounded,
+                      label: 'سجلات الرصد: ${item['total_records'] ?? 0}',
+                      color: AppColors.success,
+                    ),
+                  ],
+                ),
+              ] else ...[
+                Row(
+                  children: [
+                    if (level['name'] != null) ...[
+                      _infoChip(
+                        icon: Icons.layers_rounded,
+                        label: level['name'].toString(),
+                        color: AppColors.royalBlue,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (doctor['name'] != null)
+                      Expanded(
+                        child: _infoChip(
+                          icon: Icons.person_rounded,
+                          label: doctor['name'].toString(),
+                          color: AppColors.violet,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'معدل الحضور العام',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 10,
+                      color: AppColors.slate500,
+                    ),
+                  ),
+                  Text(
+                    '${(100 - rate).toStringAsFixed(1)}% غياب',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 10,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: LinearProgressIndicator(
+                  value: (rate / 100).clamp(0.0, 1.0),
+                  minHeight: 10,
+                  color: color,
+                  backgroundColor: AppColors.slate100,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _infoChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.slate200),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
+                color: AppColors.midnight,
+              ),
             ),
           ),
         ],
@@ -2193,12 +3713,16 @@ class _RateCard extends StatelessWidget {
   }
 }
 
+
+
+
 class _ReportMetric {
-  const _ReportMetric(this.label, this.value, this.color);
+  const _ReportMetric(this.label, this.value, this.color, [this.icon]);
 
   final String label;
   final Object? value;
   final Color color;
+  final IconData? icon;
 }
 
 class _ReportMetricStrip extends StatelessWidget {
@@ -2210,8 +3734,23 @@ class _ReportMetricStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        int columns = metrics.length;
+        if (metrics.length == 4) {
+          if (constraints.maxWidth < 380) {
+            columns = 2;
+          }
+        } else if (metrics.length == 5) {
+          if (constraints.maxWidth < 420) {
+            columns = 3;
+          }
+        } else if (metrics.length > 5) {
+          if (constraints.maxWidth < 480) {
+            columns = 3;
+          }
+        }
+
         final width =
-            (constraints.maxWidth - ((metrics.length - 1) * 8)) / metrics.length;
+            (constraints.maxWidth - ((columns - 1) * 8)) / columns;
         return Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -2228,27 +3767,33 @@ class _ReportMetricStrip extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      metric.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontFamily: 'Cairo',
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.slate500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
+                    if (metric.icon != null) ...[
+                      Icon(metric.icon!, color: metric.color, size: 14),
+                      const SizedBox(height: 4),
+                    ],
                     Text(
                       (metric.value ?? '-').toString(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontFamily: 'Cairo',
-                        fontSize: 13,
+                        fontSize: 14,
                         fontWeight: FontWeight.w900,
                         color: metric.color,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      metric.label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.slate500,
+                        height: 1.15,
                       ),
                     ),
                   ],

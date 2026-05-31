@@ -3786,45 +3786,119 @@ class _ReportSummaryGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _StatsRow(
-      stats: [
-        _Stat(
-          'الطلاب',
-          _int(summary['total_students']).toString(),
-          Icons.groups_rounded,
-          AppColors.teal,
-        ),
-        _Stat(
-          'المواد',
-          _int(summary['total_subjects']).toString(),
-          Icons.menu_book_rounded,
-          AppColors.violet,
-        ),
-        _Stat(
-          'الحضور',
-          _int(summary['present_count']).toString(),
-          Icons.check_circle_rounded,
-          AppColors.success,
-        ),
-        _Stat(
-          'الغياب',
-          _int(summary['absent_count']).toString(),
-          Icons.cancel_rounded,
-          AppColors.danger,
-        ),
-        _Stat(
-          'الأعذار',
-          _int(summary['excused_count']).toString(),
-          Icons.verified_rounded,
-          AppColors.goldDeep,
-        ),
-        _Stat(
-          'حرمان',
-          _int(summary['deprived_count']).toString(),
-          Icons.block_rounded,
-          AppColors.rose,
-        ),
-      ],
+    final stats = [
+      _Stat('الطلاب', _int(summary['total_students']).toString(), Icons.groups_rounded, AppColors.teal),
+      _Stat('المواد', _int(summary['total_subjects']).toString(), Icons.menu_book_rounded, AppColors.violet),
+      _Stat('الحضور', _int(summary['present_count']).toString(), Icons.check_circle_rounded, AppColors.success),
+      _Stat('الغياب', _int(summary['absent_count']).toString(), Icons.cancel_rounded, AppColors.danger),
+      _Stat('الأعذار', _int(summary['excused_count']).toString(), Icons.verified_rounded, AppColors.goldDeep),
+      _Stat('حرمان', _int(summary['deprived_count']).toString(), Icons.block_rounded, AppColors.rose),
+    ];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.royalBlue.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.royalBlue.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.analytics_rounded, color: AppColors.royalBlue, size: 18),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'نظرة عامة على القسم',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13.5,
+                  color: AppColors.midnight,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const columns = 3;
+              final itemWidth = (constraints.maxWidth - (columns - 1) * 10) / columns;
+              return Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: stats.map((stat) {
+                  return SizedBox(
+                    width: itemWidth,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: stat.color.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: stat.color.withValues(alpha: 0.14),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: stat.color.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(stat.icon, color: stat.color, size: 17),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            stat.value,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 20,
+                              color: stat.color,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          Text(
+                            stat.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 10,
+                              color: AppColors.slate500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }
@@ -3875,84 +3949,119 @@ class _ReportHubCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(24),
       child: Container(
-        constraints: const BoxConstraints(minHeight: 190),
-        padding: const EdgeInsets.all(16),
+        constraints: const BoxConstraints(minHeight: 200),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: AppColors.slate100),
           boxShadow: [
             BoxShadow(
-              color: color.withValues(alpha: 0.055),
-              blurRadius: 18,
+              color: color.withValues(alpha: 0.08),
+              blurRadius: 20,
               offset: const Offset(0, 10),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Colored accent strip at top
+              Container(
+                height: 4,
+                width: double.infinity,
+                color: color,
               ),
-              child: Icon(icon, color: color, size: 23),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontFamily: 'Cairo',
-                fontWeight: FontWeight.w900,
-                fontSize: 14.5,
-                height: 1.25,
-                color: AppColors.midnight,
-              ),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              description,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontFamily: 'Cairo',
-                fontWeight: FontWeight.w600,
-                fontSize: 11.5,
-                height: 1.45,
-                color: AppColors.slate500,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    actionLabel,
-                    style: TextStyle(
-                      fontFamily: 'Cairo',
-                      fontWeight: FontWeight.w900,
-                      fontSize: 12,
-                      color: color,
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Icon + Title row
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Icon(icon, color: color, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 2),
+                              Text(
+                                title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                  height: 1.3,
+                                  color: AppColors.midnight,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Icon(Icons.arrow_back_rounded, color: color, size: 16),
-                ],
+                    const SizedBox(height: 10),
+                    Text(
+                      description,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11.5,
+                        height: 1.55,
+                        color: AppColors.slate500,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    // Action button — FilledButton style
+                    SizedBox(
+                      width: double.infinity,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                actionLabel,
+                                style: const TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 15),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
