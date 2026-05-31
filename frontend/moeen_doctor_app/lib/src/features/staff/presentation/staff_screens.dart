@@ -321,6 +321,54 @@ final staffRoutes = <GoRoute>[
     builder: (context, state) => const AdministrativeReportsScreen(),
   ),
   GoRoute(
+    path: AdministrativeSubjectSelectorScreen.route,
+    builder: (context, state) => const AdministrativeSubjectSelectorScreen(),
+  ),
+  GoRoute(
+    path: AdministrativeLevelSelectorScreen.route,
+    builder: (context, state) {
+      final mode = state.uri.queryParameters['mode'] == 'threshold'
+          ? AdministrativeLevelSelectorMode.threshold
+          : AdministrativeLevelSelectorMode.summary;
+      return AdministrativeLevelSelectorScreen(mode: mode);
+    },
+  ),
+  GoRoute(
+    path: AdministrativeSubjectReportScreen.route,
+    builder: (context, state) => AdministrativeSubjectReportScreen(
+      subjectId: int.tryParse(state.uri.queryParameters['subject_id'] ?? '') ?? 0,
+      dateStart: state.uri.queryParameters['date_start'],
+      dateEnd: state.uri.queryParameters['date_end'],
+    ),
+  ),
+  GoRoute(
+    path: AdministrativeThresholdReportScreen.route,
+    builder: (context, state) => AdministrativeThresholdReportScreen(
+      levelId: int.tryParse(state.uri.queryParameters['level_id'] ?? '') ?? 0,
+      threshold:
+          int.tryParse(state.uri.queryParameters['threshold'] ?? '') ?? 25,
+      dateStart: state.uri.queryParameters['date_start'],
+      dateEnd: state.uri.queryParameters['date_end'],
+    ),
+  ),
+  GoRoute(
+    path: AdministrativeLevelSummaryReportScreen.route,
+    builder: (context, state) => AdministrativeLevelSummaryReportScreen(
+      levelId: int.tryParse(state.uri.queryParameters['level_id'] ?? '') ?? 0,
+      dateStart: state.uri.queryParameters['date_start'],
+      dateEnd: state.uri.queryParameters['date_end'],
+    ),
+  ),
+  GoRoute(
+    path: AdministrativeDoctorPerformanceReportScreen.route,
+    builder: (context, state) =>
+        const AdministrativeDoctorPerformanceReportScreen(),
+  ),
+  GoRoute(
+    path: AdministrativeComparisonReportScreen.route,
+    builder: (context, state) => const AdministrativeComparisonReportScreen(),
+  ),
+  GoRoute(
     path: AdministrativeExamsScreen.route,
     builder: (context, state) => const AdministrativeExamsScreen(),
   ),

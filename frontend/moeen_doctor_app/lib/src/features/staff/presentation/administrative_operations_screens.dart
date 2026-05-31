@@ -2,7 +2,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/downloads/download_service.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
@@ -10,6 +12,8 @@ import '../../../shared/widgets/moeen_dialogs.dart';
 import '../../../shared/widgets/status_message.dart';
 import '../data/staff_repository.dart';
 import 'staff_shell.dart';
+
+part 'administrative_reports_screens.dart';
 
 final _adminOpsRepositoryProvider = Provider<StaffRepository>((ref) {
   return StaffRepository(ref.watch(authenticatedApiClientProvider));
@@ -96,6 +100,19 @@ class _NotificationsViewState extends ConsumerState<_NotificationsView> {
     return StaffShell(
       title: 'الإعلانات والإشعارات الجماعية',
       currentRoute: AdministrativeNotificationsScreen.route,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _openCreate,
+        backgroundColor: AppColors.rose,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text(
+          'إضافة إشعار',
+          style: TextStyle(
+            fontFamily: 'Cairo',
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
       child: _ScaffoldBody(
         loading: _loading,
         error: _error,
@@ -136,41 +153,23 @@ class _NotificationsViewState extends ConsumerState<_NotificationsView> {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _ChoicePillBar(
-                      value: _type,
-                      items: const {
-                        'all': 'الكل',
-                        'announcement': 'إعلان',
-                        'exam': 'اختبار',
-                        'assignment': 'تكليف',
-                        'attendance': 'حضور',
-                        'poll': 'استبيان',
-                      },
-                      onChanged: (value) {
-                        setState(() {
-                          _type = value;
-                          _page = 1;
-                        });
-                        _load();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  FilledButton(
-                    onPressed: _openCreate,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.rose,
-                      padding: const EdgeInsets.all(16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                    child: const Icon(Icons.add_rounded),
-                  ),
-                ],
+              _ChoicePillBar(
+                value: _type,
+                items: const {
+                  'all': 'الكل',
+                  'announcement': 'إعلان',
+                  'exam': 'اختبار',
+                  'assignment': 'تكليف',
+                  'attendance': 'حضور',
+                  'poll': 'استبيان',
+                },
+                onChanged: (value) {
+                  setState(() {
+                    _type = value;
+                    _page = 1;
+                  });
+                  _load();
+                },
               ),
               const SizedBox(height: 16),
               if (_broadcasts.isEmpty)
@@ -523,25 +522,14 @@ class _ReportsView extends ConsumerStatefulWidget {
 }
 
 class _ReportsViewState extends ConsumerState<_ReportsView> {
-  final _searchController = TextEditingController();
   Map<String, dynamic>? _summaryData;
-  Map<String, dynamic>? _attendanceData;
   Object? _error;
   bool _loading = true;
-  int _page = 1;
-  int? _majorId;
-  int? _levelId;
 
   @override
   void initState() {
     super.initState();
     _load();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   @override
@@ -559,9 +547,9 @@ class _ReportsViewState extends ConsumerState<_ReportsView> {
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
             children: [
               const _OpsHero(
-                title: 'تقارير القسم وتعديل الحضور',
+                title: 'مركز التقارير التحليلي',
                 subtitle:
-                    'ملخصات تشغيلية وتقارير حضور مع إمكانية تعديل حالة السجل من نفس الصفحة.',
+                    'تقارير أكاديمية منظمة لمتابعة الحضور، الإنذارات، أداء الدفعات، والتزام الكادر التعليمي.',
                 icon: Icons.analytics_rounded,
                 color: AppColors.royalBlue,
               ),
@@ -569,96 +557,85 @@ class _ReportsViewState extends ConsumerState<_ReportsView> {
               _ReportSummaryGrid(summary: _map(_summaryData?['summary'])),
               const SizedBox(height: 18),
               const _SectionTitle(
-                'تعديل الحضور من التقارير',
-                Icons.fact_check_rounded,
+                'تقارير الحضور والغياب المتقدمة',
+                Icons.query_stats_rounded,
               ),
               const SizedBox(height: 12),
-              _ReportFilters(
-                data: _summaryData ?? const {},
-                majorId: _majorId,
-                levelId: _levelId,
-                searchController: _searchController,
-                onMajor: (value) {
-                  _majorId = value;
-                  _levelId = null;
-                  _page = 1;
-                  _loadAttendance();
-                },
-                onLevel: (value) {
-                  _levelId = value;
-                  _page = 1;
-                  _loadAttendance();
-                },
-                onSearch: () {
-                  _page = 1;
-                  _loadAttendance();
-                },
-              ),
-              const SizedBox(height: 14),
-              if (_attendanceRecords.isEmpty)
-                const _EmptyState()
-              else
-                ..._attendanceRecords.map(
-                  (record) => _AttendanceRecordCard(
-                    item: record,
-                    onEdit: () => _editAttendance(record),
+              _ReportHubGrid(
+                children: [
+                  _ReportHubCard(
+                    title: 'إحصائيات المادة',
+                    description:
+                        'تحليل حضور كل طالب داخل مادة محددة مع نسبة الغياب والتأخير.',
+                    icon: Icons.file_copy_rounded,
+                    color: AppColors.royalBlue,
+                    actionLabel: 'اختيار المادة',
+                    onTap: () =>
+                        context.push(AdministrativeSubjectSelectorScreen.route),
                   ),
-                ),
-              _Pagination(
-                page: _pageInfo(
-                  _attendanceData?['pagination'],
-                  _attendanceRecords.length,
-                ),
-                onPrevious: _page > 1
-                    ? () {
-                        _page--;
-                        _loadAttendance();
-                      }
-                    : null,
-                onNext:
-                    _page <
-                        _pageInfo(
-                          _attendanceData?['pagination'],
-                          _attendanceRecords.length,
-                        ).lastPage
-                    ? () {
-                        _page++;
-                        _loadAttendance();
-                      }
-                    : null,
-              ),
-              const SizedBox(height: 20),
-              const _SectionTitle('تقارير إضافية', Icons.query_stats_rounded),
-              const SizedBox(height: 12),
-              _ReportActionGrid(
-                onDoctorPerformance: _openDoctorPerformance,
-                onLevelSummary: () =>
-                    _openLevelPicker('ملخص المستوى', _openLevelSummary),
-                onThreshold: () => _openThresholdPicker(),
+                  _ReportHubCard(
+                    title: 'نظام الإنذارات',
+                    description:
+                        'كشف الطلاب الذين تجاوزوا نسبة غياب محددة في مستوى دراسي.',
+                    icon: Icons.warning_rounded,
+                    color: AppColors.danger,
+                    actionLabel: 'فحص التجاوزات',
+                    onTap: () => context.push(
+                      AdministrativeLevelSelectorScreen.path(
+                        AdministrativeLevelSelectorMode.threshold,
+                      ),
+                    ),
+                  ),
+                  _ReportHubCard(
+                    title: 'ملخص الدفعات',
+                    description:
+                        'عرض ملخص مستوى كامل: الطلاب، المندوب، والمواد ونسب الحضور.',
+                    icon: Icons.layers_rounded,
+                    color: AppColors.teal,
+                    actionLabel: 'عرض الملخص',
+                    onTap: () => context.push(
+                      AdministrativeLevelSelectorScreen.path(
+                        AdministrativeLevelSelectorMode.summary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 20),
               const _SectionTitle(
-                'تقارير تفصيلية',
-                Icons.stacked_bar_chart_rounded,
+                'الأداء والمتابعة',
+                Icons.insights_rounded,
               ),
               const SizedBox(height: 12),
-              ..._list(_summaryData?['subjects'])
-                  .take(8)
-                  .map(
-                    (subject) => _SubjectReportTile(
-                      subject: subject,
-                      onTap: () => _openSubjectReport(subject),
-                    ),
+              _ReportHubGrid(
+                children: [
+                  _ReportHubCard(
+                    title: 'أداء الكادر التعليمي',
+                    description:
+                        'متابعة التزام الدكاترة بجلسات التحضير ونسب حضور طلابهم.',
+                    icon: Icons.school_rounded,
+                    color: AppColors.violet,
+                    actionLabel: 'معاينة الأداء',
+                    onTap: _openDoctorPerformance,
                   ),
+                  _ReportHubCard(
+                    title: 'مقارنة المستويات والمواد',
+                    description:
+                        'قارن نسب الحضور بين المواد أو المستويات خلال فترة زمنية محددة لاكتشاف الفجوات بسرعة.',
+                    icon: Icons.compare_arrows_rounded,
+                    color: AppColors.goldDeep,
+                    actionLabel: 'فتح المقارنة',
+                    onTap: () =>
+                        context.push(AdministrativeComparisonReportScreen.route),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
       ),
     );
   }
-
-  List<Map<String, dynamic>> get _attendanceRecords =>
-      _list(_attendanceData?['records']);
 
   Future<void> _load() async {
     setState(() {
@@ -668,14 +645,9 @@ class _ReportsViewState extends ConsumerState<_ReportsView> {
     try {
       final repo = ref.read(_adminOpsRepositoryProvider);
       final summary = await repo.get('/administrative/reports');
-      final attendance = await repo.get(
-        '/administrative/reports/attendance',
-        query: _attendanceQuery(),
-      );
       if (!mounted) return;
       setState(() {
         _summaryData = _map(summary['data']);
-        _attendanceData = _map(attendance['data']);
       });
     } catch (error) {
       if (mounted) setState(() => _error = error);
@@ -684,199 +656,8 @@ class _ReportsViewState extends ConsumerState<_ReportsView> {
     }
   }
 
-  Future<void> _loadAttendance() async {
-    try {
-      final response = await ref
-          .read(_adminOpsRepositoryProvider)
-          .get('/administrative/reports/attendance', query: _attendanceQuery());
-      if (mounted) setState(() => _attendanceData = _map(response['data']));
-    } catch (error) {
-      if (mounted) setState(() => _error = error);
-    }
-  }
-
-  Map<String, dynamic> _attendanceQuery() {
-    return {
-      'page': _page,
-      if (_majorId != null) 'major_id': _majorId,
-      if (_levelId != null) 'level_id': _levelId,
-      if (_searchController.text.trim().isNotEmpty)
-        'search': _searchController.text.trim(),
-    };
-  }
-
-  Future<void> _editAttendance(Map<String, dynamic> record) {
-    return showMoeenBottomSheet<void>(
-      context: context,
-      title: 'تعديل حالة الحضور',
-      icon: Icons.edit_calendar_rounded,
-      color: AppColors.royalBlue,
-      child: _AttendanceStatusForm(
-        current: (record['status'] ?? 'absent').toString(),
-        onSubmit: (status) async {
-          try {
-            final response = await ref.read(_adminOpsRepositoryProvider).patch(
-              '/administrative/attendance/${record['id']}',
-              {'status': status},
-            );
-            if (!mounted) return;
-            Navigator.of(context).pop();
-            await showMoeenInfoDialog(
-              context: context,
-              title: 'تم تعديل الحضور',
-              message: (response['message'] ?? 'تم تحديث حالة الحضور.')
-                  .toString(),
-              icon: Icons.check_circle_rounded,
-              color: AppColors.success,
-            );
-            await _loadAttendance();
-          } on ApiException catch (error) {
-            if (!mounted) return;
-            await showMoeenInfoDialog(
-              context: context,
-              title: 'تعذر تعديل الحضور',
-              message: error.message,
-              icon: Icons.error_rounded,
-              color: AppColors.danger,
-            );
-          }
-        },
-      ),
-    );
-  }
-
-  Future<void> _openSubjectReport(Map<String, dynamic> subject) async {
-    try {
-      final response = await ref
-          .read(_adminOpsRepositoryProvider)
-          .get(
-            '/administrative/reports/subject',
-            query: {'subject_id': subject['id']},
-          );
-      if (!mounted) return;
-      await showMoeenBottomSheet<void>(
-        context: context,
-        title: 'تقرير المادة',
-        icon: Icons.menu_book_rounded,
-        color: AppColors.royalBlue,
-        fullScreen: true,
-        child: _SubjectReportDetails(data: _map(response['data'])),
-      );
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      await showMoeenInfoDialog(
-        context: context,
-        title: 'تعذر فتح التقرير',
-        message: error.message,
-        icon: Icons.error_rounded,
-        color: AppColors.danger,
-      );
-    }
-  }
-
-  Future<void> _openDoctorPerformance() async {
-    try {
-      final response = await ref
-          .read(_adminOpsRepositoryProvider)
-          .get('/administrative/reports/doctor-performance');
-      if (!mounted) return;
-      await showMoeenBottomSheet<void>(
-        context: context,
-        title: 'أداء الدكاترة',
-        icon: Icons.school_rounded,
-        color: AppColors.royalBlue,
-        fullScreen: true,
-        child: _SimpleListReport(
-          items: _list(response['data']),
-          titleOf: (item) => (item['name'] ?? '-').toString(),
-          linesOf: (item) => [
-            item['email']?.toString() ?? '',
-            'جلسات QR: ${item['qr_sessions_count'] ?? 0}',
-            'نسبة الحضور: ${item['attendance_rate'] ?? 0}%',
-          ],
-        ),
-      );
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      await _showError(context, error.message);
-    }
-  }
-
-  Future<void> _openLevelPicker(
-    String title,
-    Future<void> Function(int levelId) action,
-  ) {
-    return showMoeenBottomSheet<void>(
-      context: context,
-      title: title,
-      icon: Icons.layers_rounded,
-      color: AppColors.teal,
-      child: _LevelPickerForm(
-        majors: _list(_summaryData?['majors']),
-        onSubmit: action,
-      ),
-    );
-  }
-
-  Future<void> _openLevelSummary(int levelId) async {
-    try {
-      final response = await ref
-          .read(_adminOpsRepositoryProvider)
-          .get(
-            '/administrative/reports/level-summary',
-            query: {'level_id': levelId},
-          );
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      await showMoeenBottomSheet<void>(
-        context: context,
-        title: 'ملخص المستوى',
-        icon: Icons.layers_rounded,
-        color: AppColors.teal,
-        fullScreen: true,
-        child: _LevelSummaryReport(data: _map(response['data'])),
-      );
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      await _showError(context, error.message);
-    }
-  }
-
-  Future<void> _openThresholdPicker() {
-    return showMoeenBottomSheet<void>(
-      context: context,
-      title: 'تنبيه نسبة الغياب',
-      icon: Icons.warning_rounded,
-      color: AppColors.goldDeep,
-      child: _ThresholdReportForm(
-        majors: _list(_summaryData?['majors']),
-        onSubmit: _openThresholdReport,
-      ),
-    );
-  }
-
-  Future<void> _openThresholdReport(int levelId, int threshold) async {
-    try {
-      final response = await ref
-          .read(_adminOpsRepositoryProvider)
-          .get(
-            '/administrative/reports/threshold',
-            query: {'level_id': levelId, 'threshold': threshold},
-          );
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      await showMoeenBottomSheet<void>(
-        context: context,
-        title: 'طلاب تجاوزوا نسبة الغياب',
-        icon: Icons.warning_rounded,
-        color: AppColors.goldDeep,
-        fullScreen: true,
-        child: _ThresholdReportDetails(data: _map(response['data'])),
-      );
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      await _showError(context, error.message);
-    }
+  void _openDoctorPerformance() {
+    context.push(AdministrativeDoctorPerformanceReportScreen.route);
   }
 }
 
@@ -1779,80 +1560,172 @@ class _NotificationFormState extends State<_NotificationForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _text(_title, 'عنوان الإشعار'),
-          _text(_message, 'نص الإشعار', maxLines: 5),
-          _dropdown<String>(
-            label: 'نوع الإشعار',
-            value: _type,
-            items: const [
-              _MenuItem('announcement', 'إعلان'),
-              _MenuItem('exam', 'اختبار'),
-              _MenuItem('assignment', 'تكليف'),
-              _MenuItem('attendance', 'حضور'),
-              _MenuItem('poll', 'استبيان'),
-            ],
-            onChanged: (value) =>
-                setState(() => _type = value ?? 'announcement'),
-          ),
-          _dropdown<String>(
-            label: 'الفئة المستهدفة',
-            value: _target,
-            items: const [
-              _MenuItem('all', 'كل الكلية'),
-              _MenuItem('major', 'تخصص محدد'),
-              _MenuItem('level', 'مستوى محدد'),
-              _MenuItem('doctors', 'الدكاترة'),
-              _MenuItem('delegates', 'المندوبون'),
-            ],
-            onChanged: (value) => setState(() {
-              _target = value ?? 'all';
-              _majorId = null;
-              _levelId = null;
-            }),
-          ),
-          if (_target == 'major' || _target == 'level')
-            _dropdown<int>(
-              label: 'التخصص',
-              value: _majorId,
-              items: majors
-                  .map(
-                    (m) =>
-                        _MenuItem(_int(m['id']), (m['name'] ?? '').toString()),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() {
-                _majorId = value;
-                _levelId = null;
-              }),
+          // ── Card 1: البيانات الأساسية للرسالة والنوع ───────────────────
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: AppColors.slate200),
             ),
-          if (_target == 'level')
-            _dropdown<int>(
-              label: 'المستوى',
-              value: _levelId,
-              items: levels
-                  .map(
-                    (l) =>
-                        _MenuItem(_int(l['id']), (l['name'] ?? '').toString()),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => _levelId = value),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.edit_note_rounded, color: AppColors.rose, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'بيانات وتفاصيل الإشعار',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _text(_title, 'عنوان الإشعار', hint: 'أدخل عنواناً جذاباً للرسالة'),
+                _text(_message, 'نص الإشعار', maxLines: 4, hint: 'اكتب نص الإشعار هنا بالتفصيل...'),
+                _dropdown<String>(
+                  label: 'نوع الإشعار والتبويب',
+                  value: _type,
+                  items: const [
+                    _MenuItem('announcement', 'إعلان عام'),
+                    _MenuItem('poll', 'استبيان جماعي'),
+                    _MenuItem('exam', 'تنبيه اختبار'),
+                    _MenuItem('assignment', 'تكليف جديد'),
+                    _MenuItem('attendance', 'شؤون حضور'),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _type = value ?? 'announcement'),
+                ),
+                _dropdown<String>(
+                  label: 'الفئة المستهدفة بالرسالة',
+                  value: _target,
+                  items: const [
+                    _MenuItem('all', 'كل الكلية (طلاب ودكاترة)'),
+                    _MenuItem('major', 'تخصص أكاديمي محدد'),
+                    _MenuItem('level', 'مستوى دراسي محدد'),
+                    _MenuItem('doctors', 'أعضاء هيئة التدريس فقط'),
+                    _MenuItem('delegates', 'المندوبون والمنسقون فقط'),
+                  ],
+                  onChanged: (value) => setState(() {
+                    _target = value ?? 'all';
+                    _majorId = null;
+                    _levelId = null;
+                  }),
+                ),
+                if (_target == 'major' || _target == 'level')
+                  _dropdown<int>(
+                    label: 'التخصص الأكاديمي المستهدف',
+                    value: _majorId,
+                    items: majors
+                        .map(
+                          (m) =>
+                              _MenuItem(_int(m['id']), (m['name'] ?? '').toString()),
+                        )
+                        .toList(),
+                    onChanged: (value) => setState(() {
+                      _majorId = value;
+                      _levelId = null;
+                    }),
+                  ),
+                if (_target == 'level')
+                  _dropdown<int>(
+                    label: 'المستوى الدراسي المستهدف',
+                    value: _levelId,
+                    items: levels
+                        .map(
+                          (l) =>
+                              _MenuItem(_int(l['id']), (l['name'] ?? '').toString()),
+                        )
+                        .toList(),
+                    onChanged: (value) => setState(() => _levelId = value),
+                  ),
+              ],
             ),
-          _AttachmentPicker(
-            file: _file,
-            onPick: _pickFile,
-            onClear: () => setState(() => _file = null),
           ),
-          if (_type == 'poll')
-            _PollOptionsEditor(
-              controller: _pollOption,
-              options: _pollOptions,
-              onChanged: () => setState(() {}),
+          const SizedBox(height: 16),
+
+          // ── Card 2: الملحقات والخيارات الإضافية ──────────────────────
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: AppColors.slate200),
             ),
-          const SizedBox(height: 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.attachment_rounded, color: AppColors.rose, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'الملفات والخيارات الإضافية',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _AttachmentPicker(
+                  file: _file,
+                  onPick: _pickFile,
+                  onClear: () => setState(() => _file = null),
+                ),
+                if (_type == 'poll') ...[
+                  const SizedBox(height: 10),
+                  _PollOptionsEditor(
+                    controller: _pollOption,
+                    options: _pollOptions,
+                    onChanged: () => setState(() {}),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // ── زر الإرسال الرئيسي ───────────────────────────────────────
           FilledButton.icon(
             onPressed: _saving ? null : _submit,
-            icon: const Icon(Icons.send_rounded),
-            label: Text(_saving ? 'جاري الإرسال...' : 'إرسال الإشعار'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.rose,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 2,
+              shadowColor: AppColors.rose.withValues(alpha: 0.3),
+            ),
+            icon: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.send_rounded, size: 18),
+            label: Text(
+              _saving ? 'جاري إرسال الإشعار...' : 'إرسال الإشعار الجماعي الآن',
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w900,
+                fontSize: 14.5,
+              ),
+            ),
           ),
         ],
       ),
@@ -1879,13 +1752,17 @@ class _NotificationFormState extends State<_NotificationForm> {
       'target': _target,
       if (_majorId != null) 'major_id': _majorId,
       if (_levelId != null) 'level_id': _levelId,
-      if (_type == 'poll') 'poll_options': _pollOptions,
       if (_file?.bytes != null)
         'attachment': MultipartFile.fromBytes(
           _file!.bytes!,
           filename: _file!.name,
         ),
     };
+    if (_type == 'poll') {
+      for (var index = 0; index < _pollOptions.length; index++) {
+        payload['poll_options[$index]'] = _pollOptions[index];
+      }
+    }
     await widget.onSubmit(payload);
     if (mounted) setState(() => _saving = false);
   }
@@ -2049,55 +1926,6 @@ class _ExcuseReviewFormState extends State<_ExcuseReviewForm> {
               ),
             ),
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _AttendanceStatusForm extends StatefulWidget {
-  const _AttendanceStatusForm({required this.current, required this.onSubmit});
-
-  final String current;
-  final Future<void> Function(String status) onSubmit;
-
-  @override
-  State<_AttendanceStatusForm> createState() => _AttendanceStatusFormState();
-}
-
-class _AttendanceStatusFormState extends State<_AttendanceStatusForm> {
-  late String _status = widget.current;
-  bool _saving = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _dropdown<String>(
-          label: 'حالة الحضور',
-          value: _status,
-          items: const [
-            _MenuItem('present', 'حاضر'),
-            _MenuItem('absent', 'غائب'),
-            _MenuItem('late', 'متأخر'),
-            _MenuItem('excused', 'معذور'),
-            _MenuItem('permitted', 'مأذون'),
-            _MenuItem('exempted', 'مستثنى'),
-          ],
-          onChanged: (value) => setState(() => _status = value ?? 'absent'),
-        ),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: _saving
-              ? null
-              : () async {
-                  setState(() => _saving = true);
-                  await widget.onSubmit(_status);
-                  if (mounted) setState(() => _saving = false);
-                },
-          icon: const Icon(Icons.save_rounded),
-          label: Text(_saving ? 'جاري الحفظ...' : 'حفظ الحالة'),
         ),
       ],
     );
@@ -2567,26 +2395,204 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final title = (item['title'] ?? '').toString();
+    final type = (item['type'] ?? 'announcement').toString();
+    final createdAt = _formatDateYmd(item['created_at']);
     final total = _int(item['total_count']);
     final read = _int(item['read_count']);
-    return _ActionCard(
-      icon: Icons.campaign_rounded,
-      color: AppColors.rose,
-      title: (item['title'] ?? '').toString(),
-      subtitle: '${_typeLabel(item['type'])} • ${item['created_at'] ?? ''}',
-      chips: ['المستلمون: $total', 'المقروء: $read'],
-      actions: [
-        _RoundAction(
-          icon: Icons.visibility_rounded,
-          color: AppColors.royalBlue,
-          onTap: onTap,
+    final target = (item['target_label'] ?? item['target'] ?? '').toString();
+
+    final targetText = switch (target) {
+      'all' => 'كل الكلية',
+      'major' => 'تخصص محدد',
+      'level' => 'مستوى محدد',
+      'doctors' => 'الدكاترة',
+      'delegates' => 'المندوبون',
+      _ => target,
+    };
+
+    final Color color;
+    final IconData icon;
+    final String typeLabelText;
+
+    switch (type) {
+      case 'poll':
+        color = AppColors.royalBlue;
+        icon = Icons.poll_rounded;
+        typeLabelText = 'استبيان جماعي';
+        break;
+      case 'exam':
+        color = AppColors.goldDeep;
+        icon = Icons.event_note_rounded;
+        typeLabelText = 'تنبيه اختبار';
+        break;
+      case 'assignment':
+        color = AppColors.violet;
+        icon = Icons.assignment_rounded;
+        typeLabelText = 'تكليف دراسي';
+        break;
+      case 'attendance':
+        color = AppColors.teal;
+        icon = Icons.fact_check_rounded;
+        typeLabelText = 'إشعار حضور';
+        break;
+      default:
+        color = AppColors.rose;
+        icon = Icons.campaign_rounded;
+        typeLabelText = 'إعلان عام';
+    }
+
+    final double readRatio = total > 0 ? read / total : 0.0;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.slate100),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
-        _RoundAction(
-          icon: Icons.delete_rounded,
-          color: AppColors.danger,
-          onTap: onDelete,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(height: 4, color: color),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Icon(icon, color: color, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title.isEmpty ? '-' : title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                                color: AppColors.midnight,
+                                height: 1.3,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$typeLabelText - $createdAt',
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                color: AppColors.slate500,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: onDelete,
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.danger.withValues(alpha: 0.08),
+                          foregroundColor: AppColors.danger,
+                          padding: const EdgeInsets.all(8),
+                        ),
+                        icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildMiniBadge(
+                        Icons.groups_rounded,
+                        targetText.isEmpty ? 'الكل' : targetText,
+                        AppColors.slate600,
+                      ),
+                      Text(
+                        'المقروء: $read / $total',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: read == total && total > 0
+                              ? AppColors.success
+                              : AppColors.slate600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (total > 0) ...[
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: readRatio,
+                        minHeight: 6,
+                        backgroundColor: AppColors.slate100,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          readRatio == 1.0 ? AppColors.success : color,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildMiniBadge(IconData icon, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 12),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2845,37 +2851,6 @@ String _getStudentInitials(String name) {
   if (parts.isEmpty || name.isEmpty) return '؟';
   if (parts.length == 1) return parts[0][0];
   return '${parts[0][0]}${parts[1][0]}';
-}
-
-class _AttendanceRecordCard extends StatelessWidget {
-  const _AttendanceRecordCard({required this.item, required this.onEdit});
-
-  final Map<String, dynamic> item;
-  final VoidCallback onEdit;
-
-  @override
-  Widget build(BuildContext context) {
-    final student = _map(item['student']);
-    final subject = _map(item['subject']);
-    return _ActionCard(
-      icon: Icons.fact_check_rounded,
-      color: _statusColor(item['status']),
-      title: (student['name'] ?? '-').toString(),
-      subtitle: '${subject['name'] ?? '-'} • ${item['date'] ?? ''}',
-      chips: [
-        item['status_label']?.toString() ?? _attendanceLabel(item['status']),
-        'رقم القيد: ${student['student_number'] ?? '-'}',
-        if (item['excuse'] != null) 'يوجد عذر',
-      ],
-      actions: [
-        _RoundAction(
-          icon: Icons.edit_rounded,
-          color: AppColors.royalBlue,
-          onTap: onEdit,
-        ),
-      ],
-    );
-  }
 }
 
 class _ExamScheduleCard extends StatelessWidget {
@@ -3615,114 +3590,6 @@ class _InfoCapsule extends StatelessWidget {
   }
 }
 
-class _ActionCard extends StatelessWidget {
-
-  const _ActionCard({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    required this.chips,
-    this.actions = const [],
-  });
-
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final List<String> chips;
-  final List<Widget> actions;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(icon, color: color),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title.isEmpty ? '-' : title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.slate500,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              ...actions,
-            ],
-          ),
-          if (chips.where((c) => c.trim().isNotEmpty).isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: chips
-                    .where((chip) => chip.trim().isNotEmpty)
-                    .map((chip) => _ChipText(chip))
-                    .toList(),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RoundAction extends StatelessWidget {
-  const _RoundAction({
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onTap,
-      icon: Icon(icon),
-      color: color,
-      style: IconButton.styleFrom(
-        backgroundColor: color.withValues(alpha: 0.1),
-      ),
-    );
-  }
-}
-
 class _OpsHero extends StatelessWidget {
   const _OpsHero({
     required this.title,
@@ -3840,13 +3707,15 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final itemWidth = (MediaQuery.sizeOf(context).width - 60) / 3;
-    return Row(
-      children: stats.asMap().entries.map((entry) {
-        final i = entry.key;
-        final stat = entry.value;
-        return [
-          SizedBox(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth < 360 ? 2 : 3;
+        final itemWidth = (constraints.maxWidth - ((columns - 1) * 10)) / columns;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: stats.map((stat) {
+            return SizedBox(
             width: itemWidth,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
@@ -3877,10 +3746,12 @@ class _StatsRow extends StatelessWidget {
                   ),
                   Text(
                     stat.value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontFamily: 'Cairo',
                       fontWeight: FontWeight.w900,
-                      fontSize: 22,
+                      fontSize: constraints.maxWidth < 360 ? 18 : 20,
                       color: stat.color,
                       letterSpacing: -0.5,
                     ),
@@ -3900,10 +3771,10 @@ class _StatsRow extends StatelessWidget {
                 ],
               ),
             ),
-          ),
-          if (i < stats.length - 1) const SizedBox(width: 10),
-        ];
-      }).expand((x) => x).toList(),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 }
@@ -3954,6 +3825,136 @@ class _ReportSummaryGrid extends StatelessWidget {
           AppColors.rose,
         ),
       ],
+    );
+  }
+}
+
+class _ReportHubGrid extends StatelessWidget {
+  const _ReportHubGrid({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth < 620 ? 1 : 2;
+        final width = (constraints.maxWidth - ((columns - 1) * 12)) / columns;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: children
+              .map((child) => SizedBox(width: width, child: child))
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _ReportHubCard extends StatelessWidget {
+  const _ReportHubCard({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.color,
+    required this.actionLabel,
+    required this.onTap,
+  });
+
+  final String title;
+  final String description;
+  final IconData icon;
+  final Color color;
+  final String actionLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 190),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.slate100),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.055),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: color, size: 23),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w900,
+                fontSize: 14.5,
+                height: 1.25,
+                color: AppColors.midnight,
+              ),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              description,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w600,
+                fontSize: 11.5,
+                height: 1.45,
+                color: AppColors.slate500,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    actionLabel,
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(Icons.arrow_back_rounded, color: color, size: 16),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -4210,76 +4211,6 @@ class _ExamLevelFilters extends StatelessWidget {
   }
 }
 
-class _ReportFilters extends StatelessWidget {
-  const _ReportFilters({
-    required this.data,
-    required this.majorId,
-    required this.levelId,
-    required this.searchController,
-    required this.onMajor,
-    required this.onLevel,
-    required this.onSearch,
-  });
-
-  final Map<String, dynamic> data;
-  final int? majorId;
-  final int? levelId;
-  final TextEditingController searchController;
-  final ValueChanged<int?> onMajor;
-  final ValueChanged<int?> onLevel;
-  final VoidCallback onSearch;
-
-  @override
-  Widget build(BuildContext context) {
-    final majors = _list(data['majors']);
-    final selected = majors.firstWhere(
-      (major) => _int(major['id']) == majorId,
-      orElse: () => const {},
-    );
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _CompactDropdown<int>(
-                label: 'التخصص',
-                value: majorId,
-                items: majors
-                    .map(
-                      (m) => _MenuItem(
-                        _int(m['id']),
-                        (m['name'] ?? '').toString(),
-                      ),
-                    )
-                    .toList(),
-                onChanged: onMajor,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _CompactDropdown<int>(
-                label: 'المستوى',
-                value: levelId,
-                items: _list(selected['levels'])
-                    .map(
-                      (l) => _MenuItem(
-                        _int(l['id']),
-                        (l['name'] ?? '').toString(),
-                      ),
-                    )
-                    .toList(),
-                onChanged: onLevel,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        _SearchBox(controller: searchController, onSearch: onSearch),
-      ],
-    );
-  }
-}
-
 class _SchedulePage extends StatelessWidget {
   const _SchedulePage({
     required this.loading,
@@ -4375,88 +4306,387 @@ class _NotificationDetails extends StatelessWidget {
 
   final Map<String, dynamic> data;
 
+  String _typeText(String? type) {
+    return switch (type ?? 'announcement') {
+      'poll' => 'استبيان جماعي',
+      'exam' => 'تنبيه اختبار',
+      'assignment' => 'تكليف دراسي',
+      'attendance' => 'إشعار حضور',
+      _ => 'إعلان عام',
+    };
+  }
+
+  IconData _typeIcon(String? type) {
+    return switch (type ?? 'announcement') {
+      'poll' => Icons.poll_rounded,
+      'exam' => Icons.event_note_rounded,
+      'assignment' => Icons.assignment_rounded,
+      'attendance' => Icons.fact_check_rounded,
+      _ => Icons.campaign_rounded,
+    };
+  }
+
+  Color _typeColor(String? type) {
+    return switch (type ?? 'announcement') {
+      'poll' => AppColors.royalBlue,
+      'exam' => AppColors.goldDeep,
+      'assignment' => AppColors.violet,
+      'attendance' => AppColors.teal,
+      _ => AppColors.rose,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final stats = _map(data['stats']);
     final recipients = _list(data['recipients']);
+    final pollOptions = _list(stats['poll_options']);
+
+    final title = (stats['title'] ?? '-').toString();
+    final message = (stats['message'] ?? '').toString();
+    final type = (stats['type'] ?? 'announcement').toString();
+    final createdAt = _formatDateYmd(stats['created_at']);
+    final total = _int(stats['total_count']);
+    final read = _int(stats['read_count']);
+    final attachmentName = stats['attachment_name'];
+
+    final color = _typeColor(type);
+    final icon = _typeIcon(type);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _DetailBlock(
-          title: stats['title']?.toString() ?? '-',
-          lines: [
-            stats['message']?.toString() ?? '',
-            'النوع: ${_typeLabel(stats['type'])}',
-            'المستلمون: ${stats['total_count'] ?? 0}',
-            'المقروء: ${stats['read_count'] ?? 0}',
-            if (stats['attachment_name'] != null)
-              'المرفق: ${stats['attachment_name']}',
-          ],
-        ),
-        if (_list(stats['poll_options']).isNotEmpty) ...[
-          const SizedBox(height: 12),
-          const _SectionTitle('نتائج الاستبيان', Icons.poll_rounded),
-          const SizedBox(height: 8),
-          ..._list(stats['poll_options']).map(
-            (option) => _DetailBlock(
-              title: (option['text'] ?? '').toString(),
-              lines: [
-                '${option['count'] ?? 0} صوت • ${option['percentage'] ?? 0}%',
-              ],
-            ),
+        // ── Identity Card Header ───────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0D1B3E),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0D1B3E).withValues(alpha: 0.35),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-        ],
-        const SizedBox(height: 12),
-        const _SectionTitle('المستلمون', Icons.groups_rounded),
-        const SizedBox(height: 8),
-        ...recipients
-            .take(50)
-            .map(
-              (user) => _DetailBlock(
-                title: (user['name'] ?? '-').toString(),
-                lines: [
-                  user['email']?.toString() ?? '',
-                  user['read_at'] == null
-                      ? 'غير مقروء'
-                      : 'مقروء: ${user['read_at']}',
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              Positioned(
+                top: -24,
+                right: -24,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 2.5,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        color.withValues(alpha: 0),
+                        color,
+                        color.withValues(alpha: 0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: color.withValues(alpha: 0.4),
+                        width: 2,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      icon,
+                      color: color,
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 17,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_typeText(type)} - $createdAt',
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11.5,
+                            color: AppColors.slate400,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            _SheetBadge(
+                              label: 'المقروئية: $read / $total',
+                              icon: Icons.mark_email_read_rounded,
+                              color: read == total && total > 0
+                                  ? AppColors.success
+                                  : color,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // ── Section: محتوى الإشعار ────────────────────────────────────
+        _SheetSection(
+          title: 'محتوى الإشعار والرسالة',
+          icon: Icons.description_rounded,
+          color: color,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.midnight,
+                      height: 1.6,
+                    ),
+                  ),
+                  if (attachmentName != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.royalBlue.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                            color: AppColors.royalBlue.withValues(alpha: 0.12)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.attach_file_rounded,
+                              color: AppColors.royalBlue, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              attachmentName.toString(),
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                                color: AppColors.midnight,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-      ],
-    );
-  }
-}
-
-class _SubjectReportDetails extends StatelessWidget {
-  const _SubjectReportDetails({required this.data});
-
-  final Map<String, dynamic> data;
-
-  @override
-  Widget build(BuildContext context) {
-    final subject = _map(data['subject']);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _DetailBlock(
-          title: (subject['name'] ?? 'تقرير المادة').toString(),
-          lines: [
-            'التخصص: ${_map(subject['major'])['name'] ?? '-'}',
-            'المستوى: ${_map(subject['level'])['name'] ?? '-'}',
-            'الدكتور: ${_map(subject['doctor'])['name'] ?? '-'}',
           ],
         ),
-        const SizedBox(height: 12),
-        ..._list(data['report']).map((row) {
-          final student = _map(row['student']);
-          return _DetailBlock(
-            title: (student['name'] ?? '-').toString(),
-            lines: [
-              'حضور: ${row['present'] ?? 0} • غياب: ${row['absent'] ?? 0} • تأخير: ${row['late'] ?? 0}',
-              'نسبة الغياب: ${row['absence_percentage'] ?? 0}%',
+
+        // ── Section: نتائج الاستبيان ──────────────────────────────────
+        if (pollOptions.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _SheetSection(
+            title: 'نتائج التصويت والخيارات',
+            icon: Icons.poll_rounded,
+            color: AppColors.royalBlue,
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Column(
+                  children: pollOptions.asMap().entries.map((entry) {
+                    final opt = entry.value;
+                    final optText = (opt['text'] ?? '-').toString();
+                    final optCount = _int(opt['count']);
+                    final optPct = _int(opt['percentage']);
+                    final double ratio = optPct / 100.0;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                optText,
+                                style: const TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                  color: AppColors.midnight,
+                                ),
+                              ),
+                              Text(
+                                '$optPct% ($optCount أصوات)',
+                                style: const TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                  color: AppColors.royalBlue,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: LinearProgressIndicator(
+                              value: ratio,
+                              minHeight: 10,
+                              backgroundColor: AppColors.slate100,
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                  AppColors.royalBlue),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
             ],
-          );
-        }),
+          ),
+        ],
+
+        // ── Section: المستلمون والتفاعل ─────────────────────────────
+        const SizedBox(height: 16),
+        _SheetSection(
+          title: 'حالة القراءة والمستلمين',
+          icon: Icons.groups_rounded,
+          color: AppColors.teal,
+          children: [
+            if (recipients.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: const _AdminEmptyDetailsNote(
+                  icon: Icons.info_outline_rounded,
+                  message: 'لم يتم العثور على مستلمين لهذا الإشعار.',
+                ),
+              )
+            else
+              ...recipients.take(50).toList().asMap().entries.map((entry) {
+                final isLast = entry.key == recipients.take(50).length - 1;
+                final user = entry.value;
+                final uName = (user['name'] ?? '-').toString();
+                final uEmail = (user['email'] ?? '').toString();
+                final readAt = user['read_at'];
+                final isRead = readAt != null;
+
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: (isRead ? AppColors.success : AppColors.slate400)
+                                  .withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isRead
+                                  ? Icons.mark_email_read_rounded
+                                  : Icons.mail_outline_rounded,
+                              color: isRead ? AppColors.success : AppColors.slate500,
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  uName,
+                                  style: const TextStyle(
+                                    fontFamily: 'Cairo',
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                    color: AppColors.midnight,
+                                  ),
+                                ),
+                                if (uEmail.isNotEmpty)
+                                  Text(
+                                    uEmail,
+                                    style: const TextStyle(
+                                      fontFamily: 'Cairo',
+                                      fontSize: 11,
+                                      color: AppColors.slate500,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          _AdminChip(
+                            label: isRead ? 'مقروء' : 'غير مقروء',
+                            color: isRead ? AppColors.success : AppColors.slate600,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!isLast)
+                      Divider(
+                        height: 1,
+                        indent: 16,
+                        endIndent: 16,
+                        color: AppColors.slate100,
+                      ),
+                  ],
+                );
+              }),
+          ],
+        ),
       ],
     );
   }
@@ -4708,303 +4938,6 @@ class _ExamScheduleDetails extends StatelessWidget {
             },
           ),
       ],
-    );
-  }
-}
-
-class _ReportActionGrid extends StatelessWidget {
-  const _ReportActionGrid({
-    required this.onDoctorPerformance,
-    required this.onLevelSummary,
-    required this.onThreshold,
-  });
-
-  final VoidCallback onDoctorPerformance;
-  final VoidCallback onLevelSummary;
-  final VoidCallback onThreshold;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        _ReportAction(
-          'أداء الدكاترة',
-          Icons.school_rounded,
-          AppColors.royalBlue,
-          onDoctorPerformance,
-        ),
-        _ReportAction(
-          'ملخص المستوى',
-          Icons.layers_rounded,
-          AppColors.teal,
-          onLevelSummary,
-        ),
-        _ReportAction(
-          'نسبة الغياب',
-          Icons.warning_rounded,
-          AppColors.goldDeep,
-          onThreshold,
-        ),
-      ],
-    );
-  }
-}
-
-class _ReportAction extends StatelessWidget {
-  const _ReportAction(this.label, this.icon, this.color, this.onTap);
-
-  final String label;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: (MediaQuery.sizeOf(context).width - 50) / 2,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: _cardDecoration(),
-          child: Row(
-            children: [
-              Icon(icon, color: color),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LevelPickerForm extends StatefulWidget {
-  const _LevelPickerForm({required this.majors, required this.onSubmit});
-
-  final List<Map<String, dynamic>> majors;
-  final Future<void> Function(int levelId) onSubmit;
-
-  @override
-  State<_LevelPickerForm> createState() => _LevelPickerFormState();
-}
-
-class _LevelPickerFormState extends State<_LevelPickerForm> {
-  int? _majorId;
-  int? _levelId;
-  bool _loading = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = widget.majors.firstWhere(
-      (major) => _int(major['id']) == _majorId,
-      orElse: () => const {},
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _dropdown<int>(
-          label: 'التخصص',
-          value: _majorId,
-          items: widget.majors
-              .map(
-                (m) => _MenuItem(_int(m['id']), (m['name'] ?? '').toString()),
-              )
-              .toList(),
-          onChanged: (value) => setState(() {
-            _majorId = value;
-            _levelId = null;
-          }),
-        ),
-        _dropdown<int>(
-          label: 'المستوى',
-          value: _levelId,
-          items: _list(selected['levels'])
-              .map(
-                (l) => _MenuItem(_int(l['id']), (l['name'] ?? '').toString()),
-              )
-              .toList(),
-          onChanged: (value) => setState(() => _levelId = value),
-        ),
-        FilledButton.icon(
-          onPressed: _loading || _levelId == null
-              ? null
-              : () async {
-                  setState(() => _loading = true);
-                  await widget.onSubmit(_levelId!);
-                  if (mounted) setState(() => _loading = false);
-                },
-          icon: const Icon(Icons.visibility_rounded),
-          label: Text(_loading ? 'جاري التحميل...' : 'عرض التقرير'),
-        ),
-      ],
-    );
-  }
-}
-
-class _ThresholdReportForm extends StatefulWidget {
-  const _ThresholdReportForm({required this.majors, required this.onSubmit});
-
-  final List<Map<String, dynamic>> majors;
-  final Future<void> Function(int levelId, int threshold) onSubmit;
-
-  @override
-  State<_ThresholdReportForm> createState() => _ThresholdReportFormState();
-}
-
-class _ThresholdReportFormState extends State<_ThresholdReportForm> {
-  final _threshold = TextEditingController(text: '75');
-  int? _majorId;
-  int? _levelId;
-  bool _loading = false;
-
-  @override
-  void dispose() {
-    _threshold.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = widget.majors.firstWhere(
-      (major) => _int(major['id']) == _majorId,
-      orElse: () => const {},
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _dropdown<int>(
-          label: 'التخصص',
-          value: _majorId,
-          items: widget.majors
-              .map(
-                (m) => _MenuItem(_int(m['id']), (m['name'] ?? '').toString()),
-              )
-              .toList(),
-          onChanged: (value) => setState(() {
-            _majorId = value;
-            _levelId = null;
-          }),
-        ),
-        _dropdown<int>(
-          label: 'المستوى',
-          value: _levelId,
-          items: _list(selected['levels'])
-              .map(
-                (l) => _MenuItem(_int(l['id']), (l['name'] ?? '').toString()),
-              )
-              .toList(),
-          onChanged: (value) => setState(() => _levelId = value),
-        ),
-        _text(_threshold, 'نسبة الغياب', hint: '75'),
-        FilledButton.icon(
-          onPressed: _loading || _levelId == null
-              ? null
-              : () async {
-                  setState(() => _loading = true);
-                  await widget.onSubmit(
-                    _levelId!,
-                    _int(_threshold.text, fallback: 75),
-                  );
-                  if (mounted) setState(() => _loading = false);
-                },
-          icon: const Icon(Icons.visibility_rounded),
-          label: Text(_loading ? 'جاري التحميل...' : 'عرض التقرير'),
-        ),
-      ],
-    );
-  }
-}
-
-class _SimpleListReport extends StatelessWidget {
-  const _SimpleListReport({
-    required this.items,
-    required this.titleOf,
-    required this.linesOf,
-  });
-
-  final List<Map<String, dynamic>> items;
-  final String Function(Map<String, dynamic> item) titleOf;
-  final List<String> Function(Map<String, dynamic> item) linesOf;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) return const _EmptyState();
-    return Column(
-      children: items
-          .map(
-            (item) => _DetailBlock(title: titleOf(item), lines: linesOf(item)),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _LevelSummaryReport extends StatelessWidget {
-  const _LevelSummaryReport({required this.data});
-
-  final Map<String, dynamic> data;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _DetailBlock(
-          title: (_map(data['level'])['name'] ?? 'المستوى').toString(),
-          lines: [
-            'التخصص: ${_map(_map(data['level'])['major'])['name'] ?? '-'}',
-            'عدد الطلاب: ${_list(data['students']).length}',
-            'المندوب: ${_map(data['delegate'])['name'] ?? '-'}',
-          ],
-        ),
-        ..._list(data['subject_stats']).map((item) {
-          final subject = _map(item['subject']);
-          return _DetailBlock(
-            title: (subject['name'] ?? '-').toString(),
-            lines: [
-              'إجمالي السجلات: ${item['total_records'] ?? 0}',
-              'نسبة الحضور: ${item['attendance_rate'] ?? 0}%',
-            ],
-          );
-        }),
-      ],
-    );
-  }
-}
-
-class _ThresholdReportDetails extends StatelessWidget {
-  const _ThresholdReportDetails({required this.data});
-
-  final Map<String, dynamic> data;
-
-  @override
-  Widget build(BuildContext context) {
-    final alerts = _list(data['alerts']);
-    if (alerts.isEmpty) return const _EmptyState();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: alerts.map((item) {
-        final student = _map(item['student']);
-        final subject = _map(item['subject']);
-        return _DetailBlock(
-          title: (student['name'] ?? '-').toString(),
-          lines: [
-            'المادة: ${subject['name'] ?? '-'}',
-            'نسبة الغياب: ${item['absence_percentage'] ?? 0}%',
-            'غياب ${item['absent_count'] ?? 0} من ${item['total_sessions'] ?? 0} جلسة',
-          ],
-        );
-      }).toList(),
     );
   }
 }
@@ -5484,69 +5417,6 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _DetailBlock extends StatelessWidget {
-  const _DetailBlock({required this.title, required this.lines});
-
-  final String title;
-  final List<String> lines;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6),
-          ...lines
-              .where((line) => line.trim().isNotEmpty)
-              .map(
-                (line) => Padding(
-                  padding: const EdgeInsets.only(top: 3),
-                  child: Text(
-                    line,
-                    style: const TextStyle(
-                      color: AppColors.slate600,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SubjectReportTile extends StatelessWidget {
-  const _SubjectReportTile({required this.subject, required this.onTap});
-
-  final Map<String, dynamic> subject;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return _ActionCard(
-      icon: Icons.menu_book_rounded,
-      color: AppColors.royalBlue,
-      title: (subject['name'] ?? '-').toString(),
-      subtitle:
-          '${_map(subject['major'])['name'] ?? '-'} / ${_map(subject['level'])['name'] ?? '-'}',
-      chips: const ['تقرير المادة'],
-      actions: [
-        _RoundAction(
-          icon: Icons.visibility_rounded,
-          color: AppColors.royalBlue,
-          onTap: onTap,
-        ),
-      ],
-    );
-  }
-}
-
 class _AttachmentPicker extends StatelessWidget {
   const _AttachmentPicker({
     required this.file,
@@ -5560,29 +5430,104 @@ class _AttachmentPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasFile = file != null;
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: hasFile
+              ? AppColors.royalBlue.withValues(alpha: 0.3)
+              : AppColors.slate200,
+          width: hasFile ? 1.5 : 1,
+        ),
+      ),
       child: Row(
         children: [
-          const Icon(Icons.attach_file_rounded, color: AppColors.royalBlue),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              file?.name ?? 'لا يوجد مرفق',
-              style: const TextStyle(fontWeight: FontWeight.w800),
-              overflow: TextOverflow.ellipsis,
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: (hasFile ? AppColors.royalBlue : AppColors.slate400)
+                  .withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              hasFile ? Icons.description_rounded : Icons.attach_file_rounded,
+              color: hasFile ? AppColors.royalBlue : AppColors.slate500,
+              size: 18,
             ),
           ),
-          TextButton(
-            onPressed: onPick,
-            child: Text(file == null ? 'اختيار' : 'تغيير'),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hasFile ? file!.name : 'إرفاق ملف أو مستند للمستلمين',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12.5,
+                    color: hasFile ? AppColors.midnight : AppColors.slate500,
+                  ),
+                ),
+                if (hasFile) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'الحجم: ${((file!.size) / 1024).toStringAsFixed(1)} كيلوبايت',
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.slate500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-          if (file != null)
+          if (hasFile) ...[
+            TextButton(
+              onPressed: onPick,
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.royalBlue,
+                textStyle: const TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                ),
+              ),
+              child: const Text('تغيير'),
+            ),
             IconButton(
               onPressed: onClear,
-              icon: const Icon(Icons.close_rounded),
+              icon: const Icon(Icons.cancel_rounded,
+                  color: AppColors.danger, size: 20),
+            ),
+          ] else
+            FilledButton.icon(
+              onPressed: onPick,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.royalBlue,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: const Icon(Icons.upload_file_rounded, size: 14),
+              label: const Text(
+                'اختيار ملف',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w900,
+                  fontSize: 11.5,
+                ),
+              ),
             ),
         ],
       ),
@@ -5604,22 +5549,42 @@ class _PollOptionsEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.slate200),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'خيارات الاستبيان',
-            style: TextStyle(fontWeight: FontWeight.w900),
+          const Row(
+            children: [
+              Icon(Icons.list_alt_rounded, color: AppColors.royalBlue, size: 16),
+              SizedBox(width: 6),
+              Text(
+                'خيارات الاستبيان والتصويت',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12.5,
+                  color: AppColors.midnight,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                child: _text(controller, 'اكتب خيارًا', required: false),
+                child: _text(
+                  controller,
+                  'اكتب خيارًا للاستبيان',
+                  required: false,
+                  hint: 'مثال: نعم، موافق، غير موافق...',
+                ),
               ),
+              const SizedBox(width: 8),
               IconButton(
                 onPressed: () {
                   final value = controller.text.trim();
@@ -5628,25 +5593,53 @@ class _PollOptionsEditor extends StatelessWidget {
                   controller.clear();
                   onChanged();
                 },
-                icon: const Icon(Icons.add_circle_rounded),
-                color: AppColors.royalBlue,
+                style: IconButton.styleFrom(
+                  backgroundColor: AppColors.royalBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.all(12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.add_rounded, size: 20),
               ),
             ],
           ),
-          ...options.asMap().entries.map(
-            (entry) => ListTile(
-              dense: true,
-              title: Text(entry.value),
-              trailing: IconButton(
-                onPressed: () {
-                  options.removeAt(entry.key);
-                  onChanged();
-                },
-                icon: const Icon(Icons.delete_rounded),
-                color: AppColors.danger,
-              ),
-            ),
-          ),
+          if (options.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            ...options.asMap().entries.map(
+                  (entry) => Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.slate100),
+                    ),
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 0),
+                      title: Text(
+                        entry.value,
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12.5,
+                          color: AppColors.midnight,
+                        ),
+                      ),
+                      trailing: IconButton(
+                        onPressed: () {
+                          options.removeAt(entry.key);
+                          onChanged();
+                        },
+                        icon: const Icon(Icons.delete_outline_rounded,
+                            color: AppColors.danger, size: 18),
+                      ),
+                    ),
+                  ),
+                ),
+          ],
         ],
       ),
     );
@@ -5923,33 +5916,11 @@ Future<void> _showError(BuildContext context, String message) {
   );
 }
 
-String _typeLabel(Object? value) {
-  return switch ((value ?? '').toString()) {
-    'exam' => 'اختبار',
-    'assignment' => 'تكليف',
-    'attendance' => 'حضور',
-    'poll' => 'استبيان',
-    _ => 'إعلان',
-  };
-}
-
 String _statusLabel(Object? value) {
   return switch ((value ?? '').toString()) {
     'accepted' => 'مقبول',
     'rejected' => 'مرفوض',
     'pending' => 'معلق',
-    _ => value?.toString() ?? '-',
-  };
-}
-
-String _attendanceLabel(Object? value) {
-  return switch ((value ?? '').toString()) {
-    'present' => 'حاضر',
-    'absent' => 'غائب',
-    'late' => 'متأخر',
-    'excused' => 'معذور',
-    'permitted' => 'مأذون',
-    'exempted' => 'مستثنى',
     _ => value?.toString() ?? '-',
   };
 }
@@ -6003,6 +5974,28 @@ List<Map<String, dynamic>> _list(Object? value) {
 int _int(Object? value, {int fallback = 0}) {
   if (value == null) return fallback;
   return int.tryParse(value.toString()) ?? fallback;
+}
+
+String _formatDateYmd(Object? value) {
+  final raw = (value ?? '').toString().trim();
+  if (raw.isEmpty) return '-';
+  final parsed = DateTime.tryParse(raw);
+  if (parsed != null) {
+    return [
+      parsed.year.toString().padLeft(4, '0'),
+      parsed.month.toString().padLeft(2, '0'),
+      parsed.day.toString().padLeft(2, '0'),
+    ].join('-');
+  }
+  final match = RegExp(r'(\d{4})[-/](\d{1,2})[-/](\d{1,2})').firstMatch(raw);
+  if (match != null) {
+    return [
+      match.group(1)!,
+      match.group(2)!.padLeft(2, '0'),
+      match.group(3)!.padLeft(2, '0'),
+    ].join('-');
+  }
+  return raw.split(RegExp(r'\s+')).first;
 }
 
 String _formatTime(String value) {
@@ -6120,6 +6113,205 @@ class _IconInfo extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Shared Reusable Bottom Sheet Helpers ─────────────────────────────────────
+
+class _SheetBadge extends StatelessWidget {
+  const _SheetBadge({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 12),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.w900,
+              fontSize: 11,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetSection extends StatelessWidget {
+  const _SheetSection({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.children,
+  });
+
+  final String title;
+  final IconData icon;
+  final Color color;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.04),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(22),
+                topRight: Radius.circular(22),
+              ),
+              border: Border(
+                bottom: BorderSide(color: color.withValues(alpha: 0.08)),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 14),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...children.asMap().entries.map((entry) {
+            final isLast = entry.key == children.length - 1;
+            return Column(
+              children: [
+                entry.value,
+                if (!isLast)
+                  Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: AppColors.slate100,
+                  ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminEmptyDetailsNote extends StatelessWidget {
+  const _AdminEmptyDetailsNote({
+    required this.icon,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.slate200),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.slate500, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.slate600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminChip extends StatelessWidget {
+  const _AdminChip({
+    required this.label,
+    this.color = AppColors.slate700,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Cairo',
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: color,
+        ),
+      ),
     );
   }
 }
