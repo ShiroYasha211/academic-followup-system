@@ -93,20 +93,16 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                       child: Column(
                         children: [
-                          _DocHero(
-                            title: 'المكتبة المشتركة',
-                            subtitle:
-                                'ملفات وموارد تعليمية مشتركة مع إمكانية الرفع والتحميل.',
-                            icon: Icons.local_library_rounded,
-                            trailing: IconButton.filledTonal(
-                              onPressed: () => _showUpload(uploadSubjects),
-                              icon: const Icon(Icons.cloud_upload_rounded),
-                            ),
+                          _LibraryHeaderV3(
+                            onUpload: () => _showUpload(uploadSubjects),
                           ),
                           const SizedBox(height: 14),
-                          _LibraryToolbar(
+                          _LibraryToolbarV3(
                             search: _search,
                             isGrid: _isGrid,
+                            subjectId: _subjectId,
+                            fileType: _fileType,
+                            myUploads: _myUploads,
                             onSearch: _reload,
                             onFilter: () => _showLibraryFilters(subjects),
                             onUpload: () => _showUpload(uploadSubjects),
@@ -122,14 +118,22 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
                     delegate: _DoctorSliverHeader(
                       height: 74,
                       child: Container(
-                        color: AppColors.cream,
+                        color: const Color(0xFFF8FAFE),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Container(
                           margin: const EdgeInsets.symmetric(horizontal: 20),
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: AppColors.slate200.withValues(alpha: 0.45),
-                            borderRadius: BorderRadius.circular(16),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.slate100),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.02),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
                           child: TabBar(
                             controller: _tabs,
@@ -141,10 +145,35 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
                             dividerColor: Colors.transparent,
                             indicator: BoxDecoration(
                               color: AppColors.royalBlue,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.royalBlue.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
                             tabs: _categories
-                                .map((e) => Tab(text: e.$2))
+                                .map(
+                                  (e) => Tab(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                      ),
+                                      child: Text(
+                                        e.$2,
+                                        style: const TextStyle(
+                                          fontFamily: 'Cairo',
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                )
                                 .toList(),
                           ),
                         ),
@@ -172,22 +201,60 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
                           (group) => _docList(group['resources']).isNotEmpty,
                         )
                         .toList();
+
                     if (visibleGroups.isEmpty) {
                       return const Padding(
                         padding: EdgeInsets.all(20),
-                        child: _DocEmpty('لا توجد ملفات في هذا التصنيف.'),
+                        child: _DocEmpty('لا توجد ملفات في هذا التصنيف حاليا.'),
                       );
                     }
+
+                    if (_isGrid) {
+                      final flattenedFiles = visibleGroups.expand((group) {
+                        final resList = _docList(group['resources']);
+                        final subjectMap = _docMap(group['subject']);
+                        final subjectName = _docText(
+                          subjectMap['name'],
+                          'مادة',
+                        );
+                        return resList.map(
+                          (res) => {
+                            ..._docMap(res),
+                            'subject_name': subjectName,
+                          },
+                        );
+                      }).toList();
+
+                      return GridView.builder(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                              childAspectRatio: 0.85,
+                            ),
+                        itemCount: flattenedFiles.length,
+                        itemBuilder: (context, index) {
+                          final fileItem = flattenedFiles[index];
+                          return _LibraryGridCardV3(
+                            item: fileItem,
+                            onTap: () => _showResourceDetails(fileItem),
+                          );
+                        },
+                      );
+                    }
+
                     return ListView.separated(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
                       itemCount: visibleGroups.length,
                       separatorBuilder: (context, index) =>
                           const SizedBox(height: 14),
-                      itemBuilder: (context, index) => _LibrarySubjectGroupCard(
-                        group: visibleGroups[index],
-                        compact: _isGrid,
-                        onResourceTap: _showResourceDetails,
-                      ),
+                      itemBuilder: (context, index) =>
+                          _LibrarySubjectGroupCardV3(
+                            group: visibleGroups[index],
+                            onResourceTap: _showResourceDetails,
+                          ),
                     );
                   }).toList(),
                 ),
@@ -197,7 +264,7 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
           if (_busy)
             Positioned.fill(
               child: ColoredBox(
-                color: Colors.black.withValues(alpha: 0.08),
+                color: Colors.black.withValues(alpha: 0.12),
                 child: const Center(child: CircularProgressIndicator()),
               ),
             ),
@@ -212,7 +279,7 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
     var mine = _myUploads;
     final ok = await showMoeenBottomSheet<bool>(
       context: context,
-      title: 'فلاتر المكتبة',
+      title: 'تصفية ملفات المكتبة',
       icon: Icons.tune_rounded,
       color: AppColors.royalBlue,
       child: StatefulBuilder(
@@ -222,11 +289,23 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
             DropdownButtonFormField<int?>(
               initialValue: subject,
               isExpanded: true,
-              decoration: const InputDecoration(labelText: 'المادة'),
+              style: const TextStyle(
+                color: AppColors.midnight,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                fontFamily: 'Cairo',
+              ),
+              decoration: InputDecoration(
+                labelText: 'تصفية حسب المادة',
+                labelStyle: const TextStyle(fontFamily: 'Cairo', fontSize: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
               items: [
                 const DropdownMenuItem<int?>(
                   value: null,
-                  child: Text('كل المواد'),
+                  child: Text('كل المواد الدراسية'),
                 ),
                 ...subjects.map(
                   (item) => DropdownMenuItem<int?>(
@@ -237,30 +316,75 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
               ],
               onChanged: (value) => setLocal(() => subject = value),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: type,
-              decoration: const InputDecoration(labelText: 'نوع الملف'),
+              style: const TextStyle(
+                color: AppColors.midnight,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                fontFamily: 'Cairo',
+              ),
+              decoration: InputDecoration(
+                labelText: 'نوع مستند الملف',
+                labelStyle: const TextStyle(fontFamily: 'Cairo', fontSize: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
               items: const [
-                DropdownMenuItem(value: 'all', child: Text('الكل')),
-                DropdownMenuItem(value: 'pdf', child: Text('PDF')),
-                DropdownMenuItem(value: 'docx', child: Text('Word')),
-                DropdownMenuItem(value: 'pptx', child: Text('PowerPoint')),
-                DropdownMenuItem(value: 'xlsx', child: Text('Excel')),
+                DropdownMenuItem(value: 'all', child: Text('كل الامتدادات')),
+                DropdownMenuItem(value: 'pdf', child: Text('ملفات PDF')),
+                DropdownMenuItem(value: 'word', child: Text('مستندات Word')),
+                DropdownMenuItem(
+                  value: 'powerpoint',
+                  child: Text('عروض PowerPoint'),
+                ),
+                DropdownMenuItem(value: 'excel', child: Text('جداول Excel')),
               ],
               onChanged: (value) => setLocal(() => type = value ?? 'all'),
             ),
-            const SizedBox(height: 12),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('ملفاتي فقط'),
-              value: mine,
-              onChanged: (value) => setLocal(() => mine = value),
+            const SizedBox(height: 14),
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.slate50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.slate100),
+              ),
+              child: SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                title: const Text(
+                  'عرض ملفاتي المرفوعة فقط',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    color: AppColors.midnight,
+                  ),
+                ),
+                value: mine,
+                activeThumbColor: AppColors.royalBlue,
+                onChanged: (value) => setLocal(() => mine = value),
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('تطبيق الفلاتر'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.royalBlue,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: const Text(
+                'تطبيق خيارات الفلترة',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
+                ),
+              ),
             ),
           ],
         ),
@@ -290,7 +414,7 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
 
     final ok = await showMoeenBottomSheet<bool>(
       context: context,
-      title: 'رفع ملف للمكتبة',
+      title: 'رفع مستند للمكتبة',
       icon: Icons.cloud_upload_rounded,
       color: AppColors.royalBlue,
       fullScreen: true,
@@ -300,146 +424,342 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              DropdownButtonFormField<int>(
-                initialValue: subjectId,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'المادة'),
-                items: subjects
-                    .map(
-                      (item) => DropdownMenuItem(
-                        value: _docInt(item['id']),
-                        child: Text(_docText(item['name'])),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.slate50,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.slate100),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'البيانات الأكاديمية للملف',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                        color: AppColors.royalBlue,
                       ),
-                    )
-                    .toList(),
-                onChanged: (value) => setLocal(() => subjectId = value),
-                validator: (value) => value == null ? 'اختر المادة.' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: title,
-                decoration: const InputDecoration(labelText: 'عنوان الملف'),
-                validator: (value) =>
-                    _docText(value).isEmpty ? 'اكتب عنوان الملف.' : null,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: category,
-                      decoration: const InputDecoration(labelText: 'التصنيف'),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'lectures',
-                          child: Text('محاضرات'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'summaries',
-                          child: Text('ملخصات'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'quizzes',
-                          child: Text('كويزات'),
-                        ),
-                        DropdownMenuItem(value: 'exams', child: Text('نماذج')),
-                        DropdownMenuItem(value: 'other', child: Text('أخرى')),
-                      ],
-                      onChanged: (value) =>
-                          setLocal(() => category = value ?? 'lectures'),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: subCategory,
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<int>(
+                      initialValue: subjectId,
+                      isExpanded: true,
+                      style: const TextStyle(
+                        color: AppColors.midnight,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        fontFamily: 'Cairo',
+                      ),
                       decoration: const InputDecoration(
-                        labelText: 'النوع الفرعي',
+                        labelText: 'المادة الدراسية',
+                      ),
+                      items: subjects
+                          .map(
+                            (item) => DropdownMenuItem(
+                              value: _docInt(item['id']),
+                              child: Text(_docText(item['name'])),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) => setLocal(() => subjectId = value),
+                      validator: (value) =>
+                          value == null ? 'اختر المادة الدراسية.' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: category,
+                            style: const TextStyle(
+                              color: AppColors.midnight,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              fontFamily: 'Cairo',
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'التصنيف الرئيسي',
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'lectures',
+                                child: Text('محاضرات'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'summaries',
+                                child: Text('ملخصات'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'quizzes',
+                                child: Text('كويزات'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'exams',
+                                child: Text('نماذج'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'other',
+                                child: Text('أخرى'),
+                              ),
+                            ],
+                            onChanged: (value) =>
+                                setLocal(() => category = value ?? 'lectures'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: subCategory,
+                            style: const TextStyle(
+                              color: AppColors.midnight,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              fontFamily: 'Cairo',
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'النوع الفرعي',
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'theoretical',
+                                child: Text('نظري'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'practical',
+                                child: Text('عملي'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'seminar',
+                                child: Text('سمنار'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'other',
+                                child: Text('أخرى'),
+                              ),
+                            ],
+                            onChanged: (value) => setLocal(
+                              () => subCategory = value ?? 'theoretical',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.slate50,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.slate100),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'محتوى وتفاصيل المستند',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                        color: AppColors.royalBlue,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Cairo',
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'عنوان الملف',
+                      ),
+                      validator: (value) => _docText(value).isEmpty
+                          ? 'اكتب عنوان الملف بشكل صحيح.'
+                          : null,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: semester,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Cairo',
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'الفصل الدراسي / الترم',
+                            ),
+                            validator: (value) => _docText(value).isEmpty
+                                ? 'اكتب معلومات الترم.'
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: lecturer,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Cairo',
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'المحاضر / الدكتور',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: visibility,
+                      style: const TextStyle(
+                        color: AppColors.midnight,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        fontFamily: 'Cairo',
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'صلاحيات ظهور الملف',
                       ),
                       items: const [
                         DropdownMenuItem(
-                          value: 'theoretical',
-                          child: Text('نظري'),
+                          value: 'batch',
+                          child: Text('الدفعة الدراسية'),
                         ),
                         DropdownMenuItem(
-                          value: 'practical',
-                          child: Text('عملي'),
+                          value: 'college',
+                          child: Text('الكلية بالكامل'),
                         ),
                         DropdownMenuItem(
-                          value: 'seminar',
-                          child: Text('سمنار'),
+                          value: 'everyone',
+                          child: Text('الجميع (عام)'),
                         ),
-                        DropdownMenuItem(value: 'other', child: Text('أخرى')),
                       ],
                       onChanged: (value) =>
-                          setLocal(() => subCategory = value ?? 'theoretical'),
+                          setLocal(() => visibility = value ?? 'batch'),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: description,
+                      maxLines: 2,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Cairo',
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'وصف إضافي للملف',
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: semester,
-                decoration: const InputDecoration(labelText: 'معلومات الترم'),
-                validator: (value) =>
-                    _docText(value).isEmpty ? 'اكتب معلومات الترم.' : null,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: lecturer,
-                decoration: const InputDecoration(labelText: 'اسم المحاضر'),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: visibility,
-                decoration: const InputDecoration(labelText: 'الظهور'),
-                items: const [
-                  DropdownMenuItem(value: 'batch', child: Text('الدفعة')),
-                  DropdownMenuItem(value: 'college', child: Text('الكلية')),
-                  DropdownMenuItem(value: 'everyone', child: Text('الجميع')),
-                ],
-                onChanged: (value) =>
-                    setLocal(() => visibility = value ?? 'batch'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: description,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'الوصف'),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () async {
+              const SizedBox(height: 14),
+              InkWell(
+                onTap: () async {
                   final result = await FilePicker.platform.pickFiles();
                   if (result != null && result.files.isNotEmpty) {
                     setLocal(() => file = result.files.first);
                   }
                 },
-                icon: const Icon(Icons.attach_file_rounded),
-                label: Text(file?.name ?? 'اختيار الملف'),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 16,
+                    horizontal: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: file != null
+                        ? AppColors.success.withValues(alpha: 0.06)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: file != null
+                          ? AppColors.success
+                          : AppColors.slate200,
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        file != null
+                            ? Icons.check_circle_rounded
+                            : Icons.attach_file_rounded,
+                        color: file != null
+                            ? AppColors.success
+                            : AppColors.slate500,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          file?.name ?? 'اضغط لاختيار مستند من جهازك',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: file != null
+                                ? AppColors.success
+                                : AppColors.slate700,
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               FilledButton.icon(
                 onPressed: () {
                   if (formKey.currentState?.validate() != true) return;
                   if (file?.path == null) {
                     _docSnack(
                       ctx,
-                      'اختر الملف أولًا.',
+                      'الرجاء اختيار مستند أولا.',
                       color: AppColors.warning,
                     );
                     return;
                   }
                   Navigator.pop(ctx, true);
                 },
-                icon: const Icon(Icons.cloud_upload_rounded),
-                label: const Text('رفع الملف'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.royalBlue,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                icon: const Icon(Icons.cloud_upload_rounded, size: 20),
+                label: const Text(
+                  'رفع وبث الملف للمكتبة',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                ),
               ),
             ],
           ),
         ),
       ),
     );
+
     if (ok != true || subjectId == null || file?.path == null) return;
     setState(() => _busy = true);
     try {
@@ -456,7 +776,11 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
       });
       if (!mounted) return;
       _reload();
-      _docSnack(context, 'تم رفع الملف بنجاح.', color: AppColors.success);
+      _docSnack(
+        context,
+        'تم رفع المستند وبثه للمكتبة بنجاح.',
+        color: AppColors.success,
+      );
     } catch (error) {
       if (mounted) await _docErrorDialog(context, error);
     } finally {
@@ -465,12 +789,14 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
   }
 
   Future<void> _showResourceDetails(_Json item) async {
+    final type = _docText(item['file_type']);
+    final colorsAndIcon = _getFileColorsAndIcon(type);
     await showMoeenBottomSheet<void>(
       context: context,
-      title: 'تفاصيل الملف',
-      icon: _docFileIcon(_docText(item['file_type'])),
-      color: AppColors.royalBlue,
-      child: _ResourceDetailsPanel(
+      title: 'تفاصيل ملف المكتبة',
+      icon: colorsAndIcon.$3,
+      color: colorsAndIcon.$1,
+      child: _ResourceDetailsPanelV3(
         item: item,
         onDownload: () => _downloadResource(item),
         onOpen: () => _openResource(item),
@@ -487,7 +813,9 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
           .read(staffRepositoryProvider)
           .get('/doctor/library/$id/download');
       final url = _docText(_docMap(_docData(response))['download_url']);
-      if (url.isEmpty) throw const ApiException('رابط التحميل غير متاح.');
+      if (url.isEmpty) {
+        throw const ApiException('رابط تحميل المستند غير متاح حاليا.');
+      }
       final fileName = _docFileName(item);
       final result = await DownloadService.downloadUrlToMoeenFolder(
         url: url,
@@ -497,8 +825,8 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
       if (!mounted) return;
       await showMoeenInfoDialog(
         context: context,
-        title: 'تم تحميل الملف',
-        message: 'تم حفظ الملف في:\n${result.path}',
+        title: 'تم تحميل المستند',
+        message: 'تم حفظ الملف بنجاح في المسار:\n${result.path}',
         icon: Icons.file_download_done_rounded,
         color: AppColors.success,
       );
@@ -518,9 +846,10 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
     if (!mounted || path != null) return;
     final ok = await showMoeenConfirmDialog(
       context: context,
-      title: 'الملف غير محمل',
-      message: 'هذا الملف غير موجود على الجهاز. هل تريد تحميله الآن؟',
-      confirmLabel: 'تحميل الآن',
+      title: 'المستند غير محمل',
+      message:
+          'هذا الملف غير موجود على جهازك حاليا، هل تريد تحميله وفتحه الآن؟',
+      confirmLabel: 'نعم، تحميل الآن',
       icon: Icons.download_rounded,
       color: AppColors.royalBlue,
     );
@@ -528,10 +857,104 @@ class _DoctorLibraryScreenState extends ConsumerState<DoctorLibraryScreen>
   }
 }
 
-class _LibraryToolbar extends StatelessWidget {
-  const _LibraryToolbar({
+class _LibraryHeaderV3 extends StatelessWidget {
+  const _LibraryHeaderV3({required this.onUpload});
+
+  final VoidCallback onUpload;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.royalBlueDark, AppColors.royalBlue],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.royalBlue.withValues(alpha: 0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          PositionedDirectional(
+            end: -24,
+            top: -24,
+            child: Icon(
+              Icons.local_library_rounded,
+              size: 110,
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'المكتبة التعليمية المشتركة',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'مستودع الموارد والملفات المشتركة لجميع الكليات والمواد.',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              InkWell(
+                onTap: onUpload,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.cloud_upload_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LibraryToolbarV3 extends StatelessWidget {
+  const _LibraryToolbarV3({
     required this.search,
     required this.isGrid,
+    required this.subjectId,
+    required this.fileType,
+    required this.myUploads,
     required this.onSearch,
     required this.onFilter,
     required this.onUpload,
@@ -540,6 +963,9 @@ class _LibraryToolbar extends StatelessWidget {
 
   final TextEditingController search;
   final bool isGrid;
+  final int? subjectId;
+  final String fileType;
+  final bool myUploads;
   final VoidCallback onSearch;
   final VoidCallback onFilter;
   final VoidCallback onUpload;
@@ -547,76 +973,155 @@ class _LibraryToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool hasActiveFilters =
+        subjectId != null || fileType != 'all' || myUploads;
+
     return Row(
       children: [
         Expanded(
           child: TextField(
             controller: search,
             onSubmitted: (_) => onSearch(),
-            decoration: const InputDecoration(
-              hintText: 'ابحث عن ملف أو مادة...',
-              prefixIcon: Icon(Icons.search_rounded),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Cairo',
+            ),
+            decoration: InputDecoration(
+              hintText: 'ابحث عن ملف أو مادة دراسية...',
+              hintStyle: const TextStyle(
+                color: AppColors.slate400,
+                fontSize: 12,
+                fontFamily: 'Cairo',
+              ),
+              prefixIcon: const Icon(
+                Icons.search_rounded,
+                color: AppColors.slate400,
+                size: 20,
+              ),
               filled: true,
               fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: AppColors.slate100),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: AppColors.slate100),
+              ),
             ),
           ),
         ),
         const SizedBox(width: 8),
         IconButton.filledTonal(
           onPressed: onToggleView,
+          style: IconButton.styleFrom(
+            backgroundColor: AppColors.slate100,
+            foregroundColor: AppColors.royalBlue,
+            fixedSize: const Size(44, 44),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
           icon: Icon(
             isGrid ? Icons.view_list_rounded : Icons.grid_view_rounded,
+            size: 20,
           ),
+          tooltip: isGrid ? 'عرض القائمة' : 'عرض الشبكة',
         ),
+        const SizedBox(width: 6),
         IconButton.filledTonal(
           onPressed: onFilter,
-          icon: const Icon(Icons.tune_rounded),
+          style: IconButton.styleFrom(
+            backgroundColor: hasActiveFilters
+                ? AppColors.royalBlue.withValues(alpha: 0.12)
+                : AppColors.slate100,
+            foregroundColor: hasActiveFilters
+                ? AppColors.royalBlue
+                : AppColors.slate600,
+            fixedSize: const Size(44, 44),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: hasActiveFilters
+                  ? const BorderSide(color: AppColors.royalBlue, width: 1.2)
+                  : BorderSide.none,
+            ),
+          ),
+          icon: const Icon(Icons.tune_rounded, size: 20),
+          tooltip: 'فلاتر إضافية',
         ),
+        const SizedBox(width: 6),
         IconButton.filled(
           onPressed: onUpload,
-          icon: const Icon(Icons.add_rounded),
+          style: IconButton.styleFrom(
+            backgroundColor: AppColors.royalBlue,
+            foregroundColor: Colors.white,
+            fixedSize: const Size(44, 44),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          icon: const Icon(Icons.add_rounded, size: 22),
+          tooltip: 'رفع ملف جديد',
         ),
       ],
     );
   }
 }
 
-class _LibrarySubjectGroupCard extends StatelessWidget {
-  const _LibrarySubjectGroupCard({
+class _LibrarySubjectGroupCardV3 extends StatelessWidget {
+  const _LibrarySubjectGroupCardV3({
     required this.group,
-    required this.compact,
     required this.onResourceTap,
   });
 
   final _Json group;
-  final bool compact;
   final ValueChanged<_Json> onResourceTap;
 
   @override
   Widget build(BuildContext context) {
     final subject = _docMap(group['subject']);
     final resources = _docList(group['resources']);
-    final shownResources = compact ? resources.take(4).toList() : resources;
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 50,
+                height: 50,
                 decoration: BoxDecoration(
-                  color: AppColors.royalBlue.withValues(alpha: 0.1),
+                  color: AppColors.royalBlue.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.royalBlue.withValues(alpha: 0.14),
+                    width: 1,
+                  ),
                 ),
                 child: const Icon(
-                  Icons.menu_book_rounded,
+                  Icons.folder_copy_rounded,
                   color: AppColors.royalBlue,
+                  size: 22,
                 ),
               ),
               const SizedBox(width: 12),
@@ -631,58 +1136,52 @@ class _LibrarySubjectGroupCard extends StatelessWidget {
                       style: const TextStyle(
                         color: AppColors.midnight,
                         fontWeight: FontWeight.w900,
-                        fontSize: 15,
+                        fontSize: 14,
+                        fontFamily: 'Cairo',
                         height: 1.35,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Text(
-                      '${_docText(subject['major'], '-')} - ${_docText(subject['level'], '-')}',
+                      '${_docText(subject['major'], 'تخصص عام')} • ${_docText(subject['level'], 'المستوى')}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.slate500,
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
+                        fontFamily: 'Cairo',
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               _DocPill(
-                '${resources.length} ملف',
-                AppColors.teal,
-                icon: Icons.folder_rounded,
+                '${resources.length} ملفات',
+                AppColors.royalBlue,
+                icon: Icons.folder_zip_rounded,
               ),
             ],
           ),
           const SizedBox(height: 14),
-          ...shownResources.map(
+          ...resources.map(
             (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _LibraryResourceMiniTile(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _LibraryResourceMiniTileV3(
                 item: item,
                 onTap: () => onResourceTap(item),
               ),
             ),
           ),
-          if (compact && resources.length > shownResources.length)
-            Text(
-              '+ ${resources.length - shownResources.length} ملفات أخرى في هذه المادة',
-              style: const TextStyle(
-                color: AppColors.slate500,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
         ],
       ),
     );
   }
 }
 
-class _LibraryResourceMiniTile extends StatelessWidget {
-  const _LibraryResourceMiniTile({required this.item, required this.onTap});
+class _LibraryResourceMiniTileV3 extends StatelessWidget {
+  const _LibraryResourceMiniTileV3({required this.item, required this.onTap});
 
   final _Json item;
   final VoidCallback onTap;
@@ -690,6 +1189,7 @@ class _LibraryResourceMiniTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final type = _docText(item['file_type'], 'file');
+    final colorsAndIcon = _getFileColorsAndIcon(type);
 
     return InkWell(
       onTap: onTap,
@@ -703,68 +1203,13 @@ class _LibraryResourceMiniTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(_docFileIcon(type), color: AppColors.royalBlue, size: 22),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _docText(item['title'], 'ملف'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.midnight,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
-                    ),
-                  ),
-                  Text(
-                    '${_docText(item['category'], '-')} - ${type.toUpperCase()}',
-                    style: const TextStyle(
-                      color: AppColors.slate500,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_left_rounded, color: AppColors.slate300),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ignore: unused_element
-class _LibraryListCard extends StatelessWidget {
-  const _LibraryListCard({required this.item, required this.onTap});
-
-  final _Json item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final subject = _docMap(item['subject']);
-    final type = _docText(item['file_type'], 'file');
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: _cardDecoration(),
-        child: Row(
-          children: [
             Container(
-              width: 48,
-              height: 48,
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: AppColors.royalBlue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
+                color: colorsAndIcon.$2,
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(_docFileIcon(type), color: AppColors.royalBlue),
+              child: Icon(colorsAndIcon.$3, color: colorsAndIcon.$1, size: 18),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -772,21 +1217,34 @@ class _LibraryListCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _docText(item['title'], 'ملف'),
-                    style: const TextStyle(fontWeight: FontWeight.w900),
+                    _docText(item['title'], 'ملف بدون عنوان'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.midnight,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      fontFamily: 'Cairo',
+                    ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
-                    '${_docText(subject['name'], '-')} • ${type.toUpperCase()}',
+                    '${_docText(item['category'], 'موارد')} • ${type.toUpperCase()}',
                     style: const TextStyle(
                       color: AppColors.slate500,
                       fontWeight: FontWeight.w700,
-                      fontSize: 12,
+                      fontSize: 11,
+                      fontFamily: 'Cairo',
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_left_rounded),
+            const Icon(
+              Icons.chevron_left_rounded,
+              color: AppColors.slate400,
+              size: 20,
+            ),
           ],
         ),
       ),
@@ -794,9 +1252,8 @@ class _LibraryListCard extends StatelessWidget {
   }
 }
 
-// ignore: unused_element
-class _LibraryGridCard extends StatelessWidget {
-  const _LibraryGridCard({required this.item, required this.onTap});
+class _LibraryGridCardV3 extends StatelessWidget {
+  const _LibraryGridCardV3({required this.item, required this.onTap});
 
   final _Json item;
   final VoidCallback onTap;
@@ -804,34 +1261,145 @@ class _LibraryGridCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final type = _docText(item['file_type'], 'file');
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: _cardDecoration(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(_docFileIcon(type), color: AppColors.royalBlue, size: 38),
-            const Spacer(),
-            Text(
-              _docText(item['title'], 'ملف'),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 6),
-            _DocPill(type.toUpperCase(), AppColors.royalBlue),
-          ],
+    final colorsAndIcon = _getFileColorsAndIcon(type);
+    final subjectName = _docText(item['subject_name'], '-');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorsAndIcon.$2,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      colorsAndIcon.$3,
+                      color: colorsAndIcon.$1,
+                      size: 20,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.slate50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.slate100),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.download_rounded,
+                          size: 10,
+                          color: AppColors.slate500,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${_docInt(item['downloads_count'])}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.slate700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                _docText(item['title'], 'ملف'),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.midnight,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                  fontFamily: 'Cairo',
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subjectName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.royalBlue,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _docText(item['category'], 'أخرى'),
+                    style: const TextStyle(
+                      color: AppColors.slate500,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Cairo',
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorsAndIcon.$1,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      type.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _ResourceDetailsPanel extends StatelessWidget {
-  const _ResourceDetailsPanel({
+class _ResourceDetailsPanelV3 extends StatelessWidget {
+  const _ResourceDetailsPanelV3({
     required this.item,
     required this.onDownload,
     required this.onOpen,
@@ -846,12 +1414,19 @@ class _ResourceDetailsPanel extends StatelessWidget {
     final subject = _docMap(item['subject']);
     final uploader = _docMap(item['uploader']);
     final type = _docText(item['file_type'], 'file');
+    final colorsAndIcon = _getFileColorsAndIcon(type);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           _docText(item['title'], 'ملف'),
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+            color: AppColors.midnight,
+            fontFamily: 'Cairo',
+          ),
         ),
         const SizedBox(height: 10),
         Wrap(
@@ -860,46 +1435,177 @@ class _ResourceDetailsPanel extends StatelessWidget {
           children: [
             _DocPill(
               type.toUpperCase(),
-              AppColors.royalBlue,
-              icon: _docFileIcon(type),
+              colorsAndIcon.$1,
+              icon: colorsAndIcon.$3,
             ),
-            _DocPill(_docText(item['category'], '-'), AppColors.warning),
             _DocPill(
-              '${_docInt(item['downloads_count'])} تحميل',
+              _docText(item['category'], 'ملف مشترك'),
+              AppColors.warning,
+              icon: Icons.category_rounded,
+            ),
+            _DocPill(
+              '${_docInt(item['downloads_count'])} تحميلاً',
               AppColors.success,
+              icon: Icons.download_done_rounded,
             ),
           ],
         ),
-        const SizedBox(height: 14),
-        _InfoTile(label: 'المادة', value: _docText(subject['name'], '-')),
-        _InfoTile(label: 'الترم', value: _docText(item['semester_info'], '-')),
-        _InfoTile(
-          label: 'المحاضر',
-          value: _docText(item['lecturer_name'], '-'),
-        ),
-        _InfoTile(label: 'الناشر', value: _docText(uploader['name'], '-')),
-        _InfoTile(label: 'الوصف', value: _docText(item['description'], '-')),
         const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.slate50,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.slate100),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _InfoTileV3(
+                label: 'المادة الدراسية',
+                value: _docText(subject['name'], '-'),
+              ),
+              _InfoTileV3(
+                label: 'الفصل / الترم',
+                value: _docText(item['semester_info'], '-'),
+              ),
+              _InfoTileV3(
+                label: 'المحاضر العلمي',
+                value: _docText(item['lecturer_name'], '-'),
+              ),
+              _InfoTileV3(
+                label: 'الناشر / الدكتور',
+                value: _docText(uploader['name'], '-'),
+              ),
+              _InfoTileV3(
+                label: 'وصف المستند',
+                value: _docText(item['description'], '-'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
         Row(
           children: [
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: onOpen,
-                icon: const Icon(Icons.open_in_new_rounded),
-                label: const Text('فتح'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  side: const BorderSide(color: AppColors.slate300),
+                ),
+                icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                label: const Text(
+                  'فتح المستند',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: FilledButton.icon(
-                onPressed: onDownload,
-                icon: const Icon(Icons.download_rounded),
-                label: const Text('تحميل'),
+              child: InkWell(
+                onTap: onDownload,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.royalBlue,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.royalBlue.withValues(alpha: 0.22),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'تحميل الآن',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.arrow_downward_rounded,
+                          size: 13,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _InfoTileV3 extends StatelessWidget {
+  const _InfoTileV3({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.slate500,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+                fontFamily: 'Cairo',
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: AppColors.midnight,
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+                fontFamily: 'Cairo',
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -931,3 +1637,36 @@ class _DoctorSliverHeader extends SliverPersistentHeaderDelegate {
   }
 }
 
+(Color, Color, IconData) _getFileColorsAndIcon(String type) {
+  final ext = type.toLowerCase();
+  if (ext == 'pdf') {
+    return (
+      AppColors.danger,
+      AppColors.danger.withValues(alpha: 0.08),
+      Icons.picture_as_pdf_rounded,
+    );
+  } else if (ext == 'docx' || ext == 'doc') {
+    return (
+      AppColors.royalBlue,
+      AppColors.royalBlue.withValues(alpha: 0.08),
+      Icons.description_rounded,
+    );
+  } else if (ext == 'pptx' || ext == 'ppt') {
+    return (
+      AppColors.orange,
+      AppColors.orange.withValues(alpha: 0.08),
+      Icons.slideshow_rounded,
+    );
+  } else if (ext == 'xlsx' || ext == 'xls') {
+    return (
+      AppColors.success,
+      AppColors.success.withValues(alpha: 0.08),
+      Icons.table_view_rounded,
+    );
+  }
+  return (
+    AppColors.slate500,
+    AppColors.slate100,
+    Icons.insert_drive_file_rounded,
+  );
+}

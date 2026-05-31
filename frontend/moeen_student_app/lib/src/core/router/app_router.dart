@@ -89,6 +89,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const StudentNewsScreen(),
       ),
       GoRoute(
+        path: '/student/news/details',
+        builder: (context, state) =>
+            StudentNewsDetailsScreen(item: asMap(state.extra)),
+      ),
+      GoRoute(
         path: StudentQuizzesScreen.route,
         builder: (context, state) => const StudentQuizzesScreen(),
       ),
@@ -111,11 +116,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: StudentTreeFarmScreen.route,
-        builder: (context, state) => const StudentTreeFarmScreen(),
+        builder: (context, state) => const StudentPlaceholderScreen(feature: 'tree-farm'),
       ),
       GoRoute(
         path: StudentNotificationsScreen.route,
         builder: (context, state) => const StudentNotificationsScreen(),
+      ),
+      GoRoute(
+        path: StudentAuthorizedGradesScreen.route,
+        builder: (context, state) => const StudentAuthorizedGradesScreen(),
+      ),
+      GoRoute(
+        path: '${StudentAuthorizedGradesScreen.route}/:categoryId',
+        builder: (context, state) => StudentAuthorizedGradeDetailsScreen(
+          categoryId:
+              int.tryParse(state.pathParameters['categoryId'] ?? '') ?? 0,
+        ),
       ),
       GoRoute(
         path: StudentQrScanScreen.route,
@@ -158,8 +174,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const StudentClinicalLogbookScreen(),
       ),
       GoRoute(
+        path: StudentClinicalLogFormScreen.route,
+        builder: (context, state) => StudentClinicalLogFormScreen(
+          assignmentId: int.tryParse(
+            state.uri.queryParameters['assignmentId'] ?? '',
+          ),
+        ),
+      ),
+      GoRoute(
+        path: StudentClinicalAssignmentsScreen.route,
+        builder: (context, state) => const StudentClinicalAssignmentsScreen(),
+      ),
+      GoRoute(
         path: StudentClinicalEvaluationsScreen.route,
         builder: (context, state) => const StudentClinicalEvaluationsScreen(),
+      ),
+      GoRoute(
+        path: '/student/clinical/evaluations/:id',
+        builder: (context, state) => StudentClinicalEvaluationDetailsScreen(
+          evaluationId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        ),
       ),
       GoRoute(
         path: StudentClinicalMockExamsScreen.route,
@@ -193,23 +227,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: StudentFlashcardsScreen.route,
-        builder: (context, state) => const StudentFlashcardsScreen(),
+        builder: (context, state) => const StudentPlaceholderScreen(feature: 'flashcards'),
       ),
       GoRoute(
         path: StudentFlashcardStoreScreen.route,
-        builder: (context, state) => const StudentFlashcardStoreScreen(),
+        builder: (context, state) => const StudentPlaceholderScreen(feature: 'flashcards'),
       ),
       GoRoute(
         path: '/student/flashcards/:id/review',
-        builder: (context, state) => StudentFlashcardReviewScreen(
-          packId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
-        ),
+        builder: (context, state) => const StudentPlaceholderScreen(feature: 'flashcards'),
       ),
       GoRoute(
         path: '/student/flashcards/:id',
-        builder: (context, state) => StudentFlashcardDetailsScreen(
-          packId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
-        ),
+        builder: (context, state) => const StudentPlaceholderScreen(feature: 'flashcards'),
       ),
       GoRoute(
         path: StudentExamsScreen.route,

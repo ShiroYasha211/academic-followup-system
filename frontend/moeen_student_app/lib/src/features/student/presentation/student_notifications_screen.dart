@@ -71,11 +71,7 @@ class StudentNotificationsScreen extends ConsumerWidget {
                             index: index,
                             child: _NotificationCard(
                               item: item,
-                              onRead: () => _markRead(
-                                context,
-                                ref,
-                                number(item, 'id').toInt(),
-                              ),
+                              onRead: () => _markRead(context, ref, item),
                               onVote: (optionId) => _vote(
                                 context,
                                 ref,
@@ -127,16 +123,43 @@ class StudentNotificationsScreen extends ConsumerWidget {
     return groups;
   }
 
-  Future<void> _markRead(BuildContext context, WidgetRef ref, int id) async {
+  Future<void> _markRead(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> item,
+  ) async {
+    final id = number(item, 'id').toInt();
     if (id <= 0) return;
-    await _runSnack(
-      context,
-      () => ref.read(studentContentRepositoryProvider).markNotificationRead(id),
-      onDone: () {
+    final route = _routeForNotification(item);
+    try {
+      if (text(item, 'read_at').isEmpty) {
+        await ref
+            .read(studentContentRepositoryProvider)
+            .markNotificationRead(id);
         ref.invalidate(_notificationsProvider(1));
         ref.invalidate(studentUnreadNotificationsCountProvider);
-      },
-    );
+        ref.invalidate(studentUnreadScreenCountsProvider);
+      }
+      if (!context.mounted) return;
+      if (route != null) {
+        context.go(route);
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم تحديد الإشعار كمقروء.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
   }
 
   Future<void> _markAllRead(BuildContext context, WidgetRef ref) async {
@@ -168,6 +191,22 @@ class StudentNotificationsScreen extends ConsumerWidget {
       },
     );
   }
+}
+
+String? _routeForNotification(Map<String, dynamic> item) {
+  final data = asMap(item['data']);
+  final target =
+      (text(data, 'target_screen').isNotEmpty
+              ? text(data, 'target_screen')
+              : text(data, 'screen'))
+          .trim();
+  final type = text(item, 'type');
+  final key = target.isNotEmpty ? target : type;
+  return switch (key) {
+    'grade_delegation' ||
+    'authorized_grades' => StudentAuthorizedGradesScreen.route,
+    _ => null,
+  };
 }
 
 class _NotificationsHeader extends StatelessWidget {
@@ -274,6 +313,7 @@ class _NotificationCard extends StatelessWidget {
     final options = asList(poll['options']).map(asMap).toList();
     final hasVoted = boolValue(poll, 'has_voted');
     final votedId = number(poll, 'voted_option_id').toInt();
+    final canOpen = _routeForNotification(item) != null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -296,7 +336,7 @@ class _NotificationCard extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: unread ? onRead : null,
+        onTap: unread || canOpen ? onRead : null,
         child: IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,

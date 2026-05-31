@@ -368,6 +368,16 @@ class _ExcusesViewState extends ConsumerState<_ExcusesView> {
 
   @override
   Widget build(BuildContext context) {
+    final stats = _map(_data?['stats']);
+    final statItems = [
+      _Stat('الكل', _int(stats['all']).toString(),
+          Icons.inbox_rounded, AppColors.royalBlue),
+      _Stat('قيد المراجعة', _int(stats['pending']).toString(),
+          Icons.hourglass_empty_rounded, AppColors.goldDeep),
+      _Stat('مقبولة', _int(stats['accepted']).toString(),
+          Icons.check_circle_rounded, AppColors.success),
+    ];
+
     return StaffShell(
       title: 'الأعذار',
       currentRoute: AdministrativeExcusesScreen.route,
@@ -380,67 +390,37 @@ class _ExcusesViewState extends ConsumerState<_ExcusesView> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
             children: [
-              const _OpsHero(
-                title: 'إدارة الأعذار',
-                subtitle:
-                    'مراجعة أعذار الطلاب واتخاذ القرار المناسب حسب إعدادات الكلية.',
-                icon: Icons.verified_rounded,
-                color: AppColors.teal,
+              // ── Premium Excuse Hero ───────────────────────────────────
+              _ExcuseScreenHero(
+                total: _int(stats['all']),
+                pending: _int(stats['pending']),
               ),
               const SizedBox(height: 16),
-              _StatsRow(
-                stats: [
-                  _Stat(
-                    'الكل',
-                    _int(_map(_data?['stats'])['all']).toString(),
-                    Icons.inbox_rounded,
-                    AppColors.slate600,
-                  ),
-                  _Stat(
-                    'قيد المراجعة',
-                    _int(_map(_data?['stats'])['pending']).toString(),
-                    Icons.pending_actions_rounded,
-                    AppColors.goldDeep,
-                  ),
-                  _Stat(
-                    'مقبولة',
-                    _int(_map(_data?['stats'])['accepted']).toString(),
-                    Icons.check_circle_rounded,
-                    AppColors.success,
-                  ),
-                ],
-              ),
+
+              // ── Stats Row ────────────────────────────────────────────
+              _StatsRow(stats: statItems),
               const SizedBox(height: 14),
-              _ChoicePillBar(
-                value: _status,
-                items: const {
-                  'all': 'الكل',
-                  'pending': 'معلقة',
-                  'accepted': 'مقبولة',
-                  'rejected': 'مرفوضة',
-                },
-                onChanged: (value) {
-                  setState(() {
-                    _status = value;
-                    _page = 1;
-                  });
-                  _load();
-                },
-              ),
-              const SizedBox(height: 12),
-              _SearchBox(
+
+              // ── Unified Filter + Search Panel ────────────────────────
+              _ExcuseFilterPanel(
+                status: _status,
                 controller: _searchController,
-                onSearch: () {
-                  _page = 1;
+                onStatusChanged: (value) {
+                  setState(() { _status = value; _page = 1; });
                   _load();
                 },
+                onSearch: () { _page = 1; _load(); },
               ),
               const SizedBox(height: 16),
+
+              // ── Notice (view-only mode) ──────────────────────────────
               if (!(_data?['can_review'] == true))
                 const _NoticeCard(
                   message:
                       'استقبال الأعذار مضبوط حاليًا على دكتور المادة، لذلك هذه الصفحة للعرض فقط.',
                 ),
+
+              // ── Excuse List ──────────────────────────────────────────
               if (_excuses.isEmpty)
                 const _EmptyState()
               else
@@ -451,24 +431,16 @@ class _ExcusesViewState extends ConsumerState<_ExcusesView> {
                     onReview: () => _reviewExcuse(item),
                   ),
                 ),
+
+              // ── Pagination ───────────────────────────────────────────
               _Pagination(
                 page: _pageInfo(_data?['pagination'], _excuses.length),
                 onPrevious: _page > 1
-                    ? () {
-                        _page--;
-                        _load();
-                      }
+                    ? () { _page--; _load(); }
                     : null,
-                onNext:
-                    _page <
-                        _pageInfo(
-                          _data?['pagination'],
-                          _excuses.length,
-                        ).lastPage
-                    ? () {
-                        _page++;
-                        _load();
-                      }
+                onNext: _page <
+                        _pageInfo(_data?['pagination'], _excuses.length).lastPage
+                    ? () { _page++; _load(); }
                     : null,
               ),
             ],
@@ -916,34 +888,131 @@ class _ExamSchedulesView extends ConsumerStatefulWidget {
 }
 
 class _ExamSchedulesViewState extends ConsumerState<_ExamSchedulesView> {
+  final _searchController = TextEditingController();
   Map<String, dynamic>? _data;
   Map<String, dynamic>? _createData;
   Object? _error;
   bool _loading = true;
   int _page = 1;
+  int? _majorId;
+  int? _levelId;
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_onSearchChanged);
     _load();
   }
 
   @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<bool> _onBackPressed() async {
+    if (_majorId != null) {
+      _clearMajor();
+      return true;
+    }
+    return false;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_majorId == null) {
+      return StaffShell(
+        title: 'جداول الاختبارات',
+        currentRoute: AdministrativeExamsScreen.route,
+        onBackPressed: _onBackPressed,
+        child: _ScaffoldBody(
+          loading: _loading,
+          error: _error,
+          onRetry: _load,
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+              children: [
+                const _OpsHero(
+                  title: 'اختيار التخصص',
+                  subtitle:
+                      'حدد التخصص أولًا لعرض جداول الاختبارات الخاصة به فقط.',
+                  icon: Icons.account_tree_rounded,
+                  color: AppColors.royalBlue,
+                ),
+                const SizedBox(height: 16),
+                _SearchBox(
+                  controller: _searchController,
+                  onSearch: _onSearchChanged,
+                ),
+                const SizedBox(height: 16),
+                if (_filteredMajors.isEmpty)
+                  const _EmptyState()
+                else
+                  ..._filteredMajors.map(
+                    (major) => _ExamMajorCard(
+                      major: major,
+                      onTap: () => _selectMajor(_int(major['id'])),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return StaffShell(
       title: 'جداول الاختبارات',
       currentRoute: AdministrativeExamsScreen.route,
+      onBackPressed: _onBackPressed,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _openForm,
+        backgroundColor: AppColors.royalBlue,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text(
+          'إضافة جدول اختبارات',
+          style: TextStyle(
+            fontFamily: 'Cairo',
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+          ),
+        ),
+      ),
       child: _SchedulePage(
         loading: _loading,
         error: _error,
         title: 'جداول الاختبارات',
         subtitle: 'إنشاء جداول اختبارات كاملة حسب التخصص والمستوى والترم.',
         icon: Icons.event_note_rounded,
-        color: AppColors.violet,
-        count: _pagination.total,
+        color: AppColors.royalBlue,
+        count: _searchController.text.trim().isEmpty
+            ? _pagination.total
+            : _schedules.length,
         onRetry: _load,
-        onCreate: _openForm,
         children: [
+          _ExamMajorHeader(
+            major: _selectedMajor,
+            onChange: _clearMajor,
+          ),
+          const SizedBox(height: 12),
+          _ExamLevelFilters(
+            data: _createData ?? const {},
+            majorId: _majorId,
+            levelId: _levelId,
+            searchController: _searchController,
+            onLevel: (value) {
+              setState(() {
+                _levelId = value;
+              });
+              _load();
+            },
+            onSearch: _onSearchChanged,
+          ),
+          const SizedBox(height: 16),
           if (_schedules.isEmpty)
             const _EmptyState()
           else
@@ -955,29 +1024,90 @@ class _ExamSchedulesViewState extends ConsumerState<_ExamSchedulesView> {
                 onDelete: () => _delete(item),
               ),
             ),
-          _Pagination(
-            page: _pagination,
-            onPrevious: _page > 1
-                ? () {
-                    _page--;
-                    _load();
-                  }
-                : null,
-            onNext: _page < _pagination.lastPage
-                ? () {
-                    _page++;
-                    _load();
-                  }
-                : null,
-          ),
+          if (_searchController.text.trim().isEmpty)
+            _Pagination(
+              page: _pagination,
+              onPrevious: _page > 1
+                  ? () {
+                      _page--;
+                      _load();
+                    }
+                  : null,
+              onNext: _page < _pagination.lastPage
+                  ? () {
+                      _page++;
+                      _load();
+                    }
+                  : null,
+            ),
         ],
       ),
     );
   }
 
-  List<Map<String, dynamic>> get _schedules => _list(_data?['schedules']);
+  List<Map<String, dynamic>> get _allSchedules => _list(_data?['schedules']);
+  List<Map<String, dynamic>> get _schedules {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return _allSchedules;
+
+    return _allSchedules.where((item) {
+      final haystack = [
+        item['title'],
+        item['description'],
+        _map(item['major'])['name'],
+        _map(item['level'])['name'],
+        _map(item['term'])['name'],
+        _map(item['creator'])['name'],
+        ..._list(item['items']).map((entry) => _map(entry['subject'])['name']),
+      ].whereType<Object>().map((value) => value.toString().toLowerCase()).join(' ');
+      return haystack.contains(query);
+    }).toList();
+  }
   _PageInfo get _pagination =>
-      _pageInfo(_data?['pagination'], _schedules.length);
+      _pageInfo(_data?['pagination'], _allSchedules.length);
+
+  List<Map<String, dynamic>> get _majors => _list(_createData?['majors']);
+
+  Map<String, dynamic> get _selectedMajor => _majors.firstWhere(
+        (major) => _int(major['id']) == _majorId,
+        orElse: () => const {},
+      );
+
+  List<Map<String, dynamic>> get _filteredMajors {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return _majors;
+    return _majors.where((major) {
+      final name = (major['name'] ?? '').toString().toLowerCase();
+      return name.contains(query);
+    }).toList();
+  }
+
+  void _onSearchChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _selectMajor(int id) {
+    _searchController.clear();
+    setState(() {
+      _majorId = id;
+      _levelId = null;
+      _page = 1;
+      _data = null;
+    });
+    _load();
+  }
+
+  void _clearMajor() {
+    _searchController.clear();
+    setState(() {
+      _majorId = null;
+      _levelId = null;
+      _page = 1;
+      _data = null;
+    });
+    _load();
+  }
 
   Future<void> _load() async {
     setState(() {
@@ -986,13 +1116,27 @@ class _ExamSchedulesViewState extends ConsumerState<_ExamSchedulesView> {
     });
     try {
       final repo = ref.read(_adminOpsRepositoryProvider);
-      final data = await repo.get(
-        '/administrative/exams',
-        query: {'page': _page},
-      );
       final create =
           _createData ??
           _map((await repo.get('/administrative/exams/create-data'))['data']);
+      if (_majorId == null) {
+        if (!mounted) return;
+        setState(() {
+          _createData = create;
+          _data = null;
+        });
+        return;
+      }
+
+      final query = {
+        'page': _page,
+        'major_id': _majorId,
+        if (_levelId != null) 'level_id': _levelId,
+      };
+      final data = await repo.get(
+        '/administrative/exams',
+        query: query,
+      );
       if (!mounted) return;
       setState(() {
         _data = _map(data['data']);
@@ -1010,10 +1154,11 @@ class _ExamSchedulesViewState extends ConsumerState<_ExamSchedulesView> {
       context: context,
       title: item == null ? 'إضافة جدول اختبارات' : 'تعديل جدول اختبارات',
       icon: Icons.event_note_rounded,
-      color: AppColors.violet,
+      color: AppColors.royalBlue,
       fullScreen: true,
       child: _ExamScheduleForm(
         item: item,
+        fixedMajorId: item == null ? _majorId : null,
         createData: _createData ?? const {},
         repository: ref.read(_adminOpsRepositoryProvider),
         onSubmit: (payload) async {
@@ -1042,7 +1187,7 @@ class _ExamSchedulesViewState extends ConsumerState<_ExamSchedulesView> {
         context: context,
         title: 'تفاصيل جدول الاختبارات',
         icon: Icons.event_note_rounded,
-        color: AppColors.violet,
+        color: AppColors.royalBlue,
         fullScreen: true,
         child: _ExamScheduleDetails(data: _map(response['data'])),
       );
@@ -1100,68 +1245,384 @@ class _LectureSchedulesView extends ConsumerStatefulWidget {
       _LectureSchedulesViewState();
 }
 
-class _LectureSchedulesViewState extends ConsumerState<_LectureSchedulesView> {
+class _LectureSchedulesViewState extends ConsumerState<_LectureSchedulesView>
+    with SingleTickerProviderStateMixin {
+  final _searchController = TextEditingController();
   Map<String, dynamic>? _data;
   Map<String, dynamic>? _createData;
   Object? _error;
   bool _loading = true;
-  int _page = 1;
+  int? _majorId;
+  int? _levelId;
+  late TabController _tabController;
+  final List<int> _daysOrder = [7, 1, 2, 3, 4, 5, 6]; // Sat to Fri (mapped: 7=Sat, 1=Sun, 2=Mon, 3=Tue, 4=Wed, 5=Thu, 6=Fri)
+
+  int _doctorDayFromDateTime(int weekday) {
+    if (weekday == DateTime.sunday) return 1;
+    return weekday + 1;
+  }
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_onSearchChanged);
+    
+    final now = DateTime.now();
+    int currentDay = _doctorDayFromDateTime(now.weekday);
+    int initialIndex = _daysOrder.indexOf(currentDay);
+    if (initialIndex == -1) initialIndex = 0;
+    
+    _tabController = TabController(
+      length: _daysOrder.length,
+      vsync: this,
+      initialIndex: initialIndex,
+    );
     _load();
   }
 
   @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<bool> _onBackPressed() async {
+    if (_majorId != null) {
+      _clearMajor();
+      return true;
+    }
+    return false;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_majorId == null) {
+      return StaffShell(
+        title: 'جداول المحاضرات',
+        currentRoute: AdministrativeSchedulesScreen.route,
+        onBackPressed: _onBackPressed,
+        child: _ScaffoldBody(
+          loading: _loading,
+          error: _error,
+          onRetry: _load,
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+              children: [
+                const _OpsHero(
+                  title: 'اختيار التخصص',
+                  subtitle:
+                      'حدد التخصص أولًا لعرض جداول المحاضرات الخاصة به فقط.',
+                  icon: Icons.account_tree_rounded,
+                  color: AppColors.teal,
+                ),
+                const SizedBox(height: 16),
+                _SearchBox(
+                  controller: _searchController,
+                  onSearch: _onSearchChanged,
+                ),
+                const SizedBox(height: 16),
+                if (_filteredMajors.isEmpty)
+                  const _EmptyState()
+                else
+                  ..._filteredMajors.map(
+                    (major) => _ExamMajorCard(
+                      major: major,
+                      onTap: () => _selectMajor(_int(major['id'])),
+                      countKey: 'lecture_schedules_count',
+                      countLabel: 'جداول محاضرات',
+                      color: AppColors.teal,
+                      icon: Icons.calendar_month_rounded,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return StaffShell(
       title: 'جداول المحاضرات',
       currentRoute: AdministrativeSchedulesScreen.route,
-      child: _SchedulePage(
+      onBackPressed: _onBackPressed,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _openForm,
+        backgroundColor: AppColors.teal,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text(
+          'إضافة جدول محاضرات',
+          style: TextStyle(
+            fontFamily: 'Cairo',
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+          ),
+        ),
+      ),
+      child: _ScaffoldBody(
         loading: _loading,
         error: _error,
-        title: 'جداول المحاضرات',
-        subtitle: 'تنظيم مواعيد المحاضرات والقاعات وربطها بالدكتور والمادة.',
-        icon: Icons.calendar_month_rounded,
-        color: AppColors.teal,
-        count: _pagination.total,
         onRetry: _load,
-        onCreate: _openForm,
-        children: [
-          if (_schedules.isEmpty)
-            const _EmptyState()
-          else
-            ..._schedules.map(
-              (item) => _LectureScheduleCard(
-                item: item,
-                onEdit: () => _openForm(item: item),
-                onDelete: () => _delete(item),
+        child: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const _OpsHero(
+                      title: 'جداول المحاضرات',
+                      subtitle: 'تنظيم مواعيد المحاضرات والقاعات وربطها بالدكتور والمادة.',
+                      icon: Icons.calendar_month_rounded,
+                      color: AppColors.teal,
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.teal.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.teal.withValues(alpha: 0.15)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_month_rounded, color: AppColors.teal, size: 20),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'إجمالي الجداول المسجلة',
+                            style: TextStyle(
+                              color: AppColors.midnight,
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.teal,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              _searchController.text.trim().isEmpty
+                                  ? _pagination.total.toString()
+                                  : _schedules.length.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _ExamMajorHeader(
+                      major: _selectedMajor,
+                      onChange: _clearMajor,
+                      color: AppColors.teal,
+                    ),
+                    const SizedBox(height: 12),
+                    _ExamLevelFilters(
+                      data: _createData ?? const {},
+                      majorId: _majorId,
+                      levelId: _levelId,
+                      searchController: _searchController,
+                      onLevel: (value) {
+                        setState(() {
+                          _levelId = value;
+                        });
+                        _load();
+                      },
+                      onSearch: _onSearchChanged,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
             ),
-          _Pagination(
-            page: _pagination,
-            onPrevious: _page > 1
-                ? () {
-                    _page--;
-                    _load();
-                  }
-                : null,
-            onNext: _page < _pagination.lastPage
-                ? () {
-                    _page++;
-                    _load();
-                  }
-                : null,
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _SchedulesSliverAppBarDelegate(
+                height: 74,
+                child: Container(
+                  color: AppColors.cream,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: AppColors.slate200.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      dividerColor: Colors.transparent,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicator: BoxDecoration(
+                        color: AppColors.teal,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.teal.withValues(alpha: 0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      labelColor: Colors.white,
+                      unselectedLabelColor: AppColors.slate600,
+                      labelStyle: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                      tabs: _daysOrder.map((day) {
+                        final count = _schedules
+                            .where((item) => _int(item['day_of_week']) == day)
+                            .length;
+                        return Tab(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(_dayLabel(day)),
+                              if (count > 0) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    count.toString(),
+                                    style: const TextStyle(
+                                      fontFamily: 'Cairo',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          body: TabBarView(
+            controller: _tabController,
+            children: _daysOrder.map((day) {
+              final dayItems = _schedules
+                  .where((item) => _int(item['day_of_week']) == day)
+                  .toList();
+              if (dayItems.isEmpty) {
+                return _DailyEmptyState(dayName: _dayLabel(day));
+              }
+              return RefreshIndicator(
+                onRefresh: _load,
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+                  itemCount: dayItems.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final item = dayItems[index];
+                    return _LectureScheduleCard(
+                      item: item,
+                      onEdit: () => _openForm(item: item),
+                      onDelete: () => _delete(item),
+                    );
+                  },
+                ),
+              );
+            }).toList(),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  List<Map<String, dynamic>> get _schedules => _list(_data?['schedules']);
+  List<Map<String, dynamic>> get _allSchedules => _list(_data?['schedules']);
+  List<Map<String, dynamic>> get _schedules {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return _allSchedules;
+
+    return _allSchedules.where((item) {
+      final subject = _map(item['subject']);
+      final haystack = [
+        subject['name'],
+        _map(subject['major'])['name'],
+        _map(subject['level'])['name'],
+        _map(subject['doctor'])['name'],
+        item['hall_name'],
+        _dayLabel(item['day_of_week']),
+      ].whereType<Object>().map((value) => value.toString().toLowerCase()).join(' ');
+      return haystack.contains(query);
+    }).toList();
+  }
   _PageInfo get _pagination =>
-      _pageInfo(_data?['pagination'], _schedules.length);
+      _pageInfo(_data?['pagination'], _allSchedules.length);
+
+  List<Map<String, dynamic>> get _majors => _list(_createData?['majors']);
+
+  Map<String, dynamic> get _selectedMajor => _majors.firstWhere(
+        (major) => _int(major['id']) == _majorId,
+        orElse: () => const {},
+      );
+
+  List<Map<String, dynamic>> get _filteredMajors {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return _majors;
+    return _majors.where((major) {
+      final name = (major['name'] ?? '').toString().toLowerCase();
+      return name.contains(query);
+    }).toList();
+  }
+
+  void _onSearchChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _selectMajor(int id) {
+    _searchController.clear();
+    setState(() {
+      _majorId = id;
+      _levelId = null;
+      _data = null;
+    });
+    _load();
+  }
+
+  void _clearMajor() {
+    _searchController.clear();
+    setState(() {
+      _majorId = null;
+      _levelId = null;
+      _data = null;
+    });
+    _load();
+  }
 
   Future<void> _load() async {
     setState(() {
@@ -1170,15 +1631,30 @@ class _LectureSchedulesViewState extends ConsumerState<_LectureSchedulesView> {
     });
     try {
       final repo = ref.read(_adminOpsRepositoryProvider);
-      final data = await repo.get(
-        '/administrative/schedules',
-        query: {'page': _page},
-      );
       final create =
           _createData ??
           _map(
             (await repo.get('/administrative/schedules/create-data'))['data'],
           );
+      if (_majorId == null) {
+        if (!mounted) return;
+        setState(() {
+          _createData = create;
+          _data = null;
+        });
+        return;
+      }
+
+      final query = {
+        'page': 1,
+        'major_id': _majorId,
+        if (_levelId != null) 'level_id': _levelId,
+        'per_page': 100,
+      };
+      final data = await repo.get(
+        '/administrative/schedules',
+        query: query,
+      );
       if (!mounted) return;
       setState(() {
         _data = _map(data['data']);
@@ -1200,6 +1676,7 @@ class _LectureSchedulesViewState extends ConsumerState<_LectureSchedulesView> {
       fullScreen: true,
       child: _LectureScheduleForm(
         item: item,
+        fixedMajorId: item == null ? _majorId : null,
         createData: _createData ?? const {},
         repository: ref.read(_adminOpsRepositoryProvider),
         onSubmit: (payload) async {
@@ -1441,16 +1918,46 @@ class _ExcuseReviewFormState extends State<_ExcuseReviewForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _dropdown<String>(
-          label: 'القرار',
-          value: _status,
-          items: const [
-            _MenuItem('accepted', 'قبول العذر'),
-            _MenuItem('rejected', 'رفض العذر'),
-          ],
-          onChanged: (value) => setState(() => _status = value ?? 'accepted'),
+        // ── Visual Accept / Reject Selector ──────────────────────────────
+        const Padding(
+          padding: EdgeInsets.only(bottom: 10),
+          child: Text(
+            'قرار العذر',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.w900,
+              fontSize: 13.5,
+              color: AppColors.midnight,
+            ),
+          ),
         ),
-        if (_status == 'accepted')
+        Row(
+          children: [
+            Expanded(
+              child: _DecisionTile(
+                selected: _status == 'accepted',
+                label: 'قبول العذر',
+                icon: Icons.check_circle_rounded,
+                color: AppColors.success,
+                onTap: () => setState(() => _status = 'accepted'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _DecisionTile(
+                selected: _status == 'rejected',
+                label: 'رفض العذر',
+                icon: Icons.cancel_rounded,
+                color: AppColors.danger,
+                onTap: () => setState(() => _status = 'rejected'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // ── Resolution Dropdown (accepted only) ──────────────────────────
+        if (_status == 'accepted') ...[
           _dropdown<String>(
             label: 'الإجراء بعد القبول',
             value: _resolution,
@@ -1464,30 +1971,84 @@ class _ExcuseReviewFormState extends State<_ExcuseReviewForm> {
                 .toList(),
             onChanged: (value) => setState(() => _resolution = value),
           ),
-        _text(_comment, 'ملاحظة إدارية', required: false, maxLines: 3),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: _saving
-              ? null
-              : () async {
-                  if (_status == 'accepted' && (_resolution ?? '').isEmpty) {
-                    await _showError(
-                      context,
-                      'حدد الإجراء المطلوب عند قبول العذر.',
-                    );
-                    return;
-                  }
-                  setState(() => _saving = true);
-                  await widget.onSubmit({
-                    'status': _status,
-                    if (_status == 'accepted') 'resolution': _resolution,
-                    if (_comment.text.trim().isNotEmpty)
-                      'comment': _comment.text.trim(),
-                  });
-                  if (mounted) setState(() => _saving = false);
-                },
-          icon: const Icon(Icons.save_rounded),
-          label: Text(_saving ? 'جاري الحفظ...' : 'حفظ القرار'),
+          const SizedBox(height: 4),
+        ],
+
+        // ── Admin Note ───────────────────────────────────────────────────
+        _text(_comment, 'ملاحظة إدارية (اختياري)', required: false, maxLines: 3),
+        const SizedBox(height: 20),
+
+        // ── Submit ───────────────────────────────────────────────────────
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: LinearGradient(
+              colors: _status == 'accepted'
+                  ? [AppColors.success, AppColors.success.withValues(alpha: 0.8)]
+                  : [AppColors.danger, AppColors.danger.withValues(alpha: 0.8)],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: (_status == 'accepted' ? AppColors.success : AppColors.danger)
+                    .withValues(alpha: 0.3),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: FilledButton.icon(
+            onPressed: _saving
+                ? null
+                : () async {
+                    if (_status == 'accepted' && (_resolution ?? '').isEmpty) {
+                      await _showError(
+                        context,
+                        'حدد الإجراء المطلوب عند قبول العذر.',
+                      );
+                      return;
+                    }
+                    setState(() => _saving = true);
+                    await widget.onSubmit({
+                      'status': _status,
+                      if (_status == 'accepted') 'resolution': _resolution,
+                      if (_comment.text.trim().isNotEmpty)
+                        'comment': _comment.text.trim(),
+                    });
+                    if (mounted) setState(() => _saving = false);
+                  },
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+            icon: _saving
+                ? const SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5, color: Colors.white,
+                    ),
+                  )
+                : Icon(
+                    _status == 'accepted'
+                        ? Icons.check_circle_rounded
+                        : Icons.cancel_rounded,
+                  ),
+            label: Text(
+              _saving
+                  ? 'جاري الحفظ...'
+                  : _status == 'accepted'
+                      ? 'تأكيد قبول العذر'
+                      : 'تأكيد رفض العذر',
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -1546,12 +2107,14 @@ class _AttendanceStatusFormState extends State<_AttendanceStatusForm> {
 class _ExamScheduleForm extends StatefulWidget {
   const _ExamScheduleForm({
     required this.item,
+    required this.fixedMajorId,
     required this.createData,
     required this.repository,
     required this.onSubmit,
   });
 
   final Map<String, dynamic>? item;
+  final int? fixedMajorId;
   final Map<String, dynamic> createData;
   final StaffRepository repository;
   final Future<void> Function(Map<String, dynamic> payload) onSubmit;
@@ -1583,7 +2146,7 @@ class _ExamScheduleFormState extends State<_ExamScheduleForm> {
     _published = item['is_published'] != false;
     _majorId = _int(
       _map(item['major'])['id'],
-      fallback: _int(item['major_id']),
+      fallback: _int(item['major_id'], fallback: widget.fixedMajorId ?? 0),
     );
     _levelId = _int(
       _map(item['level'])['id'],
@@ -1622,6 +2185,9 @@ class _ExamScheduleFormState extends State<_ExamScheduleForm> {
         children: [
           _text(_title, 'عنوان الجدول'),
           _text(_description, 'الوصف', required: false, maxLines: 3),
+          if (widget.fixedMajorId != null && widget.item == null)
+            _LockedExamMajor(major: selectedMajor),
+          if (!(widget.fixedMajorId != null && widget.item == null))
           _dropdown<int>(
             label: 'التخصص',
             value: _majorId == 0 ? null : _majorId,
@@ -1679,6 +2245,7 @@ class _ExamScheduleFormState extends State<_ExamScheduleForm> {
           if (_loadingOptions) const LinearProgressIndicator(),
           ..._items.asMap().entries.map(
             (entry) => _ExamItemEditor(
+              index: entry.key + 1,
               draft: entry.value,
               subjects: _subjects,
               onRemove: _items.length > 1
@@ -1689,16 +2256,38 @@ class _ExamScheduleFormState extends State<_ExamScheduleForm> {
                   : null,
             ),
           ),
-          TextButton.icon(
+          OutlinedButton.icon(
             onPressed: () => setState(() => _items.add(_ExamItemDraft())),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('إضافة مادة للجدول'),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text(
+              'إضافة مادة للجدول',
+              style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w800),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.royalBlue,
+              side: const BorderSide(color: AppColors.royalBlue),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: _saving ? null : _submit,
-            icon: const Icon(Icons.save_rounded),
-            label: Text(_saving ? 'جاري الحفظ...' : 'حفظ جدول الاختبارات'),
+            icon: const Icon(Icons.save_rounded, size: 18),
+            label: Text(
+              _saving ? 'جاري الحفظ...' : 'حفظ جدول الاختبارات',
+              style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w800),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.royalBlue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
           ),
         ],
       ),
@@ -1740,12 +2329,14 @@ class _ExamScheduleFormState extends State<_ExamScheduleForm> {
 class _LectureScheduleForm extends StatefulWidget {
   const _LectureScheduleForm({
     required this.item,
+    required this.fixedMajorId,
     required this.createData,
     required this.repository,
     required this.onSubmit,
   });
 
   final Map<String, dynamic>? item;
+  final int? fixedMajorId;
   final Map<String, dynamic> createData;
   final StaffRepository repository;
   final Future<void> Function(Map<String, dynamic> payload) onSubmit;
@@ -1774,7 +2365,7 @@ class _LectureScheduleFormState extends State<_LectureScheduleForm> {
     final subject = _map(item['subject']);
     _majorId = _int(
       _map(subject['major'])['id'],
-      fallback: _int(subject['major_id']),
+      fallback: _int(subject['major_id'], fallback: widget.fixedMajorId ?? 0),
     );
     _levelId = _int(
       _map(subject['level'])['id'],
@@ -1782,8 +2373,8 @@ class _LectureScheduleFormState extends State<_LectureScheduleForm> {
     );
     _subjectId = _int(subject['id'], fallback: _int(item['subject_id']));
     _day = _int(item['day_of_week'], fallback: 1);
-    _start.text = (item['start_time'] ?? '').toString();
-    _end.text = (item['end_time'] ?? '').toString();
+    _start.text = _ExamItemDraft._cleanTime(item['start_time']?.toString());
+    _end.text = _ExamItemDraft._cleanTime(item['end_time']?.toString());
     _hall.text = (item['hall_name'] ?? '').toString();
     if (_levelId != null && _levelId != 0) _loadSubjects(_levelId!);
   }
@@ -1809,6 +2400,9 @@ class _LectureScheduleFormState extends State<_LectureScheduleForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (widget.fixedMajorId != null && widget.item == null)
+            _LockedExamMajor(major: selectedMajor, color: AppColors.teal),
+          if (!(widget.fixedMajorId != null && widget.item == null))
           _dropdown<int>(
             label: 'التخصص',
             value: _majorId == 0 ? null : _majorId,
@@ -1863,14 +2457,71 @@ class _LectureScheduleFormState extends State<_LectureScheduleForm> {
             ],
             onChanged: (value) => setState(() => _day = value ?? 1),
           ),
-          _text(_start, 'وقت البداية', hint: '08:00'),
-          _text(_end, 'وقت النهاية', hint: '10:00'),
+          _text(
+            _start,
+            'وقت البداية',
+            hint: 'اختر وقت البداية',
+            readOnly: true,
+            onTap: () async {
+              TimeOfDay initialTime = TimeOfDay.now();
+              final parts = _start.text.split(':');
+              if (parts.length == 2) {
+                final h = int.tryParse(parts[0]);
+                final m = int.tryParse(parts[1]);
+                if (h != null && m != null) {
+                  initialTime = TimeOfDay(hour: h, minute: m);
+                }
+              }
+              final time = await showTimePicker(
+                context: context,
+                initialTime: initialTime,
+              );
+              if (time != null) {
+                _start.text = "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
+              }
+            },
+          ),
+          _text(
+            _end,
+            'وقت النهاية',
+            hint: 'اختر وقت النهاية',
+            readOnly: true,
+            onTap: () async {
+              TimeOfDay initialTime = TimeOfDay.now();
+              final parts = _end.text.split(':');
+              if (parts.length == 2) {
+                final h = int.tryParse(parts[0]);
+                final m = int.tryParse(parts[1]);
+                if (h != null && m != null) {
+                  initialTime = TimeOfDay(hour: h, minute: m);
+                }
+              }
+              final time = await showTimePicker(
+                context: context,
+                initialTime: initialTime,
+              );
+              if (time != null) {
+                _end.text = "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
+              }
+            },
+          ),
           _text(_hall, 'القاعة', required: false),
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: _saving ? null : _submit,
-            icon: const Icon(Icons.save_rounded),
-            label: Text(_saving ? 'جاري الحفظ...' : 'حفظ جدول المحاضرة'),
+            icon: const Icon(Icons.save_rounded, size: 18),
+            label: Text(
+              _saving ? 'جاري الحفظ...' : 'حفظ جدول المحاضرة',
+              style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w800),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.teal,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
           ),
         ],
       ),
@@ -1956,28 +2607,244 @@ class _ExcuseCard extends StatelessWidget {
     final student = _map(item['student']);
     final attendance = _map(item['attendance']);
     final subject = _map(attendance['subject']);
-    return _ActionCard(
-      icon: Icons.verified_rounded,
-      color: _statusColor(item['status']),
-      title: (student['name'] ?? '-').toString(),
-      subtitle:
-          '${subject['name'] ?? '-'} • ${attendance['date'] ?? item['created_at'] ?? ''}',
-      chips: [
-        _statusLabel(item['status']),
-        'رقم القيد: ${student['student_number'] ?? '-'}',
-        if ((item['reason'] ?? '').toString().isNotEmpty)
-          item['reason'].toString(),
-      ],
-      actions: [
-        if (canReview && item['status'] == 'pending')
-          _RoundAction(
-            icon: Icons.fact_check_rounded,
-            color: AppColors.teal,
-            onTap: onReview,
+    final status = (item['status'] ?? '').toString();
+    final color = _statusColor(status);
+    final reason = (item['reason'] ?? '').toString();
+    final date = (attendance['date'] ?? item['created_at'] ?? '').toString();
+    final isPending = status == 'pending';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
-      ],
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Status accent bar ────────────────────────────────────────
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [color, color.withValues(alpha: 0.4)],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Header: Avatar + Name + Status Badge ─────────────
+                Row(
+                  children: [
+                    // Avatar with initials
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            color.withValues(alpha: 0.2),
+                            color.withValues(alpha: 0.08),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _getStudentInitials((student['name'] ?? '').toString()),
+                        style: TextStyle(
+                          color: color,
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            (student['name'] ?? '-').toString(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14.5,
+                              color: AppColors.midnight,
+                            ),
+                          ),
+                          Text(
+                            'رقم القيد: ${student['student_number'] ?? '-'}',
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                              color: AppColors.slate400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Status Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: color.withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            switch (status) {
+                              'accepted' => Icons.check_circle_rounded,
+                              'rejected' => Icons.cancel_rounded,
+                              _ => Icons.hourglass_empty_rounded,
+                            },
+                            color: color,
+                            size: 12,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _statusLabel(status),
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 10.5,
+                              color: color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // ── Meta Info Chips ───────────────────────────────────
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _InfoCapsule(
+                      icon: Icons.menu_book_rounded,
+                      text: (subject['name'] ?? '-').toString(),
+                      color: AppColors.royalBlue,
+                    ),
+                    _InfoCapsule(
+                      icon: Icons.calendar_today_rounded,
+                      text: date.length >= 10 ? date.substring(0, 10) : date,
+                      color: AppColors.slate500,
+                    ),
+                  ],
+                ),
+
+                // ── Reason Quote ─────────────────────────────────────
+                if (reason.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.goldDeep.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.goldDeep.withValues(alpha: 0.12),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.format_quote_rounded,
+                          color: AppColors.goldDeep,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            reason,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.slate600,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // ── Review Button (pending only) ──────────────────────
+                if (canReview && isPending) ...[
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: onReview,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.teal,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        shadowColor: AppColors.teal.withValues(alpha: 0.3),
+                        elevation: 4,
+                      ),
+                      icon: const Icon(Icons.fact_check_rounded, size: 18),
+                      label: const Text(
+                        'مراجعة واتخاذ قرار',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
+}
+
+// Helper: get Arabic initials
+String _getStudentInitials(String name) {
+  final parts = name.trim().split(RegExp(r'\s+'));
+  if (parts.isEmpty || name.isEmpty) return '؟';
+  if (parts.length == 1) return parts[0][0];
+  return '${parts[0][0]}${parts[1][0]}';
 }
 
 class _AttendanceRecordCard extends StatelessWidget {
@@ -2024,35 +2891,187 @@ class _ExamScheduleCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  Widget _buildPill(String text, Color color, {IconData? icon}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, color: color, size: 12),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              fontFamily: 'Cairo',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return _ActionCard(
-      icon: Icons.event_note_rounded,
-      color: AppColors.violet,
-      title: (item['title'] ?? '').toString(),
-      subtitle:
-          '${_map(item['major'])['name'] ?? '-'} / ${_map(item['level'])['name'] ?? '-'} / ${_map(item['term'])['name'] ?? '-'}',
-      chips: [
-        item['is_published'] == true ? 'منشور' : 'مسودة',
-        'بواسطة: ${_map(item['creator'])['name'] ?? '-'}',
-      ],
-      actions: [
-        _RoundAction(
-          icon: Icons.visibility_rounded,
-          color: AppColors.royalBlue,
-          onTap: onDetails,
-        ),
-        _RoundAction(
-          icon: Icons.edit_rounded,
-          color: AppColors.teal,
-          onTap: onEdit,
-        ),
-        _RoundAction(
-          icon: Icons.delete_rounded,
-          color: AppColors.danger,
-          onTap: onDelete,
-        ),
-      ],
+    final majorName = _map(item['major'])['name'] ?? '-';
+    final levelName = _map(item['level'])['name'] ?? '-';
+    final termName = _map(item['term'])['name'] ?? '-';
+    final creatorName = _map(item['creator'])['name'] ?? '-';
+    final isPublished = item['is_published'] == true;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.royalBlue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.event_note_rounded,
+                    color: AppColors.royalBlue,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        (item['title'] ?? '-').toString(),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          color: AppColors.midnight,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$majorName / $levelName / $termName',
+                        style: const TextStyle(
+                          color: AppColors.slate500,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _buildPill(
+                  isPublished ? 'منشور' : 'مسودة',
+                  isPublished ? AppColors.success : AppColors.warning,
+                  icon: isPublished ? Icons.check_circle_rounded : Icons.edit_attributes_rounded,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildPill(
+                  'بواسطة: $creatorName',
+                  AppColors.slate600,
+                  icon: Icons.person_rounded,
+                ),
+                if (item['items'] != null)
+                  _buildPill(
+                    'المواد: ${_list(item['items']).length}',
+                    AppColors.royalBlue,
+                    icon: Icons.menu_book_rounded,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: AppColors.slate100),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: onDetails,
+                    icon: const Icon(Icons.visibility_rounded, size: 16),
+                    label: const Text(
+                      'عرض التفاصيل',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontFamily: 'Cairo', fontSize: 13),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.royalBlue,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_rounded, size: 16),
+                    label: const Text(
+                      'تعديل',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontFamily: 'Cairo', fontSize: 13),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.teal,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.delete_rounded, size: 16),
+                    label: const Text(
+                      'حذف',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontFamily: 'Cairo', fontSize: 13),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2071,34 +3090,533 @@ class _LectureScheduleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subject = _map(item['subject']);
-    return _ActionCard(
-      icon: Icons.calendar_month_rounded,
-      color: AppColors.teal,
-      title: (subject['name'] ?? '-').toString(),
-      subtitle:
-          '${_dayLabel(item['day_of_week'])} • ${item['start_time'] ?? ''} - ${item['end_time'] ?? ''}',
-      chips: [
-        'القاعة: ${item['hall_name'] ?? '-'}',
-        'الدكتور: ${_map(subject['doctor'])['name'] ?? '-'}',
-        '${_map(subject['major'])['name'] ?? '-'} / ${_map(subject['level'])['name'] ?? '-'}',
-      ],
-      actions: [
-        _RoundAction(
-          icon: Icons.edit_rounded,
-          color: AppColors.royalBlue,
-          onTap: onEdit,
+    final subjectName = (subject['name'] ?? '-').toString();
+    final doctorName = _map(subject['doctor'])['name'] ?? '-';
+    final majorName = _map(subject['major'])['name'] ?? '-';
+    final levelName = _map(subject['level'])['name'] ?? '-';
+    final hallName = item['hall_name'] ?? '-';
+    final startTime = _formatTime(item['start_time']?.toString() ?? '');
+    final endTime = _formatTime(item['end_time']?.toString() ?? '');
+    final isLive = _isTimeInRange(item['start_time']?.toString() ?? '', item['end_time']?.toString() ?? '');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isLive ? AppColors.teal : AppColors.slate200,
+          width: isLive ? 2 : 1,
         ),
-        _RoundAction(
-          icon: Icons.delete_rounded,
-          color: AppColors.danger,
-          onTap: onDelete,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 85,
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+              decoration: BoxDecoration(
+                color: isLive
+                    ? AppColors.teal.withValues(alpha: 0.05)
+                    : AppColors.slate50,
+                border: BorderDirectional(
+                  end: BorderSide(
+                    color: isLive
+                        ? AppColors.teal.withValues(alpha: 0.2)
+                        : AppColors.slate200,
+                  ),
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    startTime,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      fontFamily: 'Cairo',
+                      color: isLive ? AppColors.teal : AppColors.midnight,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    height: 20,
+                    width: 2,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          isLive ? AppColors.teal : AppColors.slate300,
+                          isLive
+                              ? AppColors.teal.withValues(alpha: 0)
+                              : AppColors.slate200.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    endTime,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Cairo',
+                      color: AppColors.slate500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            subjectName,
+                            style: const TextStyle(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'Cairo',
+                              color: AppColors.midnight,
+                              height: 1.25,
+                            ),
+                          ),
+                        ),
+                        PopupMenuButton<String>(
+                          icon: const Icon(
+                            Icons.more_vert_rounded,
+                            color: AppColors.slate400,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          onSelected: (value) {
+                            if (value == 'edit') {
+                              onEdit();
+                            } else if (value == 'delete') {
+                              onDelete();
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.edit_rounded,
+                                    size: 18,
+                                    color: AppColors.teal,
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'تعديل',
+                                    style: TextStyle(
+                                      fontFamily: 'Cairo',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.delete_outline_rounded,
+                                    size: 18,
+                                    color: AppColors.danger,
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'حذف',
+                                    style: TextStyle(
+                                      fontFamily: 'Cairo',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.danger,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _IconInfo(
+                      icon: Icons.person_rounded,
+                      text: 'الدكتور: $doctorName',
+                      color: AppColors.slate600,
+                    ),
+                    const SizedBox(height: 6),
+                    _IconInfo(
+                      icon: Icons.room_rounded,
+                      text: 'القاعة: $hallName',
+                      color: AppColors.teal,
+                    ),
+                    const SizedBox(height: 6),
+                    _IconInfo(
+                      icon: Icons.school_rounded,
+                      text: '$majorName / $levelName',
+                      color: AppColors.royalBlue,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+}
+
+
+// ──────────────────────────────────────────────────────────────────────────
+// Excuse Screen Hero — Premium identity banner for the excuse screen
+// ──────────────────────────────────────────────────────────────────────────
+class _ExcuseScreenHero extends StatelessWidget {
+  const _ExcuseScreenHero({required this.total, required this.pending});
+
+  final int total;
+  final int pending;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D1B3E),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0D1B3E).withValues(alpha: 0.4),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          // Teal glow accent
+          Positioned(
+            top: -30, right: -30,
+            child: Container(
+              width: 130, height: 130,
+              decoration: BoxDecoration(
+                color: AppColors.teal.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          // Top teal line
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: Container(
+              height: 3,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.teal.withValues(alpha: 0),
+                    AppColors.teal,
+                    AppColors.teal.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 24, 22, 24),
+            child: Row(
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: AppColors.teal.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.teal.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.verified_rounded,
+                    color: AppColors.teal,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'إدارة الأعذار',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 20,
+                          color: Colors.white,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      const Text(
+                        'مراجعة أعذار الطلاب واتخاذ القرار المناسب',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                          color: AppColors.slate400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Pending badge
+                if (pending > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.goldDeep.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.goldDeep.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          pending.toString(),
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                            color: AppColors.goldDeep,
+                          ),
+                        ),
+                        const Text(
+                          'معلقة',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 10,
+                            color: AppColors.goldDeep,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Excuse Filter Panel — Unified search + status pills panel
+// ──────────────────────────────────────────────────────────────────────────
+class _ExcuseFilterPanel extends StatelessWidget {
+  const _ExcuseFilterPanel({
+    required this.status,
+    required this.controller,
+    required this.onStatusChanged,
+    required this.onSearch,
+  });
+
+  final String status;
+  final TextEditingController controller;
+  final ValueChanged<String> onStatusChanged;
+  final VoidCallback onSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        children: [
+          // Search input
+          _SearchBox(controller: controller, onSearch: onSearch),
+          const SizedBox(height: 12),
+          // Status pills
+          _ChoicePillBar(
+            value: status,
+            items: const {
+              'all': 'الكل',
+              'pending': 'معلقة',
+              'accepted': 'مقبولة',
+              'rejected': 'مرفوضة',
+            },
+            onChanged: onStatusChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Decision Tile — Visual accept/reject selector button
+// ──────────────────────────────────────────────────────────────────────────
+class _DecisionTile extends StatelessWidget {
+  const _DecisionTile({
+    required this.selected,
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.08) : AppColors.slate50,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? color : AppColors.slate200,
+            width: selected ? 2 : 1,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.15),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: selected
+                    ? color.withValues(alpha: 0.12)
+                    : AppColors.slate200.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: selected ? color : AppColors.slate400,
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                color: selected ? color : AppColors.slate500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Info Capsule — Metadata chip for excuse cards
+// ──────────────────────────────────────────────────────────────────────────
+class _InfoCapsule extends StatelessWidget {
+  const _InfoCapsule({
+    required this.icon,
+    required this.text,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 12),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.w700,
+              fontSize: 11.5,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _ActionCard extends StatelessWidget {
+
   const _ActionCard({
     required this.icon,
     required this.color,
@@ -2221,51 +3739,89 @@ class _OpsHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color, color.withValues(alpha: 0.72)],
-        ),
+        color: const Color(0xFF0D1B3E),
         borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.22),
+            color: const Color(0xFF0D1B3E).withValues(alpha: 0.35),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
         ],
       ),
-      child: Row(
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(18),
+          // Accent color glow
+          Positioned(
+            top: -20, right: -20,
+            child: Container(
+              width: 120, height: 120,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
             ),
-            child: Icon(icon, color: Colors.white, size: 30),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                  ),
+          // Top accent line
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: Container(
+              height: 3,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    color.withValues(alpha: 0),
+                    color,
+                    color.withValues(alpha: 0),
+                  ],
                 ),
-                const SizedBox(height: 5),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.78),
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(22),
+            child: Row(
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: color.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(icon, color: color, size: 28),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: AppColors.slate400,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12.5,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -2284,44 +3840,70 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: stats
-          .map(
-            (stat) => SizedBox(
-              width: (MediaQuery.sizeOf(context).width - 60) / 3,
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: _cardDecoration(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(stat.icon, color: stat.color),
-                    const SizedBox(height: 10),
-                    Text(
-                      stat.value,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 20,
-                      ),
+    final itemWidth = (MediaQuery.sizeOf(context).width - 60) / 3;
+    return Row(
+      children: stats.asMap().entries.map((entry) {
+        final i = entry.key;
+        final stat = entry.value;
+        return [
+          SizedBox(
+            width: itemWidth,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.slate100),
+                boxShadow: [
+                  BoxShadow(
+                    color: stat.color.withValues(alpha: 0.06),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Color line at top
+                  Container(
+                    height: 3,
+                    width: 28,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: stat.color,
+                      borderRadius: BorderRadius.circular(4),
                     ),
-                    Text(
-                      stat.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.slate500,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                      ),
+                  ),
+                  Text(
+                    stat.value,
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w900,
+                      fontSize: 22,
+                      color: stat.color,
+                      letterSpacing: -0.5,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    stat.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      color: AppColors.slate500,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10.5,
+                    ),
+                  ),
+                ],
               ),
             ),
-          )
-          .toList(),
+          ),
+          if (i < stats.length - 1) const SizedBox(width: 10),
+        ];
+      }).expand((x) => x).toList(),
     );
   }
 }
@@ -2371,6 +3953,258 @@ class _ReportSummaryGrid extends StatelessWidget {
           Icons.block_rounded,
           AppColors.rose,
         ),
+      ],
+    );
+  }
+}
+
+class _ExamMajorCard extends StatelessWidget {
+  const _ExamMajorCard({
+    required this.major,
+    required this.onTap,
+    this.countKey = 'exam_schedules_count',
+    this.countLabel = 'جداول اختبارات',
+    this.color = AppColors.royalBlue,
+    this.icon = Icons.account_tree_rounded,
+  });
+
+  final Map<String, dynamic> major;
+  final VoidCallback onTap;
+  final String countKey;
+  final String countLabel;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final levels = _list(major['levels']);
+    final schedulesCount = _int(major[countKey]);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppColors.slate100),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(
+                icon,
+                color: color,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    (major['name'] ?? '-').toString(),
+                    style: const TextStyle(
+                      color: AppColors.midnight,
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _ChipText('${levels.length} مستويات'),
+                      _ChipText('$schedulesCount $countLabel'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.chevron_left_rounded,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExamMajorHeader extends StatelessWidget {
+  const _ExamMajorHeader({
+    required this.major,
+    required this.onChange,
+    this.color = AppColors.royalBlue,
+  });
+
+  final Map<String, dynamic> major;
+  final VoidCallback onChange;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.account_tree_rounded, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'التخصص الحالي',
+                  style: TextStyle(
+                    color: AppColors.slate500,
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  ),
+                ),
+                Text(
+                  (major['name'] ?? '-').toString(),
+                  style: const TextStyle(
+                    color: AppColors.midnight,
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: onChange,
+            icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+            label: const Text('تغيير'),
+            style: TextButton.styleFrom(
+              foregroundColor: color,
+              textStyle: const TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LockedExamMajor extends StatelessWidget {
+  const _LockedExamMajor({
+    required this.major,
+    this.color = AppColors.royalBlue,
+  });
+
+  final Map<String, dynamic> major;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.lock_rounded, color: color, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'التخصص: ${(major['name'] ?? '-').toString()}',
+              style: const TextStyle(
+                color: AppColors.midnight,
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExamLevelFilters extends StatelessWidget {
+  const _ExamLevelFilters({
+    required this.data,
+    required this.majorId,
+    required this.levelId,
+    required this.searchController,
+    required this.onLevel,
+    required this.onSearch,
+  });
+
+  final Map<String, dynamic> data;
+  final int? majorId;
+  final int? levelId;
+  final TextEditingController searchController;
+  final ValueChanged<int?> onLevel;
+  final VoidCallback onSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    final majors = _list(data['majors']);
+    final selected = majors.firstWhere(
+      (major) => _int(major['id']) == majorId,
+      orElse: () => const {},
+    );
+    return Column(
+      children: [
+        _CompactDropdown<int>(
+          label: 'المستوى',
+          value: levelId,
+          items: _list(selected['levels'])
+              .map(
+                (l) => _MenuItem(
+                  _int(l['id']),
+                  (l['name'] ?? '').toString(),
+                ),
+              )
+              .toList(),
+          onChanged: onLevel,
+        ),
+        const SizedBox(height: 10),
+        _SearchBox(controller: searchController, onSearch: onSearch),
       ],
     );
   }
@@ -2456,7 +4290,6 @@ class _SchedulePage extends StatelessWidget {
     required this.color,
     required this.count,
     required this.onRetry,
-    required this.onCreate,
     required this.children,
   });
 
@@ -2468,7 +4301,6 @@ class _SchedulePage extends StatelessWidget {
   final Color color;
   final int count;
   final VoidCallback onRetry;
-  final VoidCallback onCreate;
   final List<Widget> children;
 
   @override
@@ -2489,40 +4321,45 @@ class _SchedulePage extends StatelessWidget {
               color: color,
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _StatsRow(
-                    stats: [
-                      _Stat('عدد الجداول', count.toString(), icon, color),
-                      _Stat(
-                        'منظم',
-                        'API',
-                        Icons.security_rounded,
-                        AppColors.success,
-                      ),
-                      _Stat(
-                        'إدارة',
-                        'CRUD',
-                        Icons.tune_rounded,
-                        AppColors.royalBlue,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                FilledButton(
-                  onPressed: onCreate,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: color,
-                    padding: const EdgeInsets.all(16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: color.withValues(alpha: 0.15)),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, color: color, size: 20),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'إجمالي الجداول المسجلة',
+                    style: TextStyle(
+                      color: AppColors.midnight,
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5,
                     ),
                   ),
-                  child: const Icon(Icons.add_rounded),
-                ),
-              ],
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      count.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             ...children,
@@ -2630,30 +4467,246 @@ class _ExamScheduleDetails extends StatelessWidget {
 
   final Map<String, dynamic> data;
 
+  Map<String, String> _parseDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) {
+      return {'day': '-', 'month': 'التاريخ'};
+    }
+    try {
+      final parsed = DateTime.tryParse(dateStr);
+      if (parsed != null) {
+        final months = [
+          'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+          'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+        ];
+        return {
+          'day': parsed.day.toString(),
+          'month': months[parsed.month - 1],
+        };
+      }
+    } catch (_) {}
+
+    final parts = dateStr.split(RegExp(r'[-/]'));
+    if (parts.length >= 3) {
+      if (parts[0].length == 4) {
+        final monthIdx = int.tryParse(parts[1]);
+        final months = [
+          'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+          'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+        ];
+        final monthName = (monthIdx != null && monthIdx >= 1 && monthIdx <= 12)
+            ? months[monthIdx - 1]
+            : parts[1];
+        return {
+          'day': parts[2],
+          'month': monthName,
+        };
+      } else {
+        final monthIdx = int.tryParse(parts[1]);
+        final months = [
+          'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+          'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+        ];
+        final monthName = (monthIdx != null && monthIdx >= 1 && monthIdx <= 12)
+            ? months[monthIdx - 1]
+            : parts[1];
+        return {
+          'day': parts[0],
+          'month': monthName,
+        };
+      }
+    }
+
+    return {'day': dateStr, 'month': 'اختبار'};
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _list(data['items']);
+    final majorName = _map(data['major'])['name'] ?? '-';
+    final levelName = _map(data['level'])['name'] ?? '-';
+    final termName = _map(data['term'])['name'] ?? '-';
+    final description = data['description']?.toString() ?? '';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _DetailBlock(
-          title: (data['title'] ?? '-').toString(),
-          lines: [
-            '${_map(data['major'])['name'] ?? '-'} / ${_map(data['level'])['name'] ?? '-'} / ${_map(data['term'])['name'] ?? '-'}',
-            data['description']?.toString() ?? '',
-          ],
-        ),
-        const SizedBox(height: 12),
-        ...items.map(
-          (item) => _DetailBlock(
-            title: (_map(item['subject'])['name'] ?? '-').toString(),
-            lines: [
-              'التاريخ: ${item['exam_date'] ?? '-'}',
-              'الوقت: ${item['start_time'] ?? '-'} - ${item['end_time'] ?? '-'}',
-              'المكان: ${item['location'] ?? '-'}',
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: AppColors.primaryGradient,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                (data['title'] ?? 'تفاصيل الجدول').toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '$majorName / $levelName / $termName',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+              if (description.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  description,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 12,
+                    fontFamily: 'Cairo',
+                    height: 1.4,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
+        const SizedBox(height: 20),
+        const Row(
+          children: [
+            Icon(Icons.calendar_today_rounded, color: AppColors.royalBlue, size: 18),
+            SizedBox(width: 8),
+            Text(
+              'مواعيد الاختبارات المشمولة',
+              style: TextStyle(
+                color: AppColors.midnight,
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
+                fontFamily: 'Cairo',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        if (items.isEmpty)
+          const _EmptyState()
+        else
+          ...items.map(
+            (item) {
+              final dateInfo = _parseDate(item['exam_date']?.toString());
+              final subjectName = (_map(item['subject'])['name'] ?? '-').toString();
+              final startTime = _formatExamTime(item['start_time']);
+              final endTime = _formatExamTime(item['end_time']);
+              final locationName = (item['location'] ?? '').toString();
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 58,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.royalBlue.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.royalBlue.withValues(alpha: 0.15)),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            dateInfo['day']!,
+                            style: const TextStyle(
+                              color: AppColors.royalBlue,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                              fontFamily: 'Cairo',
+                              height: 1.1,
+                            ),
+                          ),
+                          Text(
+                            dateInfo['month']!,
+                            style: const TextStyle(
+                              color: AppColors.royalBlue,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                              fontFamily: 'Cairo',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: AppColors.slate100),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.015),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              subjectName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                                color: AppColors.midnight,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(Icons.access_time_rounded, size: 14, color: AppColors.slate500),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '$startTime - $endTime',
+                                  style: const TextStyle(
+                                    color: AppColors.slate600,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    fontFamily: 'Cairo',
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                const Icon(Icons.location_on_rounded, size: 14, color: AppColors.slate500),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    locationName.isNotEmpty ? locationName : '-',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: AppColors.slate600,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      fontFamily: 'Cairo',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
       ],
     );
   }
@@ -2958,11 +5011,13 @@ class _ThresholdReportDetails extends StatelessWidget {
 
 class _ExamItemEditor extends StatelessWidget {
   const _ExamItemEditor({
+    required this.index,
     required this.draft,
     required this.subjects,
     required this.onRemove,
   });
 
+  final int index;
   final _ExamItemDraft draft;
   final List<Map<String, dynamic>> subjects;
   final VoidCallback? onRemove;
@@ -2974,38 +5029,139 @@ class _ExamItemEditor extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: _cardDecoration(),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.royalBlue.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'المادة رقم $index',
+                style: const TextStyle(
+                  color: AppColors.royalBlue,
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w900,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: _dropdown<int>(
-                  label: 'المادة',
-                  value: draft.subjectId,
-                  items: subjects
-                      .map(
-                        (s) => _MenuItem(
-                          _int(s['id']),
-                          (s['name'] ?? '').toString(),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) => draft.subjectId = value,
+              const Text(
+                'مادة الاختبار',
+                style: TextStyle(
+                  color: AppColors.midnight,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  fontFamily: 'Cairo',
                 ),
               ),
               if (onRemove != null)
                 IconButton(
                   onPressed: onRemove,
-                  icon: const Icon(Icons.delete_rounded),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 20),
                   color: AppColors.danger,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
             ],
           ),
-          _text(draft.date, 'تاريخ الاختبار', hint: '2026-05-20'),
+          const SizedBox(height: 12),
+          _dropdown<int>(
+            label: 'المادة',
+            value: draft.subjectId,
+            items: subjects
+                .map(
+                  (s) => _MenuItem(
+                    _int(s['id']),
+                    (s['name'] ?? '').toString(),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) => draft.subjectId = value,
+          ),
+          _text(
+            draft.date,
+            'تاريخ الاختبار',
+            hint: 'اختر تاريخ الاختبار',
+            readOnly: true,
+            onTap: () async {
+              final date = await showDatePicker(
+                context: context,
+                initialDate: DateTime.tryParse(draft.date.text) ?? DateTime.now(),
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2100),
+              );
+              if (date != null) {
+                draft.date.text =
+                    "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+              }
+            },
+          ),
           Row(
             children: [
-              Expanded(child: _text(draft.start, 'البداية', hint: '08:00')),
+              Expanded(
+                child: _text(
+                  draft.start,
+                  'البداية',
+                  hint: 'اختر الوقت',
+                  readOnly: true,
+                  onTap: () async {
+                    TimeOfDay initialTime = TimeOfDay.now();
+                    final parts = draft.start.text.split(':');
+                    if (parts.length == 2) {
+                      final h = int.tryParse(parts[0]);
+                      final m = int.tryParse(parts[1]);
+                      if (h != null && m != null) {
+                        initialTime = TimeOfDay(hour: h, minute: m);
+                      }
+                    }
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: initialTime,
+                    );
+                    if (time != null) {
+                      draft.start.text =
+                          "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
+                    }
+                  },
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _text(draft.end, 'النهاية', hint: '10:00')),
+              Expanded(
+                child: _text(
+                  draft.end,
+                  'النهاية',
+                  hint: 'اختر الوقت',
+                  readOnly: true,
+                  onTap: () async {
+                    TimeOfDay initialTime = TimeOfDay.now();
+                    final parts = draft.end.text.split(':');
+                    if (parts.length == 2) {
+                      final h = int.tryParse(parts[0]);
+                      final m = int.tryParse(parts[1]);
+                      if (h != null && m != null) {
+                        initialTime = TimeOfDay(hour: h, minute: m);
+                      }
+                    }
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: initialTime,
+                    );
+                    if (time != null) {
+                      draft.end.text =
+                          "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
+                    }
+                  },
+                ),
+              ),
             ],
           ),
           _text(draft.location, 'المكان', required: false),
@@ -3018,15 +5174,35 @@ class _ExamItemEditor extends StatelessWidget {
 class _ExamItemDraft {
   _ExamItemDraft();
 
+  static String _cleanDate(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    try {
+      final parsed = DateTime.tryParse(raw);
+      if (parsed != null) {
+        return "${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}";
+      }
+    } catch (_) {}
+    return raw.split('T')[0].split(' ')[0];
+  }
+
+  static String _cleanTime(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    final parts = raw.split(':');
+    if (parts.length >= 2) {
+      return "${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}";
+    }
+    return raw;
+  }
+
   factory _ExamItemDraft.fromJson(Map<String, dynamic> json) {
     return _ExamItemDraft()
       ..subjectId = _int(
         _map(json['subject'])['id'],
         fallback: _int(json['subject_id']),
       )
-      ..date.text = (json['exam_date'] ?? '').toString()
-      ..start.text = (json['start_time'] ?? '').toString()
-      ..end.text = (json['end_time'] ?? '').toString()
+      ..date.text = _cleanDate(json['exam_date']?.toString())
+      ..start.text = _cleanTime(json['start_time']?.toString())
+      ..end.text = _cleanTime(json['end_time']?.toString())
       ..location.text = (json['location'] ?? '').toString();
   }
 
@@ -3094,20 +5270,58 @@ class _SearchBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      textInputAction: TextInputAction.search,
-      onSubmitted: (_) => onSearch(),
-      decoration: InputDecoration(
-        hintText: 'بحث...',
-        prefixIcon: const Icon(Icons.search_rounded),
-        suffixIcon: IconButton(
-          onPressed: onSearch,
-          icon: const Icon(Icons.arrow_forward_rounded),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.slate100),
+      ),
+      child: TextField(
+        controller: controller,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => onSearch(),
+        style: const TextStyle(
+          fontFamily: 'Cairo',
+          fontWeight: FontWeight.w700,
+          fontSize: 13.5,
+          color: AppColors.midnight,
         ),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+        decoration: InputDecoration(
+          hintText: 'بحث باسم الطالب أو رقم القيد...',
+          hintStyle: const TextStyle(
+            fontFamily: 'Cairo',
+            fontWeight: FontWeight.w600,
+            fontSize: 12.5,
+            color: AppColors.slate400,
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: AppColors.slate400,
+            size: 20,
+          ),
+          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, _) {
+              if (value.text.isEmpty) return const SizedBox.shrink();
+              return IconButton(
+                onPressed: controller.clear,
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: AppColors.slate400,
+                  size: 18,
+                ),
+              );
+            },
+          ),
+          filled: true,
+          fillColor: Colors.transparent,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16, vertical: 14,
+          ),
+        ),
       ),
     );
   }
@@ -3124,24 +5338,55 @@ class _ChoicePillBar extends StatelessWidget {
   final Map<String, String> items;
   final ValueChanged<String> onChanged;
 
+  // Status-color mapping for pills
+  Color _pillColor(String key) => switch (key) {
+    'pending' => AppColors.goldDeep,
+    'accepted' => AppColors.success,
+    'rejected' => AppColors.danger,
+    _ => AppColors.royalBlue,
+  };
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: items.entries
-            .map(
-              (entry) => Padding(
-                padding: const EdgeInsetsDirectional.only(end: 8),
-                child: ChoiceChip(
-                  selected: value == entry.key,
-                  label: Text(entry.value),
-                  onSelected: (_) => onChanged(entry.key),
-                  labelStyle: const TextStyle(fontWeight: FontWeight.w800),
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: items.entries.map((entry) {
+          final isSelected = value == entry.key;
+          final chipColor = _pillColor(entry.key);
+          return Padding(
+            padding: const EdgeInsetsDirectional.only(end: 8),
+            child: GestureDetector(
+              onTap: () => onChanged(entry.key),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? chipColor.withValues(alpha: 0.1)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(
+                    color: isSelected ? chipColor : AppColors.slate200,
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                ),
+                child: Text(
+                  entry.value,
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                    fontSize: 12.5,
+                    color: isSelected ? chipColor : AppColors.slate600,
+                  ),
                 ),
               ),
-            )
-            .toList(),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -3155,21 +5400,39 @@ class _NoticeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.goldDeep.withValues(alpha: 0.09),
+        color: AppColors.goldDeep.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.goldDeep.withValues(alpha: 0.25)),
+        border: Border.all(color: AppColors.goldDeep.withValues(alpha: 0.2)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_rounded, color: AppColors.goldDeep),
-          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: AppColors.goldDeep.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.info_outline_rounded,
+              color: AppColors.goldDeep,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w700,
+                fontSize: 12.5,
+                color: AppColors.slate700,
+                height: 1.4,
+              ),
             ),
           ),
         ],
@@ -3480,12 +5743,16 @@ Widget _text(
   bool required = true,
   int maxLines = 1,
   String? hint,
+  bool readOnly = false,
+  VoidCallback? onTap,
 }) {
   return Padding(
     padding: const EdgeInsets.only(bottom: 14),
     child: TextFormField(
       controller: controller,
       maxLines: maxLines,
+      readOnly: readOnly,
+      onTap: onTap,
       validator: (value) {
         if (required && (value == null || value.trim().isEmpty)) {
           return 'هذا الحقل مطلوب.';
@@ -3495,7 +5762,32 @@ Widget _text(
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        filled: true,
+        fillColor: AppColors.slate50,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.slate200),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.slate100),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.royalBlue, width: 1.5),
+        ),
+        labelStyle: const TextStyle(
+          color: AppColors.slate600,
+          fontFamily: 'Cairo',
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+        hintStyle: const TextStyle(
+          color: AppColors.slate400,
+          fontFamily: 'Cairo',
+          fontSize: 12,
+        ),
       ),
     ),
   );
@@ -3520,7 +5812,27 @@ Widget _dropdown<T>({
           : null,
       decoration: InputDecoration(
         labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        filled: true,
+        fillColor: AppColors.slate50,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.slate200),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.slate100),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.royalBlue, width: 1.5),
+        ),
+        labelStyle: const TextStyle(
+          color: AppColors.slate600,
+          fontFamily: 'Cairo',
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
       ),
       items: [
         if (!required)
@@ -3569,6 +5881,21 @@ _PageInfo _pageInfo(Object? value, int fallbackTotal) {
     _int(map['last_page'], fallback: 1),
     _int(map['total'], fallback: fallbackTotal),
   );
+}
+
+String _formatExamTime(Object? value) {
+  final raw = (value ?? '').toString().trim();
+  if (raw.isEmpty) return '-';
+  final match = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(raw);
+  if (match == null) return raw;
+
+  final hour = int.tryParse(match.group(1) ?? '');
+  final minute = int.tryParse(match.group(2) ?? '');
+  if (hour == null || minute == null) return raw;
+
+  final period = hour >= 12 ? 'م' : 'ص';
+  final normalizedHour = hour % 12 == 0 ? 12 : hour % 12;
+  return '$normalizedHour:${minute.toString().padLeft(2, '0')} $period';
 }
 
 BoxDecoration _cardDecoration() {
@@ -3676,4 +6003,123 @@ List<Map<String, dynamic>> _list(Object? value) {
 int _int(Object? value, {int fallback = 0}) {
   if (value == null) return fallback;
   return int.tryParse(value.toString()) ?? fallback;
+}
+
+String _formatTime(String value) {
+  if (value.isEmpty) return '-';
+  final cleaned = _ExamItemDraft._cleanTime(value);
+  if (cleaned.contains(':')) {
+    final parts = cleaned.split(':');
+    if (parts.length >= 2) {
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+      if (hour != null && minute != null) {
+        final period = hour >= 12 ? 'م' : 'ص';
+        final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+        return '$hour12:${minute.toString().padLeft(2, '0')} $period';
+      }
+    }
+  }
+  return cleaned;
+}
+
+bool _isTimeInRange(String startStr, String endStr) {
+  if (startStr.isEmpty || endStr.isEmpty) return false;
+  try {
+    final now = DateTime.now();
+    final today = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    final start = DateTime.parse(
+      '$today ${startStr.length == 5 ? "$startStr:00" : startStr}',
+    );
+    final end = DateTime.parse(
+      '$today ${endStr.length == 5 ? "$endStr:00" : endStr}',
+    );
+    return now.isAfter(start) && now.isBefore(end);
+  } catch (_) {
+    return false;
+  }
+}
+
+class _DailyEmptyState extends StatelessWidget {
+  const _DailyEmptyState({required this.dayName});
+  final String dayName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.calendar_today_outlined, color: AppColors.slate300, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              'لا توجد محاضرات يوم $dayName',
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                color: AppColors.slate500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SchedulesSliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  _SchedulesSliverAppBarDelegate({required this.child, this.height = 64});
+  final Widget child;
+  final double height;
+
+  @override
+  double get minExtent => height;
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) => child;
+
+  @override
+  bool shouldRebuild(_SchedulesSliverAppBarDelegate oldDelegate) => false;
+}
+
+class _IconInfo extends StatelessWidget {
+  const _IconInfo({
+    required this.icon,
+    required this.text,
+    this.color = AppColors.slate500,
+  });
+
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color.withValues(alpha: 0.7)),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

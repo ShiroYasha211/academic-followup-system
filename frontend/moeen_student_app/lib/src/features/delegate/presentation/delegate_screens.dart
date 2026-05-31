@@ -67,6 +67,10 @@ final _delegateExamsProvider = FutureProvider.autoDispose<List<dynamic>>(
 final _delegateAssignmentsProvider = FutureProvider.autoDispose<List<dynamic>>(
   (ref) => ref.watch(delegateRepositoryProvider).assignments(),
 );
+final _delegateAssignmentPermissionsProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>(
+      (ref) => ref.watch(delegateRepositoryProvider).assignmentPermissions(),
+    );
 final _delegateResourcesProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>(
       (ref) => ref.watch(delegateRepositoryProvider).resources(),
@@ -94,10 +98,9 @@ final _delegateAnnouncementsProvider = FutureProvider.autoDispose
     );
 final _delegateAttendanceProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, ({String? search, String? date})>(
-      (ref, q) => ref.watch(delegateRepositoryProvider).attendance(
-            search: q.search,
-            date: q.date,
-          ),
+      (ref, q) => ref
+          .watch(delegateRepositoryProvider)
+          .attendance(search: q.search, date: q.date),
     );
 final _delegateAbsenceAlertsProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>(

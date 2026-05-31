@@ -41,8 +41,7 @@ class StaffPushNotificationService {
   static StreamSubscription<String>? _tokenRefreshSubscription;
   static String? _pendingNavigationPath;
 
-  static Stream<String> get navigationRequests =>
-      _navigationController.stream;
+  static Stream<String> get navigationRequests => _navigationController.stream;
   static Stream<Map<String, dynamic>> get refreshRequests =>
       _refreshController.stream;
 
@@ -116,11 +115,7 @@ class StaffPushNotificationService {
     await androidPlugin?.createNotificationChannel(_channel);
     await androidPlugin?.requestNotificationsPermission();
 
-    await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    await _messaging.requestPermission(alert: true, badge: true, sound: true);
 
     await _messaging.setForegroundNotificationPresentationOptions(
       alert: true,
@@ -204,8 +199,7 @@ class StaffPushNotificationService {
   static Future<void> _showForegroundNotification(RemoteMessage message) async {
     _refreshController.add(message.data);
     final notification = message.notification;
-    final title =
-        notification?.title ?? message.data['title'] ?? 'إشعار جديد';
+    final title = notification?.title ?? message.data['title'] ?? 'إشعار جديد';
     final body =
         notification?.body ??
         message.data['body'] ??
@@ -244,8 +238,9 @@ class StaffPushNotificationService {
     final workspace = data['workspace']?.toString();
     final rawTarget = (data['target_screen'] ?? data['screen'])?.toString();
     final type = data['type']?.toString();
-    final target =
-        rawTarget == null || rawTarget == 'notifications' ? type : rawTarget;
+    final target = rawTarget == null || rawTarget == 'notifications'
+        ? type
+        : rawTarget;
 
     if (workspace == 'administrative') {
       return switch (target) {
@@ -256,8 +251,10 @@ class StaffPushNotificationService {
         'subjects' => '/administrative/subjects',
         'excuses' || 'excuse' => '/administrative/excuses',
         'reports' || 'attendance' => '/administrative/reports',
-        'news' || 'announcement' || 'alert' || 'notifications' =>
-          '/administrative/notifications',
+        'news' ||
+        'announcement' ||
+        'alert' ||
+        'notifications' => '/administrative/notifications',
         _ => '/administrative/notifications',
       };
     }
@@ -274,7 +271,9 @@ class StaffPushNotificationService {
       'stars' || 'star' => '/doctor/stars',
       'library' || 'resource' || 'resources' => '/doctor/library',
       'news' || 'announcement' || 'poll' || 'alert' => '/doctor/news',
-      'clinical' || 'rare_case' => '/doctor/clinical',
+      'rare_case' || 'rare_cases' => '/doctor/rare-cases',
+      'volunteer' || 'volunteers' => '/doctor/volunteers',
+      'clinical' => '/doctor/clinical',
       'notifications' => '/doctor/notifications',
       _ => '/doctor/notifications',
     };

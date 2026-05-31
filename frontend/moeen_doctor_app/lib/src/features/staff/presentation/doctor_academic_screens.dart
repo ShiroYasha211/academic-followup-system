@@ -106,21 +106,6 @@ String _docStatusLabel(String status) {
   }
 }
 
-IconData _docFileIcon(String type) {
-  final value = type.toLowerCase();
-  if (value.contains('pdf')) return Icons.picture_as_pdf_rounded;
-  if (value.contains('doc')) return Icons.description_rounded;
-  if (value.contains('xls')) return Icons.table_chart_rounded;
-  if (value.contains('ppt')) return Icons.slideshow_rounded;
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(value)) {
-    return Icons.image_rounded;
-  }
-  if (value.contains('zip') || value.contains('rar')) {
-    return Icons.folder_zip_rounded;
-  }
-  return Icons.insert_drive_file_rounded;
-}
-
 String _docFileName(_Json item, {String fallback = 'moeen-file'}) {
   final title = _docText(
     item['title'] ?? item['attachment_name'] ?? item['file_name'],
@@ -731,4 +716,3 @@ class _DocPanelTabBar extends StatelessWidget {
     );
   }
 }
-

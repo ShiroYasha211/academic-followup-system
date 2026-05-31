@@ -225,6 +225,9 @@ class DelegateRepository {
   Future<List<dynamic>> assignments() async =>
       _list(await _api.get('/delegate/assignments'));
 
+  Future<Map<String, dynamic>> assignmentPermissions() async =>
+      _data(await _api.get('/delegate/assignments/permissions'));
+
   Future<String> saveAssignment({
     int? id,
     required Map<String, dynamic> data,

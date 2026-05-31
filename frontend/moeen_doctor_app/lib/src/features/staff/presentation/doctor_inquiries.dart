@@ -924,6 +924,7 @@ class _InquiryDetailsPanelState extends ConsumerState<_InquiryDetailsPanel> {
         {'answer': _answer.text.trim()},
       );
       if (!mounted) return;
+      ref.invalidate(staffAttentionCountsProvider);
       widget.onAnswered();
       setState(() {
         _future = _fetch();

@@ -11,6 +11,7 @@ class DoctorNewsScreen extends ConsumerStatefulWidget {
 
 class _DoctorNewsScreenState extends ConsumerState<DoctorNewsScreen> {
   late Future<Map<String, dynamic>> _future = _fetch();
+  String _activeFilter = 'all'; // all, unread, polls, announcements
 
   Future<Map<String, dynamic>> _fetch() {
     return ref
@@ -35,49 +36,85 @@ class _DoctorNewsScreenState extends ConsumerState<DoctorNewsScreen> {
           }
           if (snapshot.hasError) return _ErrorView(error: snapshot.error!);
 
-          final items = _docList(_docData(snapshot.data ?? const {}));
-          final unread = items.where((item) => item['read_at'] == null).length;
+          final allItems = _docList(_docData(snapshot.data ?? const {}));
+          final unreadCount = allItems
+              .where((item) => item['read_at'] == null)
+              .length;
+
+          // Local Filter Logic
+          final filteredItems = allItems.where((item) {
+            final type = _docText(item['type']);
+            final isUnread = item['read_at'] == null;
+            if (_activeFilter == 'unread') {
+              return isUnread;
+            } else if (_activeFilter == 'polls') {
+              return type == 'poll';
+            } else if (_activeFilter == 'announcements') {
+              return type == 'announcement';
+            }
+            return true;
+          }).toList();
 
           return RefreshIndicator(
             onRefresh: () async => _reload(),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
               children: [
-                _DocHero(
-                  title: 'المركز الإخباري',
-                  subtitle:
-                      'آخر الأخبار والتنبيهات الجماعية والاستبيانات المرتبطة بحسابك.',
-                  icon: Icons.newspaper_rounded,
-                  trailing: IconButton.filledTonal(
-                    onPressed: _reload,
-                    icon: const Icon(Icons.refresh_rounded),
-                  ),
-                ),
+                _NewsHeaderV3(unreadCount: unreadCount),
                 const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
+                Row(
                   children: [
-                    _DocMetric(
-                      label: 'الأخبار',
-                      value: items.length.toString(),
-                      color: AppColors.royalBlue,
-                      icon: Icons.newspaper_rounded,
+                    Expanded(
+                      child: _DocMetric(
+                        label: 'إجمالي الأخبار',
+                        value: allItems.length.toString(),
+                        color: AppColors.royalBlue,
+                        icon: Icons.newspaper_rounded,
+                      ),
                     ),
-                    _DocMetric(
-                      label: 'غير مقروء',
-                      value: unread.toString(),
-                      color: AppColors.warning,
-                      icon: Icons.mark_email_unread_rounded,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _DocMetric(
+                        label: 'غير مقروءة',
+                        value: unreadCount.toString(),
+                        color: unreadCount > 0
+                            ? AppColors.warning
+                            : AppColors.slate400,
+                        icon: Icons.mark_email_unread_rounded,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                if (items.isEmpty)
-                  const _DocEmpty('لا توجد أخبار حالياً.')
+                const SizedBox(height: 18),
+                // Quick Filter Chips Bar
+                SizedBox(
+                  height: 38,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      _filterChip(label: 'كل الأخبار', filterKey: 'all'),
+                      _filterChip(
+                        label: 'غير المقروءة',
+                        filterKey: 'unread',
+                        count: unreadCount,
+                      ),
+                      _filterChip(label: 'الاستبيانات فقط', filterKey: 'polls'),
+                      _filterChip(
+                        label: 'الإعلانات العامة',
+                        filterKey: 'announcements',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (filteredItems.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: _DocEmpty('لا توجد أخبار مطابقة للفلاتر حالياً.'),
+                  )
                 else
-                  ...items.map(
-                    (item) => _DoctorNewsCard(
+                  ...filteredItems.map(
+                    (item) => _DoctorNewsCardV3(
                       item: item,
                       onTap: () => _showNewsDetails(item),
                     ),
@@ -90,6 +127,68 @@ class _DoctorNewsScreenState extends ConsumerState<DoctorNewsScreen> {
     );
   }
 
+  Widget _filterChip({
+    required String label,
+    required String filterKey,
+    int count = 0,
+  }) {
+    final isSelected = _activeFilter == filterKey;
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: 8),
+      child: InkWell(
+        onTap: () => setState(() => _activeFilter = filterKey),
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.royalBlue : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? AppColors.royalBlue : AppColors.slate200,
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : AppColors.midnight,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+              if (count > 0) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.white : AppColors.warning,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    count.toString(),
+                    style: TextStyle(
+                      color: isSelected ? AppColors.royalBlue : Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _showNewsDetails(_Json item) async {
     final batchId = _docText(item['batch_id']);
     if (batchId.isEmpty) return;
@@ -98,14 +197,80 @@ class _DoctorNewsScreenState extends ConsumerState<DoctorNewsScreen> {
       title: 'تفاصيل الخبر',
       icon: Icons.article_rounded,
       color: AppColors.royalBlue,
-      fullScreen: true,
-      child: _DoctorNewsDetailsPanel(batchId: batchId, onChanged: _reload),
+      child: _DoctorNewsDetailsPanelV3(batchId: batchId, onChanged: _reload),
     );
   }
 }
 
-class _DoctorNewsCard extends StatelessWidget {
-  const _DoctorNewsCard({required this.item, required this.onTap});
+class _NewsHeaderV3 extends StatelessWidget {
+  const _NewsHeaderV3({required this.unreadCount});
+
+  final int unreadCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.royalBlueDark, AppColors.royalBlue],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.royalBlue.withValues(alpha: 0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          PositionedDirectional(
+            end: -22,
+            top: -22,
+            child: Icon(
+              Icons.newspaper_rounded,
+              size: 110,
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'المركز الإخباري الموحد',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                unreadCount > 0
+                    ? 'لديك عدد $unreadCount إشعارات إخبارية جديدة لم تقرأ بعد.'
+                    : 'أنت مطلع على كافة الأخبار والاستبيانات الرسمية بالكلية.',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DoctorNewsCardV3 extends StatelessWidget {
+  const _DoctorNewsCardV3({required this.item, required this.onTap});
 
   final _Json item;
   final VoidCallback onTap;
@@ -115,94 +280,119 @@ class _DoctorNewsCard extends StatelessWidget {
     final type = _docText(item['type'], 'announcement');
     final unread = item['read_at'] == null;
     final sender = _docMap(item['sender']);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: _cardDecoration().copyWith(
-          border: unread
-              ? Border.all(color: AppColors.royalBlue.withValues(alpha: 0.28))
-              : Border.all(color: AppColors.slate100),
+    final typeColor = _notificationTypeColor(type);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: unread ? typeColor.withValues(alpha: 0.02) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: unread
+              ? typeColor.withValues(alpha: 0.35)
+              : AppColors.slate100,
+          width: unread ? 1.5 : 1.0,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: _notificationTypeColor(type).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    _notificationTypeIcon(type),
-                    color: _notificationTypeColor(type),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _docText(item['title'], 'خبر جديد'),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: unread ? 0.03 : 0.015),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: typeColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      _notificationTypeIcon(type),
+                      color: typeColor,
+                      size: 20,
                     ),
                   ),
-                ),
-                _DocPill(
-                  _notificationTypeLabel(type),
-                  _notificationTypeColor(type),
-                  icon: unread ? Icons.fiber_manual_record_rounded : null,
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              _docText(item['message']),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.slate600,
-                fontWeight: FontWeight.w700,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
-              runSpacing: 8,
-              children: [
-                _DocPill(
-                  _docText(sender['name'], 'النظام'),
-                  AppColors.slate500,
-                  icon: Icons.person_rounded,
-                ),
-                _DocPill(
-                  _docDate(item['created_at']),
-                  AppColors.slate500,
-                  icon: Icons.schedule_rounded,
-                ),
-                if (_docText(item['attachment_name']).isNotEmpty)
-                  const _DocPill(
-                    'مرفق',
-                    AppColors.royalBlue,
-                    icon: Icons.attach_file_rounded,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _docText(item['title'], 'خبر جديد'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.midnight,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
                   ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 8),
+                  _DocPill(
+                    _notificationTypeLabel(type),
+                    typeColor,
+                    icon: unread ? Icons.fiber_manual_record_rounded : null,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _docText(item['message']),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.slate600,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  fontFamily: 'Cairo',
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _DocPill(
+                    _docText(sender['name'], 'الناشر الرسمي'),
+                    AppColors.slate500,
+                    icon: Icons.person_outline_rounded,
+                  ),
+                  _DocPill(
+                    _docDate(item['created_at']),
+                    AppColors.royalBlue,
+                    icon: Icons.schedule_rounded,
+                  ),
+                  if (_docText(item['attachment_name']).isNotEmpty)
+                    const _DocPill(
+                      'مستند مرفق',
+                      AppColors.teal,
+                      icon: Icons.attach_file_rounded,
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _DoctorNewsDetailsPanel extends ConsumerStatefulWidget {
-  const _DoctorNewsDetailsPanel({
+class _DoctorNewsDetailsPanelV3 extends ConsumerStatefulWidget {
+  const _DoctorNewsDetailsPanelV3({
     required this.batchId,
     required this.onChanged,
   });
@@ -211,12 +401,12 @@ class _DoctorNewsDetailsPanel extends ConsumerStatefulWidget {
   final VoidCallback onChanged;
 
   @override
-  ConsumerState<_DoctorNewsDetailsPanel> createState() =>
-      _DoctorNewsDetailsPanelState();
+  ConsumerState<_DoctorNewsDetailsPanelV3> createState() =>
+      _DoctorNewsDetailsPanelV3State();
 }
 
-class _DoctorNewsDetailsPanelState
-    extends ConsumerState<_DoctorNewsDetailsPanel> {
+class _DoctorNewsDetailsPanelV3State
+    extends ConsumerState<_DoctorNewsDetailsPanelV3> {
   late Future<Map<String, dynamic>> _future = _fetch();
   bool _voting = false;
 
@@ -247,6 +437,7 @@ class _DoctorNewsDetailsPanelState
         final hasVoted = _docBool(data['has_voted']);
         final sender = _docMap(item['sender']);
         final type = _docText(item['type'], 'announcement');
+        final typeColor = _notificationTypeColor(type);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -255,64 +446,182 @@ class _DoctorNewsDetailsPanelState
               children: [
                 _DocPill(
                   _notificationTypeLabel(type),
-                  _notificationTypeColor(type),
+                  typeColor,
+                  icon: _notificationTypeIcon(type),
                 ),
                 const SizedBox(width: 8),
-                _DocPill(_docDate(item['created_at']), AppColors.slate500),
+                _DocPill(
+                  _docDate(item['created_at']),
+                  AppColors.royalBlue,
+                  icon: Icons.schedule_rounded,
+                ),
               ],
             ),
             const SizedBox(height: 14),
             Text(
               _docText(item['title'], 'خبر جديد'),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: AppColors.midnight,
+                fontFamily: 'Cairo',
+              ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
-              _docText(sender['name'], 'النظام'),
+              'الناشر: ${_docText(sender['name'], 'الكلية')}',
               style: const TextStyle(
                 color: AppColors.slate500,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                fontFamily: 'Cairo',
               ),
             ),
             const SizedBox(height: 14),
-            Text(
-              _docText(item['message']),
-              style: const TextStyle(
-                color: AppColors.midnight,
-                height: 1.6,
-                fontWeight: FontWeight.w700,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.slate50,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.slate100),
+              ),
+              child: Text(
+                _docText(item['message']),
+                style: const TextStyle(
+                  color: AppColors.midnight,
+                  height: 1.5,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Cairo',
+                ),
               ),
             ),
             if (_docText(item['attachment_url']).isNotEmpty) ...[
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () => _downloadAttachment(item),
-                icon: Icon(_docFileIcon(_docText(item['attachment_name']))),
-                label: Text(_docText(item['attachment_name'], 'تحميل المرفق')),
+              const SizedBox(height: 14),
+              InkWell(
+                onTap: () => _downloadAttachment(item),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.slate200),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.attach_file_rounded,
+                        color: AppColors.royalBlue,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _docText(
+                            item['attachment_name'],
+                            'مستند مرفق بالخبر',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            color: AppColors.midnight,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppColors.royalBlue.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.download_rounded,
+                          color: AppColors.royalBlue,
+                          size: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
             if (type == 'poll') ...[
               const SizedBox(height: 18),
               Text(
-                hasVoted ? 'تم تسجيل تصويتك' : 'اختر إجابتك',
-                style: const TextStyle(fontWeight: FontWeight.w900),
+                hasVoted
+                    ? 'تم تسجيل تصويتك بنجاح'
+                    : 'الرجاء اختيار إجابة من الاستبيان:',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontFamily: 'Cairo',
+                  fontSize: 13,
+                  color: AppColors.midnight,
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               ...options.map((option) {
+                final isSelected = hasVoted; // Highlight voted state nicely
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
-                  decoration: _cardDecoration(),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.success.withValues(alpha: 0.05)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.success
+                          : AppColors.slate200,
+                    ),
+                  ),
                   child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 2,
+                    ),
                     title: Text(
                       _docText(option['option_text'] ?? option['text']),
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
                     ),
                     trailing: hasVoted
-                        ? const Icon(Icons.check_circle_outline_rounded)
+                        ? const Icon(
+                            Icons.check_circle_rounded,
+                            color: AppColors.success,
+                            size: 20,
+                          )
                         : FilledButton(
                             onPressed: _voting
                                 ? null
                                 : () => _vote(_docInt(option['id'])),
-                            child: const Text('تصويت'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.royalBlue,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text(
+                              'تصويت',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                   ),
                 );
@@ -320,19 +629,33 @@ class _DoctorNewsDetailsPanelState
             ],
             if (related.length > 1) ...[
               const SizedBox(height: 18),
-              Text(
-                'الإشعارات المرتبطة (${related.length})',
-                style: const TextStyle(fontWeight: FontWeight.w900),
+              const Text(
+                'التحديثات والإشعارات المرتبطة بالخبر:',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontFamily: 'Cairo',
+                  fontSize: 13,
+                  color: AppColors.midnight,
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               ...related.map(
                 (notification) => Container(
                   margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: _cardDecoration(),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.slate100),
+                  ),
                   child: Text(
                     _docText(notification['message']),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      fontFamily: 'Cairo',
+                      color: AppColors.slate700,
+                    ),
                   ),
                 ),
               ),
@@ -371,7 +694,7 @@ class _DoctorNewsDetailsPanelState
       await showMoeenInfoDialog(
         context: context,
         title: 'تم التحميل',
-        message: 'تم حفظ المرفق في:\n${result.path}',
+        message: 'تم حفظ المرفق بنجاح في:\n${result.path}',
         icon: Icons.file_download_done_rounded,
         color: AppColors.success,
       );
@@ -425,45 +748,40 @@ class _DoctorNotificationsScreenState
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
               children: [
-                _DocHero(
-                  title: 'الإشعارات',
-                  subtitle: 'متابعة إشعارات النظام والتعليم عليها كمقروءة.',
-                  icon: Icons.notifications_rounded,
-                  trailing: unreadCount > 0
-                      ? TextButton(
-                          onPressed: _markAllRead,
-                          child: const Text('قراءة الكل'),
-                        )
-                      : IconButton.filledTonal(
-                          onPressed: _reload,
-                          icon: const Icon(Icons.refresh_rounded),
-                        ),
+                _NotificationsHeaderV3(
+                  unreadCount: unreadCount,
+                  onMarkAllRead: _markAllRead,
                 ),
                 const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
+                Row(
                   children: [
-                    _DocMetric(
-                      label: 'الإجمالي',
-                      value: notifications.length.toString(),
-                      color: AppColors.royalBlue,
-                      icon: Icons.notifications_rounded,
+                    Expanded(
+                      child: _DocMetric(
+                        label: 'إجمالي الإشعارات',
+                        value: notifications.length.toString(),
+                        color: AppColors.royalBlue,
+                        icon: Icons.notifications_rounded,
+                      ),
                     ),
-                    _DocMetric(
-                      label: 'غير مقروء',
-                      value: unreadCount.toString(),
-                      color: AppColors.warning,
-                      icon: Icons.mark_email_unread_rounded,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _DocMetric(
+                        label: 'غير مقروءة',
+                        value: unreadCount.toString(),
+                        color: unreadCount > 0
+                            ? AppColors.warning
+                            : AppColors.slate400,
+                        icon: Icons.mark_email_unread_rounded,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
                 if (notifications.isEmpty)
-                  const _DocEmpty('لا توجد إشعارات حالياً.')
+                  const _DocEmpty('لا توجد إشعارات واردة حالياً.')
                 else
                   ...notifications.map(
-                    (notification) => _DoctorNotificationCard(
+                    (notification) => _DoctorNotificationCardV3(
                       notification: notification,
                       onTap: () => _openNotification(notification),
                     ),
@@ -483,6 +801,7 @@ class _DoctorNotificationsScreenState
         await ref
             .read(staffRepositoryProvider)
             .post('/doctor/notifications/$id/read', const {});
+        ref.invalidate(staffAttentionCountsProvider);
         _reload();
       } catch (_) {
         // Showing details is more important than failing because read tracking failed.
@@ -491,10 +810,10 @@ class _DoctorNotificationsScreenState
     if (!mounted) return;
     await showMoeenBottomSheet<void>(
       context: context,
-      title: 'تفاصيل الإشعار',
+      title: 'تفاصيل الإشعار الوارد',
       icon: Icons.notifications_active_rounded,
       color: _notificationTypeColor(_docText(notification['type'])),
-      child: _NotificationDetailsPanel(notification: notification),
+      child: _NotificationDetailsPanelV3(notification: notification),
     );
   }
 
@@ -504,10 +823,11 @@ class _DoctorNotificationsScreenState
           .read(staffRepositoryProvider)
           .post('/doctor/notifications/mark-all-read', const {});
       if (!mounted) return;
+      ref.invalidate(staffAttentionCountsProvider);
       _reload();
       _docSnack(
         context,
-        'تم تعليم جميع الإشعارات كمقروءة.',
+        'تم تعليم جميع الإشعارات كمقروءة بنجاح.',
         color: AppColors.success,
       );
     } catch (error) {
@@ -516,8 +836,114 @@ class _DoctorNotificationsScreenState
   }
 }
 
-class _DoctorNotificationCard extends StatelessWidget {
-  const _DoctorNotificationCard({
+class _NotificationsHeaderV3 extends StatelessWidget {
+  const _NotificationsHeaderV3({
+    required this.unreadCount,
+    required this.onMarkAllRead,
+  });
+
+  final int unreadCount;
+  final VoidCallback onMarkAllRead;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.royalBlueDark, AppColors.royalBlue],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.royalBlue.withValues(alpha: 0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          PositionedDirectional(
+            end: -20,
+            top: -20,
+            child: Icon(
+              Icons.notifications_rounded,
+              size: 110,
+              color: Colors.white.withValues(alpha: 0.07),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'مركز الإشعارات والتنبيهات',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      unreadCount > 0
+                          ? 'لديك عدد $unreadCount إشعارات غير مقروءة تتطلب المتابعة.'
+                          : 'لا توجد إشعارات معلقة، حسابك محدّث بالكامل.',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (unreadCount > 0) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: onMarkAllRead,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: const Text(
+                      'قراءة الكل',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DoctorNotificationCardV3 extends StatelessWidget {
+  const _DoctorNotificationCardV3({
     required this.notification,
     required this.onTap,
   });
@@ -529,102 +955,129 @@ class _DoctorNotificationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final type = _docText(notification['type'], 'notification');
     final unread = notification['read_at'] == null;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: _cardDecoration().copyWith(
-          border: Border.all(
-            color: unread
-                ? _notificationTypeColor(type).withValues(alpha: 0.32)
-                : AppColors.slate100,
-          ),
+    final typeColor = _notificationTypeColor(type);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: unread ? typeColor.withValues(alpha: 0.02) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: unread
+              ? typeColor.withValues(alpha: 0.35)
+              : AppColors.slate100,
+          width: unread ? 1.5 : 1.0,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: _notificationTypeColor(type).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: unread ? 0.03 : 0.015),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: typeColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  _notificationTypeIcon(type),
+                  color: typeColor,
+                  size: 20,
+                ),
               ),
-              child: Icon(
-                _notificationTypeIcon(type),
-                color: _notificationTypeColor(type),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _docText(notification['title'], 'إشعار جديد'),
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _docText(notification['title'], 'إشعار جديد'),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.midnight,
+                              fontFamily: 'Cairo',
+                            ),
                           ),
                         ),
-                      ),
-                      if (unread)
-                        const Icon(
-                          Icons.fiber_manual_record_rounded,
-                          color: AppColors.warning,
-                          size: 14,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _docText(notification['message']),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.slate600,
-                      fontWeight: FontWeight.w700,
-                      height: 1.4,
+                        if (unread)
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: typeColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _DocPill(
-                        _notificationTypeLabel(type),
-                        _notificationTypeColor(type),
+                    const SizedBox(height: 6),
+                    Text(
+                      _docText(notification['message']),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.slate600,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                        fontFamily: 'Cairo',
+                        height: 1.45,
                       ),
-                      _DocPill(
-                        _docDate(notification['created_at']),
-                        AppColors.slate500,
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _DocPill(_notificationTypeLabel(type), typeColor),
+                        _DocPill(
+                          _docDate(notification['created_at']),
+                          AppColors.royalBlue,
+                          icon: Icons.schedule_rounded,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _NotificationDetailsPanel extends StatelessWidget {
-  const _NotificationDetailsPanel({required this.notification});
+class _NotificationDetailsPanelV3 extends StatelessWidget {
+  const _NotificationDetailsPanelV3({required this.notification});
 
   final _Json notification;
 
   @override
   Widget build(BuildContext context) {
     final type = _docText(notification['type'], 'notification');
+    final typeColor = _notificationTypeColor(type);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -632,36 +1085,81 @@ class _NotificationDetailsPanel extends StatelessWidget {
           children: [
             _DocPill(
               _notificationTypeLabel(type),
-              _notificationTypeColor(type),
+              typeColor,
+              icon: _notificationTypeIcon(type),
             ),
             const SizedBox(width: 8),
-            _DocPill(_docDate(notification['created_at']), AppColors.slate500),
+            _DocPill(
+              _docDate(notification['created_at']),
+              AppColors.royalBlue,
+              icon: Icons.schedule_rounded,
+            ),
           ],
         ),
         const SizedBox(height: 14),
         Text(
           _docText(notification['title'], 'إشعار جديد'),
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+            color: AppColors.midnight,
+            fontFamily: 'Cairo',
+          ),
         ),
         const SizedBox(height: 12),
-        Text(
-          _docText(notification['message']),
-          style: const TextStyle(
-            height: 1.6,
-            fontWeight: FontWeight.w700,
-            color: AppColors.midnight,
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.slate50,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.slate100),
+          ),
+          child: Text(
+            _docText(notification['message']),
+            style: const TextStyle(
+              height: 1.5,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.midnight,
+              fontFamily: 'Cairo',
+            ),
           ),
         ),
         if (_docText(notification['attachment_name']).isNotEmpty) ...[
-          const SizedBox(height: 16),
-          _DocPill(
-            _docText(notification['attachment_name']),
-            AppColors.royalBlue,
-            icon: Icons.attach_file_rounded,
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.slate200),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.attach_file_rounded,
+                  color: AppColors.royalBlue,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _docText(notification['attachment_name']),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      color: AppColors.midnight,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ],
     );
   }
 }
-

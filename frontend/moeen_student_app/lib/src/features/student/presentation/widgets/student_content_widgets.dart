@@ -1966,7 +1966,9 @@ class _NewsCard extends StatelessWidget {
               child: InkWell(
                 onTap: () async {
                   await onOpen?.call(item);
-                  if (context.mounted) _showNewsDetails(context, item);
+                  if (context.mounted) {
+                    context.push('/student/news/details', extra: item);
+                  }
                 },
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

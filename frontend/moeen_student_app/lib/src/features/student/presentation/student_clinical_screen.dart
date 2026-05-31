@@ -25,18 +25,14 @@ class StudentClinicalScreen extends ConsumerWidget {
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(_clinicalLogbookProvider),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 36),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
               children: [
                 _ClinicalHeader(
                   title: 'مسارك السريري',
                   subtitle:
                       'إدارة السجل العملي، مهام الإنجاز، تقييمات الدكتور، الاختبارات التدريبية والحالات النادرة من مكان واحد.',
                   icon: Icons.local_hospital_rounded,
-                  colors: const [
-                    AppColors.royalBlueDark,
-                    AppColors.royalBlue,
-                    AppColors.teal,
-                  ],
+                  colors: const [AppColors.teal, Color(0xFF0D5E57)],
                 ),
                 const SizedBox(height: 18),
                 _ClinicalStatsRow(
@@ -78,6 +74,13 @@ class StudentClinicalScreen extends ConsumerWidget {
                       AppColors.royalBlue,
                     ),
                     _ClinicalActionItem(
+                      'التكليفات السريرية',
+                      'كل تكليفات الحالات ومحاولاتك والباركود في مكان واحد',
+                      Icons.assignment_turned_in_rounded,
+                      StudentClinicalAssignmentsScreen.route,
+                      AppColors.teal,
+                    ),
+                    _ClinicalActionItem(
                       'تقييماتي',
                       'نتائج تقييمات الدكتور ومهاراتك',
                       Icons.radar_rounded,
@@ -101,10 +104,16 @@ class StudentClinicalScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 22),
-                _ClinicalSectionTitle('آخر السجلات', Icons.history_rounded),
+                _ClinicalSectionTitle(
+                  'آخر السجلات',
+                  Icons.history_rounded,
+                ),
                 const SizedBox(height: 10),
                 if (logs.isEmpty)
-                  const EmptyState(message: 'لا توجد سجلات عملية حتى الآن.')
+                  const EmptyState(
+                    message:
+                        'لا توجد سجلات عملية حتى الآن.',
+                  )
                 else
                   ...logs
                       .take(3)
@@ -116,7 +125,9 @@ class StudentClinicalScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10),
                 if (assignments.isEmpty)
-                  const EmptyState(message: 'لا توجد مهام سريرية حالية.')
+                  const EmptyState(
+                    message: 'لا توجد مهام سريرية حالية.',
+                  )
                 else
                   ...assignments
                       .take(3)
@@ -130,13 +141,22 @@ class StudentClinicalScreen extends ConsumerWidget {
   }
 }
 
-class StudentClinicalLogbookScreen extends ConsumerWidget {
+class StudentClinicalLogbookScreen extends ConsumerStatefulWidget {
   const StudentClinicalLogbookScreen({super.key});
 
   static const route = '/student/clinical/logbook';
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StudentClinicalLogbookScreen> createState() =>
+      _StudentClinicalLogbookScreenState();
+}
+
+class _StudentClinicalLogbookScreenState
+    extends ConsumerState<StudentClinicalLogbookScreen> {
+  String _selectedFilter = 'all'; // 'all', 'confirmed', 'pending', 'rejected'
+
+  @override
+  Widget build(BuildContext context) {
     final canAccess = _canAccessClinical(ref);
     if (!canAccess) {
       return const _ClinicalForbiddenShell();
@@ -147,35 +167,123 @@ class StudentClinicalLogbookScreen extends ConsumerWidget {
       title: 'السجل العملي',
       parentRoute: StudentClinicalScreen.route,
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showClinicalLogSheet(context, ref),
+        onPressed: () async {
+          final changed = await context.push<bool>(
+            StudentClinicalLogFormScreen.path(),
+          );
+          if (changed == true) {
+            ref.invalidate(_clinicalLogbookProvider);
+          }
+        },
         icon: const Icon(Icons.add_rounded),
         label: const Text('تسجيل اليوم'),
+        backgroundColor: AppColors.teal,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: AppColors.teal.withValues(alpha: 0.1),
+            width: 1.5,
+          ),
+        ),
+        extendedTextStyle: const TextStyle(
+          fontFamily: 'Cairo',
+          fontWeight: FontWeight.w900,
+          fontSize: 14,
+        ),
       ),
       child: _AsyncBody(
         state: state,
         onRetry: () => ref.invalidate(_clinicalLogbookProvider),
         builder: (data) {
-          final logs = asList(data['logs']);
+          final rawLogs = asList(data['logs']);
           final assignments = asList(data['assignments']);
+
+          // Filter logs locally
+          final filteredLogs = rawLogs.where((raw) {
+            final log = asMap(raw);
+            final status = text(log, 'status', fallback: 'pending');
+            if (_selectedFilter == 'all') return true;
+            if (_selectedFilter == 'confirmed') return status == 'confirmed';
+            if (_selectedFilter == 'pending')
+              return status == 'pending' || status == 'submitted_for_review';
+            if (_selectedFilter == 'rejected') return status == 'rejected';
+            return true;
+          }).toList();
+
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(_clinicalLogbookProvider),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 96),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
               children: [
                 _ClinicalHeader(
                   title: 'سجل اليوم العملي',
                   subtitle:
                       'أدخل ما تم تنفيذه في اليوم، ثم اعرض QR للدكتور حتى يعتمد العناصر الفعلية والتشخيص.',
                   icon: Icons.qr_code_2_rounded,
-                  colors: const [AppColors.royalBlue, AppColors.teal],
+                  colors: const [AppColors.teal, Color(0xFF0D5E57)],
                 ),
                 const SizedBox(height: 20),
-                _ClinicalSectionTitle('سجلاتك اليومية', Icons.event_available),
+
+                // Horizontal Filter Chips
+                SizedBox(
+                  height: 40,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      _buildFilterChip('all', 'الكل', rawLogs.length),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'confirmed',
+                        'معتمدة',
+                        rawLogs
+                            .where(
+                              (l) => text(asMap(l), 'status') == 'confirmed',
+                            )
+                            .length,
+                        AppColors.success,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'pending',
+                        'معلقة',
+                        rawLogs.where((l) {
+                          final s = text(asMap(l), 'status');
+                          return s == 'pending' || s == 'submitted_for_review';
+                        }).length,
+                        AppColors.warning,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'rejected',
+                        'مرفوضة',
+                        rawLogs
+                            .where(
+                              (l) => text(asMap(l), 'status') == 'rejected',
+                            )
+                            .length,
+                        AppColors.danger,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                _ClinicalSectionTitle(
+                  'سجلاتك اليومية',
+                  Icons.event_available,
+                ),
                 const SizedBox(height: 10),
-                if (logs.isEmpty)
-                  const EmptyState(message: 'لا توجد سجلات عملية.')
+                if (filteredLogs.isEmpty)
+                  const EmptyState(
+                    message:
+                        'لا توجد سجلات عملية تطابق خيار التصفية.',
+                  )
                 else
-                  ...logs.map((raw) => _ClinicalLogCard(log: asMap(raw))),
+                  ...filteredLogs.map(
+                    (raw) => _ClinicalLogCard(log: asMap(raw)),
+                  ),
                 const SizedBox(height: 22),
                 _ClinicalSectionTitle(
                   'مهام الإنجاز السريري',
@@ -183,7 +291,9 @@ class StudentClinicalLogbookScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10),
                 if (assignments.isEmpty)
-                  const EmptyState(message: 'لا توجد مهام سريرية حالية.')
+                  const EmptyState(
+                    message: 'لا توجد مهام سريرية حالية.',
+                  )
                 else
                   ...assignments.map(
                     (raw) => _ClinicalAssignmentCard(item: asMap(raw)),
@@ -195,15 +305,1353 @@ class StudentClinicalLogbookScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _buildFilterChip(
+    String value,
+    String label,
+    int count, [
+    Color? activeColor,
+  ]) {
+    final selected = _selectedFilter == value;
+    final color = activeColor ?? AppColors.teal;
+    return InkWell(
+      onTap: () => setState(() => _selectedFilter = value),
+      borderRadius: BorderRadius.circular(99),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.12) : Colors.white,
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(
+            color: selected ? color : AppColors.slate200,
+            width: selected ? 1.4 : 1,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              Icon(Icons.check_rounded, color: color, size: 14),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              '$label ($count)',
+              style: TextStyle(
+                color: selected ? color : AppColors.slate600,
+                fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                fontSize: 12.5,
+                fontFamily: 'Cairo',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class StudentClinicalEvaluationsScreen extends ConsumerWidget {
-  const StudentClinicalEvaluationsScreen({super.key});
+class StudentClinicalLogFormScreen extends ConsumerStatefulWidget {
+  const StudentClinicalLogFormScreen({super.key, this.assignmentId});
 
-  static const route = '/student/clinical/evaluations';
+  static const route = '/student/clinical/logbook/create';
+
+  final int? assignmentId;
+
+  static String path({int? assignmentId}) {
+    if (assignmentId == null || assignmentId <= 0) return route;
+    return '$route?assignmentId=$assignmentId';
+  }
+
+  @override
+  ConsumerState<StudentClinicalLogFormScreen> createState() =>
+      _StudentClinicalLogFormScreenState();
+}
+
+class _StudentClinicalLogFormScreenState
+    extends ConsumerState<StudentClinicalLogFormScreen> {
+  final _notesController = TextEditingController();
+  final _activitySearchController = TextEditingController();
+  final List<TextEditingController> _roundControllers = [];
+  final Set<int> _historyIds = {};
+  final Set<int> _examIds = {};
+  final Map<String, String> _errors = {};
+
+  Timer? _draftTimer;
+  int _step = 0;
+  int? _centerId;
+  int? _departmentId;
+  int? _doctorId;
+  bool _initialized = false;
+  bool _saving = false;
+  String _activitySearch = '';
+
+  String get _draftKey {
+    final suffix = widget.assignmentId == null
+        ? 'manual'
+        : 'assignment.${widget.assignmentId}';
+    return 'student.clinical.logbook.create.$suffix';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _notesController.addListener(_scheduleDraftSave);
+    _activitySearchController.addListener(() {
+      setState(() => _activitySearch = _activitySearchController.text.trim());
+    });
+  }
+
+  @override
+  void dispose() {
+    _draftTimer?.cancel();
+    _notesController.dispose();
+    _activitySearchController.dispose();
+    for (final controller in _roundControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canAccess = _canAccessClinical(ref);
+    if (!canAccess) {
+      return const _ClinicalForbiddenShell();
+    }
+    final state = ref.watch(_clinicalLogbookProvider);
+    return StudentShell(
+      currentIndex: 34,
+      title: 'تسجيل اليوم العملي',
+      parentRoute: StudentClinicalLogbookScreen.route,
+      child: _AsyncBody(
+        state: state,
+        onRetry: () => ref.invalidate(_clinicalLogbookProvider),
+        builder: (data) {
+          _ensureInitialized(data);
+          final assignment = _assignmentFromData(data);
+          final options = asMap(data['form_options']);
+          final centers = asList(options['training_centers']);
+          final departments = asList(options['departments']);
+          final bodies = asList(options['body_systems']).map(asMap).toList();
+          final doctors = asList(options['doctors']);
+          final assignmentMissing =
+              widget.assignmentId != null && assignment.isEmpty;
+
+          if (assignmentMissing) {
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 96),
+              children: [
+                const EmptyState(
+                  message:
+                      'لم يتم العثور على التكليف السريري المطلوب.',
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () => context.pop(false),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  label: const Text('العودة'),
+                ),
+              ],
+            );
+          }
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
+            children: [
+              _ClinicalHeader(
+                title: widget.assignmentId == null
+                    ? 'تسجيل يوم عملي جديد'
+                    : 'تنفيذ تكليف سريري',
+                subtitle:
+                    'سجل المكان والأنشطة وحالات المرور، ثم راجع البيانات قبل الحفظ وعرض الباركود للدكتور.',
+                icon: Icons.fact_check_rounded,
+                colors: const [AppColors.teal, Color(0xFF0D5E57)],
+              ),
+              const SizedBox(height: 14),
+              _ClinicalLogStepIndicator(step: _step),
+              const SizedBox(height: 16),
+              if (assignment.isNotEmpty) ...[
+                _ClinicalAssignmentAttemptBanner(assignment: assignment),
+                const SizedBox(height: 14),
+              ],
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: KeyedSubtree(
+                  key: ValueKey(_step),
+                  child: switch (_step) {
+                    0 => _buildLocationStep(
+                      assignment: assignment,
+                      centers: centers,
+                      departments: departments,
+                      doctors: doctors,
+                    ),
+                    1 => _buildActivitiesStep(bodies),
+                    2 => _buildRoundsStep(),
+                    _ => _buildReviewStep(
+                      assignment: assignment,
+                      centers: centers,
+                      departments: departments,
+                      doctors: doctors,
+                      bodies: bodies,
+                    ),
+                  },
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildFooterActions(
+                data: data,
+                assignment: assignment,
+                centers: centers,
+                departments: departments,
+                doctors: doctors,
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _ensureInitialized(Map<String, dynamic> data) {
+    if (_initialized) return;
+    _initialized = true;
+    final assignment = _assignmentFromData(data);
+    final clinicalCase = asMap(assignment['clinical_case']);
+    _centerId = _idOrNull(asMap(clinicalCase['training_center']));
+    _departmentId = _idOrNull(asMap(clinicalCase['clinical_department']));
+    _doctorId = _idOrNull(asMap(assignment['assigner']));
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreDraft());
+  }
+
+  Map<String, dynamic> _assignmentFromData(Map<String, dynamic> data) {
+    final id = widget.assignmentId;
+    if (id == null || id <= 0) return const {};
+    for (final raw in asList(data['assignments'])) {
+      final item = asMap(raw);
+      if (number(item, 'id').toInt() == id) return item;
+    }
+    return const {};
+  }
+
+  int? _idOrNull(Map<String, dynamic> item) {
+    final id = number(item, 'id').toInt();
+    return id > 0 ? id : null;
+  }
+
+  Widget _buildLocationStep({
+    required Map<String, dynamic> assignment,
+    required List<dynamic> centers,
+    required List<dynamic> departments,
+    required List<dynamic> doctors,
+  }) {
+    final fixed = assignment.isNotEmpty;
+    return _ClinicalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ClinicalFormTitle(
+            icon: Icons.location_on_rounded,
+            title: 'بيانات المكان والدكتور',
+            subtitle: fixed
+                ? 'تم تعبئة هذه البيانات من التكليف ولا يمكن تعديلها.'
+                : 'اختر مكان التدريب والدكتور الذي سيعتمد السجل.',
+          ),
+          const SizedBox(height: 16),
+          _ClinicalDropdown(
+            label: 'مركز التدريب',
+            value: _centerId,
+            items: centers,
+            onChanged: fixed ? null : (value) => _setLocation(center: value),
+          ),
+          _InlineFieldError(_errors['center']),
+          const SizedBox(height: 12),
+          _ClinicalDropdown(
+            label: 'القسم',
+            value: _departmentId,
+            items: departments,
+            onChanged: fixed
+                ? null
+                : (value) => _setLocation(department: value),
+          ),
+          _InlineFieldError(_errors['department']),
+          const SizedBox(height: 12),
+          _ClinicalDropdown(
+            label: 'الدكتور',
+            value: _doctorId,
+            items: doctors,
+            onChanged: fixed ? null : (value) => _setLocation(doctor: value),
+          ),
+          _InlineFieldError(_errors['doctor']),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivitiesStep(List<Map<String, dynamic>> bodies) {
+    final filtered = _filteredBodies(bodies);
+    return Column(
+      children: [
+        _ClinicalCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _ClinicalFormTitle(
+                icon: Icons.checklist_rounded,
+                title: 'الأنشطة المنفذة',
+                subtitle:
+                    'اختر القصص المرضية والفحوصات السريرية التي أنجزتها اليوم.',
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _activitySearchController,
+                style: const TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'بحث داخل أنظمة الجسم',
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                    color: AppColors.teal,
+                  ),
+                  filled: true,
+                  fillColor: AppColors.slate50,
+                  floatingLabelStyle: const TextStyle(
+                    fontFamily: 'Cairo',
+                    color: AppColors.teal,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  labelStyle: const TextStyle(
+                    fontFamily: 'Cairo',
+                    color: AppColors.slate500,
+                    fontSize: 12,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: AppColors.slate200),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: AppColors.teal,
+                      width: 1.6,
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _ClinicalCounterChip(
+                    label: 'قصص مرضية',
+                    value: _historyIds.length,
+                    color: AppColors.royalBlue,
+                  ),
+                  _ClinicalCounterChip(
+                    label: 'فحوصات سريرية',
+                    value: _examIds.length,
+                    color: AppColors.teal,
+                  ),
+                  _ClinicalCounterChip(
+                    label: 'حالات مرور',
+                    value: _activeRounds.length,
+                    color: AppColors.goldDeep,
+                  ),
+                ],
+              ),
+              _InlineFieldError(_errors['activities']),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _ActivitySelectionPanel(
+          title: 'القصص المرضية',
+          icon: Icons.history_edu_rounded,
+          bodies: filtered,
+          selected: _historyIds,
+          color: AppColors.royalBlue,
+          onToggle: _toggleHistory,
+        ),
+        const SizedBox(height: 12),
+        _ActivitySelectionPanel(
+          title: 'الفحوصات السريرية',
+          icon: Icons.health_and_safety_rounded,
+          bodies: filtered,
+          selected: _examIds,
+          color: AppColors.teal,
+          onToggle: _toggleExam,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRoundsStep() {
+    return _ClinicalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _ClinicalFormTitle(
+            icon: Icons.groups_rounded,
+            title: 'حالات المرور والملاحظات',
+            subtitle:
+                'أضف كل حالة مرور في حقل مستقل بدل الكتابة بفواصل، ثم اكتب أي ملاحظات مهمة.',
+          ),
+          const SizedBox(height: 14),
+          if (_roundControllers.isEmpty)
+            const EmptyState(
+              message: 'لم تتم إضافة حالات مرور بعد.',
+            )
+          else
+            ..._roundControllers.asMap().entries.map((entry) {
+              final index = entry.key;
+              final controller = entry.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        onChanged: (_) => _scheduleDraftSave(),
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'حالة مرور ${index + 1}',
+                          prefixIcon: const Icon(
+                            Icons.person_search_rounded,
+                            color: AppColors.teal,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.slate50,
+                          floatingLabelStyle: const TextStyle(
+                            fontFamily: 'Cairo',
+                            color: AppColors.teal,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          labelStyle: const TextStyle(
+                            fontFamily: 'Cairo',
+                            color: AppColors.slate500,
+                            fontSize: 12,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: AppColors.slate200,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: AppColors.teal,
+                              width: 1.6,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      onPressed: () => _removeRound(index),
+                      icon: const Icon(Icons.close_rounded),
+                      color: AppColors.danger,
+                    ),
+                  ],
+                ),
+              );
+            }),
+          const SizedBox(height: 4),
+          OutlinedButton.icon(
+            onPressed: _addRound,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('إضافة حالة مرور'),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _notesController,
+            minLines: 3,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              labelText: 'ملاحظات المرور',
+              prefixIcon: Icon(Icons.notes_rounded),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewStep({
+    required Map<String, dynamic> assignment,
+    required List<dynamic> centers,
+    required List<dynamic> departments,
+    required List<dynamic> doctors,
+    required List<Map<String, dynamic>> bodies,
+  }) {
+    final historyNames = _namesForIds(bodies, _historyIds);
+    final examNames = _namesForIds(bodies, _examIds);
+    return Column(
+      children: [
+        _ClinicalCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _ClinicalFormTitle(
+                icon: Icons.fact_check_rounded,
+                title: 'مراجعة قبل الحفظ',
+                subtitle:
+                    'تأكد من البيانات. بعد الحفظ سيظهر سجل اليوم والباركود مباشرة.',
+              ),
+              const SizedBox(height: 14),
+              _ClinicalDetailRow(
+                'مركز التدريب',
+                _optionName(centers, _centerId),
+              ),
+              _ClinicalDetailRow(
+                'القسم',
+                _optionName(departments, _departmentId),
+              ),
+              _ClinicalDetailRow(
+                'الدكتور',
+                _optionName(doctors, _doctorId),
+              ),
+              if (assignment.isNotEmpty)
+                _ClinicalDetailRow(
+                  'التكليف',
+                  text(
+                    asMap(assignment['clinical_case']),
+                    'patient_name',
+                    fallback: text(
+                      assignment,
+                      'task_type_label',
+                      fallback: '-',
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _ReviewListCard(
+          title: 'القصص المرضية',
+          icon: Icons.history_edu_rounded,
+          values: historyNames,
+        ),
+        const SizedBox(height: 12),
+        _ReviewListCard(
+          title: 'الفحوصات السريرية',
+          icon: Icons.health_and_safety_rounded,
+          values: examNames,
+        ),
+        const SizedBox(height: 12),
+        _ReviewListCard(
+          title: 'حالات المرور',
+          icon: Icons.groups_rounded,
+          values: _activeRounds,
+        ),
+        if (_notesController.text.trim().isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _ClinicalCard(
+            child: _ClinicalDetailRow(
+              'ملاحظات المرور',
+              _notesController.text.trim(),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildFooterActions({
+    required Map<String, dynamic> data,
+    required Map<String, dynamic> assignment,
+    required List<dynamic> centers,
+    required List<dynamic> departments,
+    required List<dynamic> doctors,
+  }) {
+    return Row(
+      children: [
+        if (_step > 0)
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _saving ? null : () => setState(() => _step--),
+              icon: const Icon(Icons.arrow_back_rounded, size: 18),
+              label: const Text(
+                'السابق',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                side: const BorderSide(color: AppColors.slate300),
+                foregroundColor: AppColors.slate600,
+              ),
+            ),
+          ),
+        if (_step > 0) const SizedBox(width: 10),
+        Expanded(
+          flex: 2,
+          child: FilledButton.icon(
+            onPressed: _saving
+                ? null
+                : _step < 3
+                ? _goNext
+                : () => _save(data, assignment),
+            icon: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Icon(
+                    _step < 3
+                        ? Icons.arrow_forward_rounded
+                        : Icons.save_rounded,
+                    size: 18,
+                  ),
+            label: Text(
+              _step < 3 ? 'التالي' : 'حفظ وعرض الباركود',
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+              ),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.teal,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 2,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Map<String, dynamic>> _filteredBodies(
+    List<Map<String, dynamic>> bodies,
+  ) {
+    final query = _activitySearch.toLowerCase();
+    if (query.isEmpty) return bodies;
+    return bodies
+        .where((body) => text(body, 'name').toLowerCase().contains(query))
+        .toList();
+  }
+
+  List<String> _namesForIds(List<Map<String, dynamic>> bodies, Set<int> ids) {
+    return bodies
+        .where((body) => ids.contains(number(body, 'id').toInt()))
+        .map((body) => text(body, 'name'))
+        .where((name) => name.isNotEmpty)
+        .toList();
+  }
+
+  List<String> get _activeRounds => _roundControllers
+      .map((controller) => controller.text.trim())
+      .where((value) => value.isNotEmpty)
+      .toList();
+
+  String _optionName(List<dynamic> items, int? id) {
+    if (id == null) return '-';
+    for (final raw in items) {
+      final item = asMap(raw);
+      if (number(item, 'id').toInt() == id)
+        return text(item, 'name', fallback: '-');
+    }
+    return '-';
+  }
+
+  void _setLocation({int? center, int? department, int? doctor}) {
+    setState(() {
+      if (center != null) _centerId = center;
+      if (department != null) _departmentId = department;
+      if (doctor != null) _doctorId = doctor;
+      _errors.remove('center');
+      _errors.remove('department');
+      _errors.remove('doctor');
+    });
+    _scheduleDraftSave();
+  }
+
+  void _toggleHistory(int id) {
+    setState(() {
+      _historyIds.contains(id) ? _historyIds.remove(id) : _historyIds.add(id);
+      _errors.remove('activities');
+    });
+    _scheduleDraftSave();
+  }
+
+  void _toggleExam(int id) {
+    setState(() {
+      _examIds.contains(id) ? _examIds.remove(id) : _examIds.add(id);
+      _errors.remove('activities');
+    });
+    _scheduleDraftSave();
+  }
+
+  void _addRound([String value = '']) {
+    final controller = TextEditingController(text: value);
+    controller.addListener(_scheduleDraftSave);
+    setState(() {
+      _roundControllers.add(controller);
+      _errors.remove('activities');
+    });
+    _scheduleDraftSave();
+  }
+
+  void _removeRound(int index) {
+    final controller = _roundControllers.removeAt(index);
+    controller.dispose();
+    setState(() {});
+    _scheduleDraftSave();
+  }
+
+  void _goNext() {
+    if (_step == 0 && !_validateLocation()) return;
+    if (_step == 1 && !_validateActivities()) return;
+    setState(() => _step++);
+  }
+
+  bool _validateLocation() {
+    final nextErrors = <String, String>{};
+    if (_centerId == null)
+      nextErrors['center'] = 'اختر مركز التدريب.';
+    if (_departmentId == null)
+      nextErrors['department'] = 'اختر القسم.';
+    if (_doctorId == null) nextErrors['doctor'] = 'اختر الدكتور.';
+    setState(() {
+      _errors
+        ..remove('center')
+        ..remove('department')
+        ..remove('doctor')
+        ..addAll(nextErrors);
+    });
+    return nextErrors.isEmpty;
+  }
+
+  bool _validateActivities() {
+    final ok =
+        _historyIds.isNotEmpty ||
+        _examIds.isNotEmpty ||
+        _activeRounds.isNotEmpty;
+    setState(() {
+      if (ok) {
+        _errors.remove('activities');
+      } else {
+        _errors['activities'] =
+            'اختر نشاطًا واحدًا على الأقل أو أضف حالة مرور.';
+      }
+    });
+    return ok;
+  }
+
+  Future<void> _save(
+    Map<String, dynamic> data,
+    Map<String, dynamic> assignment,
+  ) async {
+    if (!_validateLocation() || !_validateActivities()) return;
+    final isOnline = await ref.read(connectivityServiceProvider).isOnline();
+    if (!isOnline) {
+      if (!mounted) return;
+      await showMoeenInfoDialog(
+        context: context,
+        title: 'لا يوجد اتصال بالإنترنت',
+        message:
+            'يرجى الاتصال بالإنترنت لحفظ سجل اليوم العملي.',
+        icon: Icons.wifi_off_rounded,
+        color: AppColors.danger,
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    final rounds = _activeRounds.map((value) => {'case_name': value}).toList();
+    final payload = {
+      if (widget.assignmentId != null)
+        'case_assignment_id': widget.assignmentId,
+      'training_center_id': _centerId,
+      'department_id': _departmentId,
+      'doctor_id': _doctorId,
+      'histories': _historyIds.map((id) => {'body_system_id': id}).toList(),
+      'exams': _examIds.map((id) => {'body_system_id': id}).toList(),
+      'did_round': rounds.isNotEmpty,
+      'rounds': rounds,
+      'round_notes': _notesController.text.trim(),
+    };
+
+    try {
+      final saved = await ref
+          .read(studentContentRepositoryProvider)
+          .createClinicalLog(payload);
+      await _clearDraft();
+      ref.invalidate(_clinicalLogbookProvider);
+      if (!mounted) return;
+      await showMoeenBottomSheet<void>(
+        context: context,
+        title: 'تفاصيل السجل العملي',
+        icon: Icons.qr_code_2_rounded,
+        color: AppColors.royalBlue,
+        child: _ClinicalLogDetailsPanel(initialLog: saved),
+      );
+      if (mounted) context.pop(true);
+    } on ApiException catch (error) {
+      if (mounted) {
+        await showMoeenInfoDialog(
+          context: context,
+          title: 'تعذر حفظ السجل',
+          message: error.message,
+          icon: error.isOffline
+              ? Icons.wifi_off_rounded
+              : Icons.error_outline_rounded,
+          color: AppColors.danger,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        await showMoeenInfoDialog(
+          context: context,
+          title: 'تعذر حفظ السجل',
+          message: 'حدث خطأ غير متوقع. حاول مرة أخرى.',
+          icon: Icons.error_outline_rounded,
+          color: AppColors.danger,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _scheduleDraftSave() {
+    if (!_initialized || _saving) return;
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 450), _saveDraft);
+  }
+
+  Future<void> _restoreDraft() async {
+    try {
+      final raw = await ref.read(secureStorageProvider).read(key: _draftKey);
+      if (raw == null || raw.isEmpty || !mounted) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return;
+      setState(() {
+        if (widget.assignmentId == null) {
+          _centerId = decoded['center_id'] as int? ?? _centerId;
+          _departmentId = decoded['department_id'] as int? ?? _departmentId;
+          _doctorId = decoded['doctor_id'] as int? ?? _doctorId;
+        }
+        _historyIds
+          ..clear()
+          ..addAll(
+            asList(decoded['histories'])
+                .map((value) => int.tryParse(value.toString()) ?? 0)
+                .where((id) => id > 0),
+          );
+        _examIds
+          ..clear()
+          ..addAll(
+            asList(decoded['exams'])
+                .map((value) => int.tryParse(value.toString()) ?? 0)
+                .where((id) => id > 0),
+          );
+        for (final controller in _roundControllers) {
+          controller.dispose();
+        }
+        _roundControllers.clear();
+        for (final value in asList(decoded['rounds'])) {
+          final text = value.toString().trim();
+          if (text.isNotEmpty)
+            _roundControllers.add(
+              TextEditingController(text: text)
+                ..addListener(_scheduleDraftSave),
+            );
+        }
+        _notesController.text = decoded['notes']?.toString() ?? '';
+      });
+    } catch (_) {
+      // A broken draft should never block the student from creating a log.
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    final payload = {
+      'center_id': _centerId,
+      'department_id': _departmentId,
+      'doctor_id': _doctorId,
+      'histories': _historyIds.toList(),
+      'exams': _examIds.toList(),
+      'rounds': _activeRounds,
+      'notes': _notesController.text,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    await ref
+        .read(secureStorageProvider)
+        .write(key: _draftKey, value: jsonEncode(payload));
+  }
+
+  Future<void> _clearDraft() {
+    _draftTimer?.cancel();
+    return ref.read(secureStorageProvider).delete(key: _draftKey);
+  }
+}
+
+class _ClinicalLogStepIndicator extends StatelessWidget {
+  const _ClinicalLogStepIndicator({required this.step});
+
+  final int step;
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = const [
+      ('المكان', Icons.location_on_rounded),
+      ('الأنشطة', Icons.checklist_rounded),
+      ('المرور', Icons.groups_rounded),
+      ('المراجعة', Icons.fact_check_rounded),
+    ];
+    return Row(
+      children: steps.asMap().entries.map((entry) {
+        final index = entry.key;
+        final item = entry.value;
+        final active = index == step;
+        final done = index < step;
+        return Expanded(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            margin: EdgeInsetsDirectional.only(
+              end: index == steps.length - 1 ? 0 : 6,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            decoration: BoxDecoration(
+              color: active || done
+                  ? AppColors.teal.withValues(alpha: 0.1)
+                  : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: active || done ? AppColors.teal : AppColors.slate200,
+              ),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  done ? Icons.check_circle_rounded : item.$2,
+                  size: 18,
+                  color: active || done ? AppColors.teal : AppColors.slate400,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.$1,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: 'Cairo',
+                    color: active || done ? AppColors.teal : AppColors.slate500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _ClinicalFormTitle extends StatelessWidget {
+  const _ClinicalFormTitle({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _ClinicalIconBubble(icon, AppColors.teal),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: AppColors.midnight,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: AppColors.slate600,
+                  fontWeight: FontWeight.w700,
+                  height: 1.5,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InlineFieldError extends StatelessWidget {
+  const _InlineFieldError(this.message);
+
+  final String? message;
+
+  @override
+  Widget build(BuildContext context) {
+    if (message == null || message!.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Text(
+        message!,
+        style: const TextStyle(
+          color: AppColors.danger,
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+          fontFamily: 'Cairo',
+        ),
+      ),
+    );
+  }
+}
+
+class _ClinicalCounterChip extends StatelessWidget {
+  const _ClinicalCounterChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Text(
+        '$label: $value',
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+          fontFamily: 'Cairo',
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivitySelectionPanel extends StatelessWidget {
+  const _ActivitySelectionPanel({
+    required this.title,
+    required this.icon,
+    required this.bodies,
+    required this.selected,
+    required this.color,
+    required this.onToggle,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<Map<String, dynamic>> bodies;
+  final Set<int> selected;
+  final Color color;
+  final ValueChanged<int> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ClinicalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.midnight,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              _ClinicalCounterChip(
+                label: 'المحدد',
+                value: selected.length,
+                color: color,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (bodies.isEmpty)
+            const EmptyState(
+              message: 'لا توجد نتائج مطابقة للبحث.',
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: bodies.map((item) {
+                final id = number(item, 'id').toInt();
+                final active = selected.contains(id);
+                return FilterChip(
+                  selected: active,
+                  showCheckmark: true,
+                  label: Text(text(item, 'name')),
+                  onSelected: (_) => onToggle(id),
+                  selectedColor: color.withValues(alpha: 0.14),
+                  checkmarkColor: color,
+                  side: BorderSide(color: active ? color : AppColors.slate200),
+                  labelStyle: TextStyle(
+                    color: active ? color : AppColors.slate700,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Cairo',
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewListCard extends StatelessWidget {
+  const _ReviewListCard({
+    required this.title,
+    required this.icon,
+    required this.values,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<String> values;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ClinicalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ClinicalSectionTitle('$title (${values.length})', icon),
+          const SizedBox(height: 10),
+          if (values.isEmpty)
+            const Text(
+              'لا توجد عناصر.',
+              style: TextStyle(
+                color: AppColors.slate500,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          else
+            ...values.map(
+              (value) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      color: AppColors.success,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        value,
+                        style: const TextStyle(
+                          color: AppColors.slate800,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class StudentClinicalAssignmentsScreen extends ConsumerWidget {
+  const StudentClinicalAssignmentsScreen({super.key});
+
+  static const route = '/student/clinical/assignments';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final canAccess = _canAccessClinical(ref);
+    if (!canAccess) {
+      return const _ClinicalForbiddenShell();
+    }
+    final state = ref.watch(_clinicalLogbookProvider);
+    return StudentShell(
+      currentIndex: 34,
+      title: 'التكليفات السريرية',
+      parentRoute: StudentClinicalScreen.route,
+      child: _AsyncBody(
+        state: state,
+        onRetry: () => ref.invalidate(_clinicalLogbookProvider),
+        builder: (data) {
+          final assignments = asList(data['assignments']).map(asMap).toList();
+          final pending = assignments
+              .where((item) => text(item, 'status') != 'approved')
+              .length;
+          final approved = assignments
+              .where((item) => text(item, 'status') == 'approved')
+              .length;
+          return RefreshIndicator(
+            onRefresh: () async => ref.invalidate(_clinicalLogbookProvider),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
+              children: [
+                _ClinicalHeader(
+                  title: 'تكليفات الحالات السريرية',
+                  subtitle:
+                      'راجع التكليف، نفذ المحاولة العملية، ثم اعرض الباركود للدكتور للاعتماد.',
+                  icon: Icons.assignment_turned_in_rounded,
+                  colors: const [AppColors.teal, Color(0xFF0D5E57)],
+                ),
+                const SizedBox(height: 18),
+                _ClinicalStatsRow(
+                  items: [
+                    _ClinicalStatItem(
+                      'كل التكليفات',
+                      '${assignments.length}',
+                      Icons.assignment_rounded,
+                      AppColors.royalBlue,
+                    ),
+                    _ClinicalStatItem(
+                      'تحتاج متابعة',
+                      '$pending',
+                      Icons.pending_actions_rounded,
+                      AppColors.warning,
+                    ),
+                    _ClinicalStatItem(
+                      'معتمدة',
+                      '$approved',
+                      Icons.verified_rounded,
+                      AppColors.success,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                if (assignments.isEmpty)
+                  const EmptyState(
+                    message:
+                        'لا توجد تكليفات سريرية حاليًا.',
+                  )
+                else
+                  ...assignments.map(
+                    (item) => _ClinicalAssignmentCard(item: item),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class StudentClinicalEvaluationsScreen extends ConsumerStatefulWidget {
+  const StudentClinicalEvaluationsScreen({super.key});
+
+  static const route = '/student/clinical/evaluations';
+  static String detailsPath(int id) => '/student/clinical/evaluations/$id';
+
+  @override
+  ConsumerState<StudentClinicalEvaluationsScreen> createState() =>
+      _StudentClinicalEvaluationsScreenState();
+}
+
+class _StudentClinicalEvaluationsScreenState
+    extends ConsumerState<StudentClinicalEvaluationsScreen> {
+  final _searchController = TextEditingController();
+  String _query = '';
+  String _grade = 'all';
+  String _doctor = 'all';
+  String _sort = 'latest';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() => _query = _searchController.text.trim().toLowerCase());
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final canAccess = _canAccessClinical(ref);
     if (!canAccess) {
       return const _ClinicalForbiddenShell();
@@ -218,18 +1666,23 @@ class StudentClinicalEvaluationsScreen extends ConsumerWidget {
         onRetry: () => ref.invalidate(_clinicalEvaluationsProvider),
         builder: (data) {
           final stats = asMap(data['stats']);
-          final radar = asList(data['radar_chart']);
-          final evaluations = asList(data['evaluations']);
+          final radar = asList(data['radar_chart']).map(asMap).toList();
+          final allEvaluations = asList(
+            data['evaluations'],
+          ).map(asMap).toList();
+          final evaluations = _filteredEvaluations(allEvaluations);
+          final doctors = _doctorOptions(allEvaluations);
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(_clinicalEvaluationsProvider),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 36),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
               children: [
                 _ClinicalHeader(
                   title: 'تقييمات الدكتور',
-                  subtitle: 'اعرف نقاط قوتك وضعفك في المهارات السريرية.',
+                  subtitle:
+                      'تابع درجاتك وملاحظات الدكاترة وتفاصيل كل بند في التقييم السريري.',
                   icon: Icons.radar_rounded,
-                  colors: const [AppColors.success, AppColors.teal],
+                  colors: const [AppColors.teal, Color(0xFF0D5E57)],
                 ),
                 const SizedBox(height: 18),
                 _ClinicalStatsRow(
@@ -255,19 +1708,185 @@ class StudentClinicalEvaluationsScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 20),
-                if (radar.isNotEmpty) ...[
-                  _ClinicalSectionTitle('تحليل المهارات', Icons.insights),
-                  const SizedBox(height: 10),
-                  ...radar.map((raw) => _ClinicalSkillBar(item: asMap(raw))),
-                  const SizedBox(height: 20),
-                ],
+                _ClinicalSkillsOverview(radar: radar),
+                const SizedBox(height: 20),
+                _ClinicalEvaluationFilters(
+                  searchController: _searchController,
+                  grade: _grade,
+                  doctor: _doctor,
+                  sort: _sort,
+                  doctors: doctors,
+                  onGradeChanged: (value) => setState(() => _grade = value),
+                  onDoctorChanged: (value) => setState(() => _doctor = value),
+                  onSortChanged: (value) => setState(() => _sort = value),
+                ),
+                const SizedBox(height: 18),
                 _ClinicalSectionTitle('سجل التقييمات', Icons.history),
                 const SizedBox(height: 10),
-                if (evaluations.isEmpty)
-                  const EmptyState(message: 'لا توجد تقييمات سريرية بعد.')
+                if (allEvaluations.isEmpty)
+                  const _ClinicalEmptyEvaluationsState()
+                else if (evaluations.isEmpty)
+                  const EmptyState(
+                    message: 'لا توجد تقييمات تطابق خيارات البحث الحالية.',
+                  )
                 else
                   ...evaluations.map(
                     (raw) => _ClinicalEvaluationCard(item: asMap(raw)),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _filteredEvaluations(
+    List<Map<String, dynamic>> evaluations,
+  ) {
+    final filtered = evaluations.where((item) {
+      final checklist = asMap(item['checklist']);
+      final doctor = asMap(item['doctor']);
+      final matchesQuery =
+          _query.isEmpty ||
+          text(checklist, 'title').toLowerCase().contains(_query) ||
+          text(doctor, 'name').toLowerCase().contains(_query);
+      final matchesGrade = _grade == 'all' || text(item, 'grade') == _grade;
+      final doctorId = number(doctor, 'id').toInt().toString();
+      final matchesDoctor = _doctor == 'all' || doctorId == _doctor;
+      return matchesQuery && matchesGrade && matchesDoctor;
+    }).toList();
+
+    filtered.sort((a, b) {
+      final aDate = DateTime.tryParse(text(a, 'created_at')) ?? DateTime(1900);
+      final bDate = DateTime.tryParse(text(b, 'created_at')) ?? DateTime(1900);
+      return _sort == 'oldest'
+          ? aDate.compareTo(bDate)
+          : bDate.compareTo(aDate);
+    });
+    return filtered;
+  }
+
+  List<MapEntry<String, String>> _doctorOptions(
+    List<Map<String, dynamic>> evaluations,
+  ) {
+    final map = <String, String>{};
+    for (final item in evaluations) {
+      final doctor = asMap(item['doctor']);
+      final id = number(doctor, 'id').toInt();
+      if (id > 0) map[id.toString()] = text(doctor, 'name', fallback: '-');
+    }
+    final options = map.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    return options;
+  }
+}
+
+class StudentClinicalEvaluationDetailsScreen extends ConsumerWidget {
+  const StudentClinicalEvaluationDetailsScreen({
+    super.key,
+    required this.evaluationId,
+  });
+
+  final int evaluationId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final canAccess = _canAccessClinical(ref);
+    if (!canAccess) {
+      return const _ClinicalForbiddenShell();
+    }
+    final state = ref.watch(_clinicalEvaluationProvider(evaluationId));
+    return StudentShell(
+      currentIndex: 34,
+      title: 'تفاصيل التقييم',
+      parentRoute: StudentClinicalEvaluationsScreen.route,
+      child: _AsyncBody(
+        state: state,
+        onRetry: () =>
+            ref.invalidate(_clinicalEvaluationProvider(evaluationId)),
+        builder: (data) {
+          final evaluation = asMap(data['evaluation']);
+          final checklist = asMap(evaluation['checklist']);
+          final doctor = asMap(evaluation['doctor']);
+          final scores = asList(evaluation['scores']).map(asMap).toList();
+          final color = _clinicalStatusColor(text(evaluation, 'grade'));
+          return RefreshIndicator(
+            onRefresh: () async =>
+                ref.invalidate(_clinicalEvaluationProvider(evaluationId)),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
+              children: [
+                _ClinicalHeader(
+                  title: text(checklist, 'title', fallback: 'تفاصيل التقييم'),
+                  subtitle: 'د. ${text(doctor, 'name', fallback: '-')}',
+                  icon: Icons.fact_check_rounded,
+                  colors: const [AppColors.teal, Color(0xFF0D5E57)],
+                ),
+                const SizedBox(height: 16),
+                _ClinicalCard(
+                  child: Column(
+                    children: [
+                      Text(
+                        '${text(evaluation, 'percentage', fallback: '0')}%',
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 34,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _ClinicalStatusBadge(text(evaluation, 'grade')),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          _ClinicalInfoPill(
+                            label: 'الدرجة',
+                            value:
+                                '${_formatClinicalMark(number(evaluation, 'total_score').toDouble())} / ${_formatClinicalMark(number(evaluation, 'max_score').toDouble())}',
+                          ),
+                          _ClinicalInfoPill(
+                            label: 'الوقت',
+                            value: text(
+                              evaluation,
+                              'formatted_time',
+                              fallback: '-',
+                            ),
+                          ),
+                          _ClinicalInfoPill(
+                            label: 'التاريخ',
+                            value: dateOnly(text(evaluation, 'created_at')),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (text(evaluation, 'doctor_feedback').trim().isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  _ClinicalCard(
+                    child: _ClinicalDetailRow(
+                      'ملاحظات الدكتور',
+                      text(evaluation, 'doctor_feedback'),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                _ClinicalSectionTitle('بنود التقييم', Icons.checklist_rounded),
+                const SizedBox(height: 10),
+                if (scores.isEmpty)
+                  const EmptyState(
+                    message: 'لا توجد بنود تفصيلية لهذا التقييم.',
+                  )
+                else
+                  ...scores.asMap().entries.map(
+                    (entry) => _ClinicalEvaluationScoreCard(
+                      index: entry.key + 1,
+                      item: entry.value,
+                    ),
                   ),
               ],
             ),
@@ -301,6 +1920,21 @@ class StudentClinicalMockExamsScreen extends ConsumerWidget {
         onPressed: () => _showCustomChecklistSheet(context, ref),
         icon: const Icon(Icons.playlist_add_rounded),
         label: const Text('نموذج مخصص'),
+        backgroundColor: AppColors.teal,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: AppColors.teal.withValues(alpha: 0.1),
+            width: 1.5,
+          ),
+        ),
+        extendedTextStyle: const TextStyle(
+          fontFamily: 'Cairo',
+          fontWeight: FontWeight.w900,
+          fontSize: 14,
+        ),
       ),
       child: _AsyncBody(
         state: state,
@@ -311,29 +1945,41 @@ class StudentClinicalMockExamsScreen extends ConsumerWidget {
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(_clinicalMockExamsProvider),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 96),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
               children: [
                 _ClinicalHeader(
                   title: 'اختبارات تدريبية',
                   subtitle:
                       'تدرب على قوائم التقييم العامة أو قوائم أنشأها الدكتور أو أنشئ نموذجك الخاص.',
                   icon: Icons.fact_check_rounded,
-                  colors: const [AppColors.goldDeep, AppColors.royalBlue],
+                  colors: const [AppColors.teal, Color(0xFF0D5E57)],
                 ),
                 const SizedBox(height: 20),
-                _ClinicalSectionTitle('النماذج المتاحة', Icons.list_alt),
+                _ClinicalSectionTitle(
+                  'النماذج المتاحة',
+                  Icons.list_alt,
+                ),
                 const SizedBox(height: 10),
                 if (checklists.isEmpty)
-                  const EmptyState(message: 'لا توجد نماذج تدريبية متاحة.')
+                  const EmptyState(
+                    message:
+                        'لا توجد نماذج تدريبية متاحة.',
+                  )
                 else
                   ...checklists.map(
                     (raw) => _ClinicalChecklistCard(item: asMap(raw)),
                   ),
                 const SizedBox(height: 22),
-                _ClinicalSectionTitle('محاولاتك السابقة', Icons.history),
+                _ClinicalSectionTitle(
+                  'محاولاتك السابقة',
+                  Icons.history,
+                ),
                 const SizedBox(height: 10),
                 if (attempts.isEmpty)
-                  const EmptyState(message: 'لا توجد محاولات تدريبية بعد.')
+                  const EmptyState(
+                    message:
+                        'لا توجد محاولات تدريبية بعد.',
+                  )
                 else
                   ...attempts.map(
                     (raw) => _ClinicalMockAttemptCard(item: asMap(raw)),
@@ -361,6 +2007,8 @@ class _StudentClinicalMockTakeScreenState
     extends ConsumerState<StudentClinicalMockTakeScreen> {
   final Map<int, String> _scores = {};
   final Map<int, TextEditingController> _notes = {};
+  final Set<int> _expandedNotes = {};
+  double _fontSizeScale = 1.0;
   Timer? _timer;
   String _timerMode = 'official';
   int _customMinutes = 10;
@@ -383,6 +2031,367 @@ class _StudentClinicalMockTakeScreenState
     super.dispose();
   }
 
+  List<Map<String, dynamic>> _buildItemsTree(List<dynamic> flatItems) {
+    final Map<int, Map<String, dynamic>> itemsMap = {};
+    final List<Map<String, dynamic>> rootItems = [];
+
+    for (final raw in flatItems) {
+      final item = Map<String, dynamic>.from(asMap(raw));
+      item['sub_items'] = <Map<String, dynamic>>[];
+      final id = number(item, 'id').toInt();
+      itemsMap[id] = item;
+    }
+
+    for (final item in itemsMap.values) {
+      final parentId = number(item, 'parent_id').toInt();
+      if (parentId > 0 && itemsMap.containsKey(parentId)) {
+        final parent = itemsMap[parentId]!;
+        final List<Map<String, dynamic>> subs = List<Map<String, dynamic>>.from(
+          parent['sub_items'],
+        );
+        subs.add(item);
+        parent['sub_items'] = subs;
+      } else {
+        rootItems.add(item);
+      }
+    }
+
+    return rootItems;
+  }
+
+  Widget _evaluationGroup(int index, Map<String, dynamic> parent) {
+    final subs = asList(parent['sub_items']);
+    final children = subs.isEmpty ? [parent] : subs;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.slate200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.teal.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Text(
+                  'المجموعة ${index + 1}',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.teal,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  text(
+                    parent,
+                    'description',
+                    fallback: 'عنصر التقييم',
+                  ),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.midnight,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 20, thickness: 1, color: AppColors.slate200),
+          ...children.map((raw) => _scoreableItem(asMap(raw))),
+        ],
+      ),
+    );
+  }
+
+  Widget _scoreableItem(Map<String, dynamic> item) {
+    final id = number(item, 'id').toInt();
+    final current = _scores[id] ?? 'not_done';
+    final note = _notes.putIfAbsent(id, () => TextEditingController());
+    final isExpanded = _expandedNotes.contains(id);
+    final hasNote = note.text.trim().isNotEmpty;
+    final description = text(
+      item,
+      'description',
+      fallback: 'عنصر فرعي',
+    );
+    final adaptiveIcon = _getAdaptiveIcon(description);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.slate200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Icon(adaptiveIcon, size: 13, color: AppColors.teal),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  description,
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 12 * _fontSizeScale,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.midnight,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _ClinicalMiniBadge(
+                '${number(item, 'marks', fallback: 1).toInt()} درجة',
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _scorePill(
+                  id,
+                  'done',
+                  'تم بالكامل',
+                  AppColors.success,
+                  current,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _scorePill(
+                  id,
+                  'partial',
+                  'تم جزئياً',
+                  AppColors.gold,
+                  current,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _scorePill(
+                  id,
+                  'not_done',
+                  'لم يتم',
+                  AppColors.danger,
+                  current,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    if (isExpanded) {
+                      _expandedNotes.remove(id);
+                    } else {
+                      _expandedNotes.add(id);
+                    }
+                  });
+                },
+                icon: Icon(
+                  hasNote ? Icons.note_alt_rounded : Icons.add_comment_rounded,
+                  size: 13,
+                  color: hasNote ? AppColors.teal : AppColors.slate400,
+                ),
+                label: Text(
+                  hasNote
+                      ? 'تعديل الملاحظة'
+                      : 'إضافة ملاحظة',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: hasNote ? AppColors.teal : AppColors.slate500,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+          if (isExpanded) ...[
+            const SizedBox(height: 8),
+            TextField(
+              controller: note,
+              minLines: 1,
+              maxLines: 3,
+              style: const TextStyle(fontFamily: 'Cairo', fontSize: 12),
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'ملاحظة على هذا البند الفرعي',
+                labelStyle: const TextStyle(fontFamily: 'Cairo', fontSize: 11),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                fillColor: AppColors.slate50,
+                filled: true,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.slate200),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.slate200),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.teal),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _scorePill(
+    int id,
+    String value,
+    String label,
+    Color color,
+    String current,
+  ) {
+    final active = current == value;
+    IconData icon = Icons.check_circle_rounded;
+    if (value == 'partial') {
+      icon = Icons.hourglass_empty_rounded;
+    } else if (value == 'not_done') {
+      icon = Icons.cancel_rounded;
+    }
+
+    return InkWell(
+      onTap: () => setState(() => _scores[id] = value),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(
+          color: active ? color : color.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: color.withValues(alpha: active ? 1.0 : 0.15),
+            width: active ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 13, color: active ? Colors.white : color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.bold,
+                color: active ? Colors.white : color,
+                fontFamily: 'Cairo',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getAdaptiveIcon(String text) {
+    final t = text.toLowerCase();
+    if (t.contains('غسل') ||
+        t.contains('تعقيم') ||
+        t.contains('يد') ||
+        t.contains('wash') ||
+        t.contains('sanitize') ||
+        t.contains('hand')) {
+      return Icons.clean_hands_rounded;
+    }
+    if (t.contains('سماع') ||
+        t.contains('فحص') ||
+        t.contains('صدر') ||
+        t.contains('قلب') ||
+        t.contains('سماعة') ||
+        t.contains('stethoscope') ||
+        t.contains('examine') ||
+        t.contains('heart') ||
+        t.contains('chest')) {
+      return Icons.hearing_rounded;
+    }
+    if (t.contains('تحدث') ||
+        t.contains('شرح') ||
+        t.contains('سؤال') ||
+        t.contains('تواصل') ||
+        t.contains('مريض') ||
+        t.contains('explain') ||
+        t.contains('ask') ||
+        t.contains('communicate')) {
+      return Icons.forum_rounded;
+    }
+    if (t.contains('كتابة') ||
+        t.contains('تسجيل') ||
+        t.contains('ملاحظة') ||
+        t.contains('ملف') ||
+        t.contains('تقرير') ||
+        t.contains('write') ||
+        t.contains('record') ||
+        t.contains('note') ||
+        t.contains('file')) {
+      return Icons.rate_review_rounded;
+    }
+    if (t.contains('إبرة') ||
+        t.contains('حقن') ||
+        t.contains('سحب') ||
+        t.contains('دم') ||
+        t.contains('عينة') ||
+        t.contains('needle') ||
+        t.contains('injection') ||
+        t.contains('blood')) {
+      return Icons.vaccines_rounded;
+    }
+    if (t.contains('نبض') ||
+        t.contains('ط¶ط؛ط·') ||
+        t.contains('حرارة') ||
+        t.contains('تنفس') ||
+        t.contains('pulse') ||
+        t.contains('blood pressure') ||
+        t.contains('temperature')) {
+      return Icons.monitor_heart_rounded;
+    }
+    return Icons.subdirectory_arrow_left_rounded;
+  }
+
   @override
   Widget build(BuildContext context) {
     final canAccess = _canAccessClinical(ref);
@@ -400,6 +2409,7 @@ class _StudentClinicalMockTakeScreenState
             ref.invalidate(_clinicalMockTakeProvider(widget.checklistId)),
         builder: (data) {
           final items = asList(data['items']);
+          final itemsTree = _buildItemsTree(items);
           final officialMinutes = number(
             data,
             'time_limit_minutes',
@@ -414,7 +2424,8 @@ class _StudentClinicalMockTakeScreenState
               description: text(
                 data,
                 'description',
-                fallback: 'اختر طريقة حساب الوقت قبل بدء التدريب.',
+                fallback:
+                    'اختر طريقة حساب الوقت قبل بدء التدريب.',
               ),
               officialMinutes: officialMinutes,
               timerMode: _timerMode,
@@ -426,7 +2437,7 @@ class _StudentClinicalMockTakeScreenState
             );
           }
           return ListView(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 36),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
             children: [
               _MockExamActiveHeader(
                 title: text(data, 'title', fallback: 'نموذج تدريبي'),
@@ -439,17 +2450,89 @@ class _StudentClinicalMockTakeScreenState
                     .length,
               ),
               const SizedBox(height: 18),
-              ...items.map((raw) {
-                final item = asMap(raw);
-                final id = number(item, 'id').toInt();
-                _notes.putIfAbsent(id, TextEditingController.new);
-                return _ClinicalScoreItem(
-                  item: item,
-                  value: _scores[id] ?? 'not_done',
-                  notes: _notes[id]!,
-                  onChanged: (value) => setState(() => _scores[id] = value),
-                );
-              }),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'بنود التقييم السريري',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: AppColors.midnight,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.slate100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            if (_fontSizeScale > 0.85) {
+                              setState(() => _fontSizeScale -= 0.15);
+                            }
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            child: Icon(
+                              Icons.zoom_out,
+                              size: 14,
+                              color: AppColors.slate600,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${(_fontSizeScale * 100).toInt()}%',
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.slate700,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            if (_fontSizeScale < 1.3) {
+                              setState(() => _fontSizeScale += 0.15);
+                            }
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            child: Icon(
+                              Icons.zoom_in,
+                              size: 14,
+                              color: AppColors.slate600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (itemsTree.isEmpty)
+                const EmptyState(
+                  message: 'لا توجد بنود في هذا النموذج.',
+                )
+              else
+                ...itemsTree.asMap().entries.map((entry) {
+                  return _evaluationGroup(entry.key, entry.value);
+                }),
               const SizedBox(height: 14),
               FilledButton.icon(
                 onPressed: _submitting ? null : () => _submit(items),
@@ -465,7 +2548,17 @@ class _StudentClinicalMockTakeScreenState
                     : const Icon(Icons.send_rounded),
                 label: const Text(
                   'إنهاء وتسليم التدريب',
-                  style: TextStyle(fontWeight: FontWeight.w900),
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.teal,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
               ),
             ],
@@ -535,7 +2628,9 @@ class _StudentClinicalMockTakeScreenState
         if (automatic) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('انتهى وقت التدريب وتم تسليم النتيجة.'),
+              content: Text(
+                'انتهى وقت التدريب وتم تسليم النتيجة.',
+              ),
             ),
           );
         }
@@ -580,13 +2675,13 @@ class _MockTimerSetup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 36),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
       children: [
         _ClinicalHeader(
           title: title,
           subtitle: description,
           icon: Icons.timer_rounded,
-          colors: const [AppColors.royalBlue, AppColors.goldDeep],
+          colors: const [AppColors.teal, Color(0xFF0D5E57)],
         ),
         const SizedBox(height: 18),
         _ClinicalCard(
@@ -606,7 +2701,8 @@ class _MockTimerSetup extends StatelessWidget {
                 value: 'official',
                 groupValue: timerMode,
                 title: 'الوقت الرسمي',
-                subtitle: '$officialMinutes دقيقة مثل إعداد الويب',
+                subtitle:
+                    '$officialMinutes دقيقة مثل إعداد الويب',
                 icon: Icons.school_rounded,
                 onChanged: onModeChanged,
               ),
@@ -920,7 +3016,10 @@ class StudentClinicalMockResultScreen extends ConsumerWidget {
               const SizedBox(height: 18),
               ...radar.map((raw) => _ClinicalSkillBar(item: asMap(raw))),
               const SizedBox(height: 18),
-              _ClinicalSectionTitle('تفاصيل العناصر', Icons.checklist_rounded),
+              _ClinicalSectionTitle(
+                'تفاصيل العناصر',
+                Icons.checklist_rounded,
+              ),
               const SizedBox(height: 10),
               ...scores.map((raw) => _ClinicalMockScoreCard(item: asMap(raw))),
             ],
@@ -966,7 +3065,9 @@ class StudentClinicalRareCasesScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
                 if (items.isEmpty)
-                  const EmptyState(message: 'لا توجد حالات نادرة نشطة.')
+                  const EmptyState(
+                    message: 'لا توجد حالات نادرة نشطة.',
+                  )
                 else
                   ...items.map((raw) => _RareCaseCard(item: asMap(raw))),
               ],
@@ -994,56 +3095,65 @@ class _ClinicalHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
           colors: colors,
         ),
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: colors.first.withValues(alpha: 0.24),
+            color: colors.first.withValues(alpha: 0.18),
             blurRadius: 24,
-            offset: const Offset(0, 14),
+            offset: const Offset(0, 12),
           ),
         ],
       ),
       child: Row(
         children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(icon, color: Colors.white, size: 28),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 23,
+                    fontSize: 18,
                     fontWeight: FontWeight.w900,
+                    height: 1.25,
+                    fontFamily: 'Cairo',
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
                   subtitle,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.82),
-                    height: 1.5,
+                    color: Colors.white.withValues(alpha: 0.75),
                     fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    height: 1.45,
+                    fontFamily: 'Cairo',
                   ),
                 ),
               ],
             ),
-          ),
-          Container(
-            width: 66,
-            height: 66,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: Icon(icon, color: AppColors.gold, size: 36),
           ),
         ],
       ),
@@ -1119,37 +3229,110 @@ class _ClinicalStatsRow extends StatelessWidget {
               .map(
                 (item) => SizedBox(
                   width: itemWidth,
-                  child: _ClinicalCard(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 88),
-                      child: Row(
+                  height: 98,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: item.color.withValues(alpha: 0.15),
+                        width: 1.4,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: item.color.withValues(alpha: 0.055),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: Stack(
                         children: [
-                          _ClinicalIconBubble(item.icon, item.color),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
+                          Positioned(
+                            left: -18,
+                            top: -18,
+                            child: Container(
+                              width: 58,
+                              height: 58,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: item.color.withValues(alpha: 0.12),
+                                    blurRadius: 22,
+                                    spreadRadius: 10,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            left: 20,
+                            right: 20,
+                            child: Container(
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: item.color,
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(3),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            child: Row(
                               children: [
-                                Text(
-                                  item.value,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppColors.midnight,
+                                Expanded(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.label,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: AppColors.slate500,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          fontFamily: 'Cairo',
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        item.value,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: AppColors.midnight,
+                                          fontSize: 23,
+                                          fontWeight: FontWeight.w900,
+                                          height: 1.2,
+                                          fontFamily: 'Cairo',
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                Text(
-                                  item.label,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: AppColors.slate500,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 11,
-                                    height: 1.2,
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: item.color.withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    item.icon,
+                                    color: item.color,
+                                    size: 20,
                                   ),
                                 ),
                               ],
@@ -1184,38 +3367,74 @@ class _ClinicalActionGrid extends StatelessWidget {
       childAspectRatio: 1.05,
       children: actions
           .map(
-            (action) => _ClinicalCard(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(22),
-                onTap: () => context.push(action.route),
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _ClinicalIconBubble(action.icon, action.color),
-                      const Spacer(),
-                      Text(
-                        action.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
-                          color: AppColors.midnight,
-                        ),
+            (action) => Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: action.color.withValues(alpha: 0.12),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: action.color.withValues(alpha: 0.03),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => context.push(action.route),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: action.color.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              action.icon,
+                              color: action.color,
+                              size: 20,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            action.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'Cairo',
+                              color: AppColors.slate900,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            action.subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.slate500,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                              height: 1.35,
+                              fontFamily: 'Cairo',
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        action.subtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.slate500,
-                          fontSize: 11,
-                          height: 1.35,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -1224,6 +3443,65 @@ class _ClinicalActionGrid extends StatelessWidget {
           .toList(),
     );
   }
+}
+
+void _showQuickQrDialog(BuildContext context, Map<String, dynamic> log) {
+  final qrToken = text(log, 'qr_token');
+  final expiresAt = text(log, 'qr_expires_at');
+  final expired = boolValue(log, 'is_qr_expired');
+  final dept = asMap(log['department']);
+  final doctor = asMap(log['doctor']);
+
+  showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'مسح سريع - ${text(dept, 'name', fallback: 'سجل عملي')}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      fontFamily: 'Cairo',
+                      color: AppColors.midnight,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'الدكتور: ${text(doctor, 'name', fallback: '-')}',
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                fontFamily: 'Cairo',
+                color: AppColors.slate600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _ClinicalQrBox(
+              token: qrToken,
+              expiresAt: expiresAt,
+              expired: expired,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _ClinicalLogCard extends ConsumerWidget {
@@ -1239,126 +3517,231 @@ class _ClinicalLogCard extends ConsumerWidget {
     final activities = asList(log['activities']);
     final status = text(log, 'status', fallback: 'pending');
     final canChange = status == 'pending';
-    return _ClinicalCard(
+    final qrToken = text(log, 'qr_token');
+
+    final statusColor = switch (status) {
+      'confirmed' || 'approved' => AppColors.success,
+      'rejected' => AppColors.danger,
+      'pending' || 'submitted_for_review' => AppColors.warning,
+      _ => AppColors.slate300,
+    };
+
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: () => _showClinicalLogDetails(context, ref, log),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _ClinicalIconBubble(
-                  Icons.fact_check_rounded,
-                  AppColors.royalBlue,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    text(department, 'name', fallback: 'قسم عملي'),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.midnight,
-                    ),
-                  ),
-                ),
-                _ClinicalStatusBadge(status),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '${text(center, 'name', fallback: 'مركز غير محدد')} | ${text(doctor, 'name', fallback: 'دكتور غير محدد')}',
-              style: const TextStyle(
-                color: AppColors.slate600,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _ClinicalMiniBadge(
-                  'قصص: ${text(log, 'history_count', fallback: '0')}',
-                ),
-                _ClinicalMiniBadge(
-                  'فحوصات: ${text(log, 'exam_count', fallback: '0')}',
-                ),
-                _ClinicalMiniBadge(
-                  'مرور: ${log['did_round'] == true ? 'نعم' : 'لا'}',
-                ),
-                _ClinicalMiniBadge('QR جاهز'),
-              ],
-            ),
-            if (activities.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              ...activities.take(5).map((raw) {
-                final activity = asMap(raw);
-                final body = asMap(activity['body_system']);
-                final confirmed = activity['is_confirmed'] == true;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: statusColor.withValues(alpha: 0.15),
+          width: 1.4,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: statusColor.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _showClinicalLogDetails(context, ref, log),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Icon(
-                        confirmed
-                            ? Icons.verified_rounded
-                            : Icons.radio_button_unchecked_rounded,
-                        color: confirmed
-                            ? AppColors.success
-                            : AppColors.slate300,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '${_clinicalActivityLabel(text(activity, 'activity_type'))}: ${text(body, 'name', fallback: text(activity, 'case_name', fallback: '-'))}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.fact_check_rounded,
+                          color: statusColor,
+                          size: 20,
                         ),
                       ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          text(department, 'name', fallback: 'قسم عملي'),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'Cairo',
+                            color: AppColors.midnight,
+                          ),
+                        ),
+                      ),
+                      _ClinicalStatusBadge(status),
                     ],
                   ),
-                );
-              }),
-            ],
-            const SizedBox(height: 10),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: TextButton.icon(
-                onPressed: () => _showClinicalLogDetails(context, ref, log),
-                icon: const Icon(Icons.qr_code_2_rounded),
-                label: const Text('عرض التفاصيل والباركود'),
-              ),
-            ),
-            if (canChange) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () =>
-                          _showClinicalLogSheet(context, ref, existing: log),
-                      icon: const Icon(Icons.edit_rounded),
-                      label: const Text('تعديل'),
+                  const SizedBox(height: 10),
+                  Text(
+                    '${text(center, 'name', fallback: 'مركز غير محدد')} | ${text(doctor, 'name', fallback: 'دكتور غير محدد')}',
+                    style: const TextStyle(
+                      color: AppColors.slate600,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      fontFamily: 'Cairo',
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _deleteClinicalLog(context, ref, log),
-                      icon: const Icon(Icons.delete_rounded),
-                      label: const Text('حذف'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.danger,
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _ClinicalMiniBadge(
+                        'قصص: ${text(log, 'history_count', fallback: '0')}',
                       ),
-                    ),
+                      _ClinicalMiniBadge(
+                        'فحوصات: ${text(log, 'exam_count', fallback: '0')}',
+                      ),
+                      _ClinicalMiniBadge(
+                        'مرور: ${log['did_round'] == true ? 'نعم' : 'لا'}',
+                      ),
+                      if (qrToken.isNotEmpty &&
+                          status != 'confirmed' &&
+                          status != 'rejected')
+                        const _ClinicalMiniBadge('QR جاهز'),
+                    ],
                   ),
+                  if (activities.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    ...activities.take(5).map((raw) {
+                      final activity = asMap(raw);
+                      final body = asMap(activity['body_system']);
+                      final confirmed = activity['is_confirmed'] == true;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            Icon(
+                              confirmed
+                                  ? Icons.verified_rounded
+                                  : Icons.radio_button_unchecked_rounded,
+                              color: confirmed
+                                  ? AppColors.success
+                                  : AppColors.slate300,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '${_clinicalActivityLabel(text(activity, 'activity_type'))}: ${text(body, 'name', fallback: text(activity, 'case_name', fallback: '-'))}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  fontFamily: 'Cairo',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () =>
+                            _showClinicalLogDetails(context, ref, log),
+                        icon: const Icon(Icons.info_outline_rounded, size: 16),
+                        label: const Text(
+                          'التفاصيل والملخص',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      if (qrToken.isNotEmpty &&
+                          status != 'confirmed' &&
+                          status != 'rejected')
+                        FilledButton.icon(
+                          onPressed: () => _showQuickQrDialog(context, log),
+                          icon: const Icon(
+                            Icons.qr_code_scanner_rounded,
+                            size: 16,
+                          ),
+                          label: const Text(
+                            'مسح سريع',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.teal,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (canChange) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _showClinicalLogSheet(
+                              context,
+                              ref,
+                              existing: log,
+                            ),
+                            icon: const Icon(Icons.edit_rounded, size: 16),
+                            label: const Text(
+                              'تعديل',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () =>
+                                _deleteClinicalLog(context, ref, log),
+                            icon: const Icon(Icons.delete_rounded, size: 16),
+                            label: const Text(
+                              'حذف',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.danger,
+                              side: const BorderSide(color: AppColors.danger),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
-            ],
-          ],
+            ),
+          ),
         ),
       ),
     );
@@ -1374,7 +3757,7 @@ void _showClinicalLogDetails(
     context: context,
     title: 'تفاصيل السجل العملي',
     icon: Icons.qr_code_2_rounded,
-    color: AppColors.royalBlue,
+    color: AppColors.teal,
     child: _ClinicalLogDetailsPanel(initialLog: log),
   );
 }
@@ -1426,6 +3809,7 @@ class _ClinicalLogDetailsPanelState
                 style: const TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 18,
+                  fontFamily: 'Cairo',
                   color: AppColors.midnight,
                 ),
               ),
@@ -1444,24 +3828,55 @@ class _ClinicalLogDetailsPanelState
         else
           _ClinicalApprovedBox(status: status),
         const SizedBox(height: 16),
-        _ClinicalDetailRow('المركز', text(center, 'name', fallback: '-')),
-        _ClinicalDetailRow('القسم', text(department, 'name', fallback: '-')),
-        _ClinicalDetailRow('الدكتور', text(doctor, 'name', fallback: '-')),
-        _ClinicalDetailRow('التاريخ', dateOnly(text(_log, 'log_date'))),
-        if (text(_log, 'doctor_notes').isNotEmpty)
-          _ClinicalDetailRow('ملاحظات الدكتور', text(_log, 'doctor_notes')),
-        const SizedBox(height: 16),
-        const Text(
-          'تفاصيل الاعتماد',
-          style: TextStyle(
-            color: AppColors.midnight,
-            fontWeight: FontWeight.w900,
-            fontSize: 15,
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.slate50,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.slate200),
           ),
+          child: Column(
+            children: [
+              _ClinicalDetailRow(
+                'المركز',
+                text(center, 'name', fallback: '-'),
+              ),
+              const Divider(height: 16, color: AppColors.slate200),
+              _ClinicalDetailRow(
+                'القسم',
+                text(department, 'name', fallback: '-'),
+              ),
+              const Divider(height: 16, color: AppColors.slate200),
+              _ClinicalDetailRow(
+                'الدكتور',
+                text(doctor, 'name', fallback: '-'),
+              ),
+              const Divider(height: 16, color: AppColors.slate200),
+              _ClinicalDetailRow(
+                'التاريخ',
+                dateOnly(text(_log, 'log_date')),
+              ),
+              if (text(_log, 'doctor_notes').isNotEmpty) ...[
+                const Divider(height: 16, color: AppColors.slate200),
+                _ClinicalDetailRow(
+                  'ملاحظات الدكتور',
+                  text(_log, 'doctor_notes'),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _ClinicalSectionTitle(
+          'تفاصيل الاعتماد والأنشطة',
+          Icons.assignment_rounded,
         ),
         const SizedBox(height: 10),
         if (groups.isEmpty)
-          const EmptyState(message: 'لا توجد أنشطة مسجلة في هذا السجل.')
+          const EmptyState(
+            message:
+                'لا توجد أنشطة مسجلة في هذا السجل.',
+          )
         else
           ...groups.map((group) => _ClinicalLogGroupCard(group: group)),
         if (canRegenerate) ...[
@@ -1477,10 +3892,23 @@ class _ClinicalLogDetailsPanelState
                       color: Colors.white,
                     ),
                   )
-                : const Icon(Icons.refresh_rounded),
+                : const Icon(Icons.refresh_rounded, size: 18),
             label: const Text(
               'تجديد الباركود',
-              style: TextStyle(fontWeight: FontWeight.w900),
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+              ),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.teal,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 2,
             ),
           ),
         ],
@@ -1615,7 +4043,9 @@ class _ClinicalQrTimerState extends State<_ClinicalQrTimer> {
   @override
   Widget build(BuildContext context) {
     if (_secondsLeft <= 0) {
-      return const _ClinicalMiniBadge('انتهت صلاحية الباركود');
+      return const _ClinicalMiniBadge(
+        'انتهت صلاحية الباركود',
+      );
     }
     final minutes = _secondsLeft ~/ 60;
     final seconds = _secondsLeft % 60;
@@ -1685,6 +4115,8 @@ class _ClinicalDetailRow extends StatelessWidget {
               style: const TextStyle(
                 color: AppColors.slate500,
                 fontWeight: FontWeight.w800,
+                fontFamily: 'Cairo',
+                fontSize: 13,
               ),
             ),
           ),
@@ -1694,6 +4126,8 @@ class _ClinicalDetailRow extends StatelessWidget {
               style: const TextStyle(
                 color: AppColors.midnight,
                 fontWeight: FontWeight.w800,
+                fontFamily: 'Cairo',
+                fontSize: 13,
               ),
             ),
           ),
@@ -1712,19 +4146,22 @@ class _ClinicalLogGroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = asList(group['items']).map(asMap).toList();
     final confirmed = boolValue(group, 'all_confirmed');
+    final hasRejected =
+        boolValue(group, 'has_rejected') ||
+        items.any((item) => text(item, 'review_status') == 'rejected');
+    final statusColor = confirmed
+        ? AppColors.success
+        : hasRejected
+        ? AppColors.danger
+        : AppColors.warning;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: confirmed
-            ? AppColors.success.withValues(alpha: 0.08)
-            : AppColors.slate50,
+        color: statusColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: confirmed
-              ? AppColors.success.withValues(alpha: 0.22)
-              : AppColors.slate200,
-        ),
+        border: Border.all(color: statusColor.withValues(alpha: 0.22)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1732,8 +4169,12 @@ class _ClinicalLogGroupCard extends StatelessWidget {
           Row(
             children: [
               Icon(
-                confirmed ? Icons.verified_rounded : Icons.pending_rounded,
-                color: confirmed ? AppColors.success : AppColors.warning,
+                confirmed
+                    ? Icons.verified_rounded
+                    : hasRejected
+                    ? Icons.cancel_rounded
+                    : Icons.pending_rounded,
+                color: statusColor,
                 size: 18,
               ),
               const SizedBox(width: 8),
@@ -1743,33 +4184,114 @@ class _ClinicalLogGroupCard extends StatelessWidget {
                   style: const TextStyle(
                     fontWeight: FontWeight.w900,
                     color: AppColors.midnight,
+                    fontFamily: 'Cairo',
                   ),
                 ),
               ),
+              _ClinicalMiniBadge(
+                confirmed
+                    ? 'معتمد'
+                    : hasRejected
+                    ? 'به عناصر مرفوضة'
+                    : 'بانتظار',
+              ),
             ],
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: items.map((item) {
-              final body = asMap(item['body_system']);
-              return _ClinicalMiniBadge(
-                text(
-                  body,
-                  'name',
-                  fallback: text(item, 'case_name', fallback: '-'),
-                ),
-              );
-            }).toList(),
-          ),
+          const SizedBox(height: 10),
+          ...items.map((item) {
+            final body = asMap(item['body_system']);
+            final reviewStatus = text(
+              item,
+              'review_status',
+              fallback: boolValue(item, 'is_confirmed')
+                  ? 'approved'
+                  : 'pending',
+            );
+            final label = text(
+              body,
+              'name',
+              fallback: text(item, 'case_name', fallback: '-'),
+            );
+            return Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.86),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.slate200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    _clinicalReviewStatusIcon(reviewStatus),
+                    color: _clinicalReviewStatusColor(reviewStatus),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            color: AppColors.midnight,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'Cairo',
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _clinicalReviewStatusLabel(reviewStatus),
+                          style: TextStyle(
+                            color: _clinicalReviewStatusColor(reviewStatus),
+                            fontWeight: FontWeight.w800,
+                            fontFamily: 'Cairo',
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (text(item, 'diagnosis').isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'التشخيص: ${text(item, 'diagnosis')}',
+                            style: const TextStyle(
+                              color: AppColors.slate700,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Cairo',
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                        if (text(item, 'review_notes').isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'ملاحظة: ${text(item, 'review_notes')}',
+                            style: const TextStyle(
+                              color: AppColors.danger,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Cairo',
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
           if (text(group, 'diagnosis').isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              'التشخيص: ${text(group, 'diagnosis')}',
+              'التشخيص العام: ${text(group, 'diagnosis')}',
               style: const TextStyle(
                 color: AppColors.slate700,
                 fontWeight: FontWeight.w700,
+                fontFamily: 'Cairo',
+                fontSize: 12.5,
               ),
             ),
           ],
@@ -1777,6 +4299,30 @@ class _ClinicalLogGroupCard extends StatelessWidget {
       ),
     );
   }
+}
+
+IconData _clinicalReviewStatusIcon(String status) {
+  return switch (status) {
+    'approved' => Icons.check_circle_rounded,
+    'rejected' => Icons.cancel_rounded,
+    _ => Icons.radio_button_unchecked_rounded,
+  };
+}
+
+Color _clinicalReviewStatusColor(String status) {
+  return switch (status) {
+    'approved' => AppColors.success,
+    'rejected' => AppColors.danger,
+    _ => AppColors.warning,
+  };
+}
+
+String _clinicalReviewStatusLabel(String status) {
+  return switch (status) {
+    'approved' => 'تم الاعتماد',
+    'rejected' => 'مرفوض ويحتاج محاولة جديدة',
+    _ => 'بانتظار مراجعة الدكتور',
+  };
 }
 
 List<Map<String, dynamic>> _fallbackClinicalGroups(Map<String, dynamic> log) {
@@ -1799,6 +4345,9 @@ List<Map<String, dynamic>> _fallbackClinicalGroups(Map<String, dynamic> log) {
           'all_confirmed':
               list.isNotEmpty &&
               list.every((item) => boolValue(item, 'is_confirmed')),
+          'has_rejected': list.any(
+            (item) => text(item, 'review_status') == 'rejected',
+          ),
           'diagnosis': list
               .map((item) => text(item, 'diagnosis'))
               .firstWhere((value) => value.isNotEmpty, orElse: () => ''),
@@ -1818,64 +4367,426 @@ class _ClinicalAssignmentCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final clinicalCase = asMap(item['clinical_case']);
     final status = text(item, 'status', fallback: 'assigned');
-    final canSubmit = status == 'assigned' || status == 'rejected';
-    return _ClinicalCard(
-      margin: const EdgeInsets.only(bottom: 12),
+    final canSubmit =
+        item['can_start_attempt'] == true ||
+        status == 'assigned' ||
+        status == 'rejected';
+    final latestAttempt = asMap(item['latest_attempt']);
+    final attemptGroups = asList(latestAttempt['grouped_activities']).isNotEmpty
+        ? asList(latestAttempt['grouped_activities']).map(asMap).toList()
+        : _fallbackClinicalGroups(latestAttempt);
+    return InkWell(
+      onTap: () => _showClinicalAssignmentDetails(context, ref, item),
+      borderRadius: BorderRadius.circular(22),
+      child: _ClinicalCard(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _ClinicalIconBubble(Icons.assignment_rounded, AppColors.teal),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    text(
+                      clinicalCase,
+                      'patient_name',
+                      fallback: text(
+                        item,
+                        'task_type',
+                        fallback: 'مهمة سريرية',
+                      ),
+                    ),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                _ClinicalStatusBadge(status),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _clinicalActivityLabel(text(item, 'task_type')),
+              style: const TextStyle(
+                color: AppColors.slate600,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            if (text(item, 'student_completion_message').isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('رسالتك: ${text(item, 'student_completion_message')}'),
+            ],
+            if (text(item, 'review_notes').isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'ملاحظة الدكتور: ${text(item, 'review_notes')}',
+                style: const TextStyle(
+                  color: AppColors.rose,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+            if (latestAttempt.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              _ClinicalAttemptSummary(
+                attempt: latestAttempt,
+                groups: attemptGroups,
+              ),
+            ],
+            if (canSubmit) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    final changed = await context.push<bool>(
+                      StudentClinicalLogFormScreen.path(
+                        assignmentId: number(item, 'id').toInt(),
+                      ),
+                    );
+                    if (changed == true) {
+                      ref.invalidate(_clinicalLogbookProvider);
+                    }
+                  },
+                  icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                  label: Text(
+                    status == 'rejected'
+                        ? 'إعادة تنفيذ المحاولة'
+                        : 'بدء تنفيذ التكليف',
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.teal,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 2,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+void _showClinicalAssignmentDetails(
+  BuildContext context,
+  WidgetRef ref,
+  Map<String, dynamic> assignment,
+) {
+  showMoeenBottomSheet(
+    context: context,
+    title: 'تفاصيل التكليف السريري',
+    icon: Icons.assignment_turned_in_rounded,
+    color: AppColors.teal,
+    fullScreen: true,
+    child: _ClinicalAssignmentDetailsPanel(assignment: assignment),
+  );
+}
+
+class _ClinicalAssignmentDetailsPanel extends ConsumerWidget {
+  const _ClinicalAssignmentDetailsPanel({required this.assignment});
+
+  final Map<String, dynamic> assignment;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final clinicalCase = asMap(assignment['clinical_case']);
+    final assigner = asMap(assignment['assigner']);
+    final latestAttempt = asMap(assignment['latest_attempt']);
+    final attempts = asList(assignment['attempts']).map(asMap).toList();
+    final canStart =
+        assignment['can_start_attempt'] == true ||
+        text(assignment, 'status') == 'assigned' ||
+        text(assignment, 'status') == 'rejected';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ClinicalCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _ClinicalIconBubble(
+                    Icons.medical_information_rounded,
+                    AppColors.teal,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      text(
+                        clinicalCase,
+                        'patient_name',
+                        fallback: text(
+                          clinicalCase,
+                          'diagnosis_or_description',
+                          fallback: 'تكليف سريري',
+                        ),
+                      ),
+                      style: const TextStyle(
+                        color: AppColors.midnight,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  ),
+                  _ClinicalStatusBadge(text(assignment, 'status')),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.slate50,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.slate200),
+                ),
+                child: Column(
+                  children: [
+                    _ClinicalDetailRow(
+                      'نوع المهمة',
+                      _clinicalActivityLabel(text(assignment, 'task_type')),
+                    ),
+                    const Divider(height: 16, color: AppColors.slate200),
+                    _ClinicalDetailRow(
+                      'الدكتور',
+                      text(assigner, 'name', fallback: '-'),
+                    ),
+                    const Divider(height: 16, color: AppColors.slate200),
+                    _ClinicalDetailRow(
+                      'المركز',
+                      text(
+                        asMap(clinicalCase['training_center']),
+                        'name',
+                        fallback: '-',
+                      ),
+                    ),
+                    const Divider(height: 16, color: AppColors.slate200),
+                    _ClinicalDetailRow(
+                      'القسم',
+                      text(
+                        asMap(clinicalCase['clinical_department']),
+                        'name',
+                        fallback: '-',
+                      ),
+                    ),
+                    if (text(assignment, 'instructions').isNotEmpty) ...[
+                      const Divider(height: 16, color: AppColors.slate200),
+                      _ClinicalDetailRow(
+                        'التعليمات',
+                        text(assignment, 'instructions'),
+                      ),
+                    ],
+                    if (text(assignment, 'review_notes').isNotEmpty) ...[
+                      const Divider(height: 16, color: AppColors.slate200),
+                      _ClinicalDetailRow(
+                        'ملاحظة الدكتور',
+                        text(assignment, 'review_notes'),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        if (latestAttempt.isNotEmpty) ...[
+          _ClinicalSectionTitle(
+            'الباركود وآخر محاولة',
+            Icons.qr_code_2_rounded,
+          ),
+          const SizedBox(height: 10),
+          _ClinicalLogDetailsPanel(initialLog: latestAttempt),
+        ] else
+          _ClinicalCard(
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.qr_code_2_rounded,
+                  color: AppColors.slate400,
+                  size: 42,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'لا يوجد باركود بعد. ابدأ تنفيذ التكليف ثم احفظ المحاولة.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.slate600,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Cairo',
+                    fontSize: 13,
+                  ),
+                ),
+                if (canStart) ...[
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    onPressed: () async {
+                      final changed = await context.push<bool>(
+                        StudentClinicalLogFormScreen.path(
+                          assignmentId: number(assignment, 'id').toInt(),
+                        ),
+                      );
+                      if (changed == true) {
+                        ref.invalidate(_clinicalLogbookProvider);
+                      }
+                    },
+                    icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                    label: const Text(
+                      'بدء تنفيذ التكليف',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.teal,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 24,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 2,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        if (attempts.length > 1) ...[
+          const SizedBox(height: 18),
+          _ClinicalSectionTitle(
+            'المحاولات السابقة',
+            Icons.history_rounded,
+          ),
+          const SizedBox(height: 10),
+          ...attempts.skip(1).map((attempt) {
+            final groups = asList(attempt['grouped_activities']).isNotEmpty
+                ? asList(attempt['grouped_activities']).map(asMap).toList()
+                : _fallbackClinicalGroups(attempt);
+            return _ClinicalAttemptSummary(attempt: attempt, groups: groups);
+          }),
+        ],
+      ],
+    );
+  }
+}
+
+class _ClinicalAttemptSummary extends StatelessWidget {
+  const _ClinicalAttemptSummary({required this.attempt, required this.groups});
+
+  final Map<String, dynamic> attempt;
+  final List<Map<String, dynamic>> groups;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = text(attempt, 'status', fallback: 'pending');
+    final done = groups
+        .where((group) => boolValue(group, 'all_confirmed'))
+        .length;
+    final rejected = groups
+        .where(
+          (group) =>
+              boolValue(group, 'has_rejected') ||
+              asList(
+                group['items'],
+              ).any((item) => text(asMap(item), 'review_status') == 'rejected'),
+        )
+        .length;
+    final remaining = groups.length - done;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.slate200),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              _ClinicalIconBubble(Icons.assignment_rounded, AppColors.teal),
-              const SizedBox(width: 12),
+              Icon(
+                status == 'rejected'
+                    ? Icons.cancel_rounded
+                    : status == 'confirmed'
+                    ? Icons.verified_rounded
+                    : Icons.pending_actions_rounded,
+                color: _clinicalStatusColor(status),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  text(
-                    clinicalCase,
-                    'patient_name',
-                    fallback: text(item, 'task_type', fallback: 'مهمة سريرية'),
-                  ),
+                  'آخر محاولة: ${_clinicalStatusLabel(status)}',
                   style: const TextStyle(
+                    color: AppColors.midnight,
                     fontWeight: FontWeight.w900,
-                    fontSize: 16,
+                    fontFamily: 'Cairo',
+                    fontSize: 13,
                   ),
                 ),
               ),
-              _ClinicalStatusBadge(status),
+              _ClinicalMiniBadge(
+                rejected > 0
+                    ? 'تم $done / مرفوض $rejected'
+                    : 'تم $done / متبقي $remaining',
+              ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            _clinicalActivityLabel(text(item, 'task_type')),
-            style: const TextStyle(
-              color: AppColors.slate600,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          if (text(item, 'student_completion_message').isNotEmpty) ...[
+          if (groups.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text('رسالتك: ${text(item, 'student_completion_message')}'),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: groups.map((group) {
+                final confirmed = boolValue(group, 'all_confirmed');
+                final rejected =
+                    boolValue(group, 'has_rejected') ||
+                    asList(group['items']).any(
+                      (item) =>
+                          text(asMap(item), 'review_status') == 'rejected',
+                    );
+                return _ClinicalMiniBadge(
+                  '${text(group, 'label', fallback: '-')} ${confirmed
+                      ? 'تم'
+                      : rejected
+                      ? 'مرفوض'
+                      : 'بانتظار'}',
+                );
+              }).toList(),
+            ),
           ],
-          if (text(item, 'review_notes').isNotEmpty) ...[
+          if (text(attempt, 'doctor_notes').isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              'ملاحظة الدكتور: ${text(item, 'review_notes')}',
+              'ملاحظة الدكتور: ${text(attempt, 'doctor_notes')}',
               style: const TextStyle(
                 color: AppColors.rose,
                 fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-          if (canSubmit) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => _submitClinicalAssignment(context, ref, item),
-                icon: const Icon(Icons.send_rounded),
-                label: Text(
-                  status == 'rejected' ? 'إعادة الإرسال' : 'إرسال إنجاز',
-                ),
+                fontFamily: 'Cairo',
+                fontSize: 12,
               ),
             ),
           ],
@@ -1931,6 +4842,314 @@ class _ClinicalSkillBar extends StatelessWidget {
   }
 }
 
+class _ClinicalSkillsOverview extends StatelessWidget {
+  const _ClinicalSkillsOverview({required this.radar});
+
+  final List<Map<String, dynamic>> radar;
+
+  @override
+  Widget build(BuildContext context) {
+    if (radar.isEmpty) {
+      return _ClinicalCard(
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _ClinicalSectionTitle('تحليل المهارات', Icons.insights),
+            SizedBox(height: 10),
+            Text(
+              'سيظهر تحليل المهارات بعد توفر بنود تقييم كافية.',
+              style: TextStyle(
+                color: AppColors.slate600,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Cairo',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final sorted = [...radar]
+      ..sort(
+        (a, b) => number(b, 'percentage').compareTo(number(a, 'percentage')),
+      );
+    final strongest = sorted.first;
+    final weakest = sorted.last;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _ClinicalSectionTitle('تحليل المهارات', Icons.insights),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _ClinicalSkillSummaryCard(
+                label: 'أقوى مهارة',
+                item: strongest,
+                color: AppColors.success,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _ClinicalSkillSummaryCard(
+                label: 'تحتاج تركيز',
+                item: weakest,
+                color: AppColors.warning,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ...radar.map((item) => _ClinicalSkillBar(item: item)),
+      ],
+    );
+  }
+}
+
+class _ClinicalSkillSummaryCard extends StatelessWidget {
+  const _ClinicalSkillSummaryCard({
+    required this.label,
+    required this.item,
+    required this.color,
+  });
+
+  final String label;
+  final Map<String, dynamic> item;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'Cairo',
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            text(item, 'label_ar', fallback: text(item, 'label_en')),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.midnight,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'Cairo',
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${number(item, 'percentage').toStringAsFixed(0)}%',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
+              fontFamily: 'Cairo',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClinicalEvaluationFilters extends StatelessWidget {
+  const _ClinicalEvaluationFilters({
+    required this.searchController,
+    required this.grade,
+    required this.doctor,
+    required this.sort,
+    required this.doctors,
+    required this.onGradeChanged,
+    required this.onDoctorChanged,
+    required this.onSortChanged,
+  });
+
+  final TextEditingController searchController;
+  final String grade;
+  final String doctor;
+  final String sort;
+  final List<MapEntry<String, String>> doctors;
+  final ValueChanged<String> onGradeChanged;
+  final ValueChanged<String> onDoctorChanged;
+  final ValueChanged<String> onSortChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ClinicalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: searchController,
+            decoration: const InputDecoration(
+              labelText: 'بحث باسم التقييم أو الدكتور',
+              prefixIcon: Icon(Icons.search_rounded),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _EvaluationFilterChip(
+                label: 'الكل',
+                selected: grade == 'all',
+                onTap: () => onGradeChanged('all'),
+              ),
+              _EvaluationFilterChip(
+                label: 'ممتاز',
+                selected: grade == 'excellent',
+                onTap: () => onGradeChanged('excellent'),
+              ),
+              _EvaluationFilterChip(
+                label: 'جيد',
+                selected: grade == 'good',
+                onTap: () => onGradeChanged('good'),
+              ),
+              _EvaluationFilterChip(
+                label: 'مقبول',
+                selected: grade == 'acceptable',
+                onTap: () => onGradeChanged('acceptable'),
+              ),
+              _EvaluationFilterChip(
+                label: 'ضعيف',
+                selected: grade == 'weak',
+                onTap: () => onGradeChanged('weak'),
+              ),
+              _EvaluationFilterChip(
+                label: 'راسب',
+                selected: grade == 'fail',
+                onTap: () => onGradeChanged('fail'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: doctor,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'الدكتور'),
+                  items: [
+                    const DropdownMenuItem(value: 'all', child: Text('الكل')),
+                    ...doctors.map(
+                      (entry) => DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(entry.value),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) => onDoctorChanged(value ?? 'all'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: sort,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'الترتيب'),
+                  items: const [
+                    DropdownMenuItem(value: 'latest', child: Text('الأحدث')),
+                    DropdownMenuItem(value: 'oldest', child: Text('الأقدم')),
+                  ],
+                  onChanged: (value) => onSortChanged(value ?? 'latest'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EvaluationFilterChip extends StatelessWidget {
+  const _EvaluationFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      selectedColor: AppColors.teal.withValues(alpha: 0.14),
+      labelStyle: TextStyle(
+        color: selected ? AppColors.teal : AppColors.slate600,
+        fontWeight: FontWeight.w900,
+        fontFamily: 'Cairo',
+      ),
+      side: BorderSide(color: selected ? AppColors.teal : AppColors.slate200),
+    );
+  }
+}
+
+class _ClinicalEmptyEvaluationsState extends StatelessWidget {
+  const _ClinicalEmptyEvaluationsState();
+
+  @override
+  Widget build(BuildContext context) {
+    return _ClinicalCard(
+      child: Column(
+        children: [
+          const Icon(
+            Icons.fact_check_outlined,
+            size: 42,
+            color: AppColors.slate400,
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'لا توجد تقييمات سريرية بعد.',
+            style: TextStyle(
+              color: AppColors.midnight,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'Cairo',
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'ستظهر هنا تقييمات الدكتور بعد التدريب السريري، ويمكنك التدرب مسبقًا عبر OSCE.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.slate600,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Cairo',
+            ),
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: () => context.go(StudentClinicalMockExamsScreen.route),
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: const Text('الانتقال إلى تدريب OSCE'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ClinicalEvaluationCard extends StatelessWidget {
   const _ClinicalEvaluationCard({required this.item});
 
@@ -1940,27 +5159,256 @@ class _ClinicalEvaluationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final checklist = asMap(item['checklist']);
     final doctor = asMap(item['doctor']);
+    final grade = text(item, 'grade');
+    final color = _clinicalStatusColor(grade);
+    final feedback = text(item, 'doctor_feedback').trim();
     return _ClinicalCard(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Row(
+      child: InkWell(
+        onTap: () => context.push(
+          StudentClinicalEvaluationsScreen.detailsPath(
+            number(item, 'id').toInt(),
+          ),
+        ),
+        borderRadius: BorderRadius.circular(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _ClinicalIconBubble(Icons.rate_review_rounded, color),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        text(checklist, 'title', fallback: 'تقييم سريري'),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.midnight,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'د. ${text(doctor, 'name', fallback: '-')}',
+                        style: const TextStyle(
+                          color: AppColors.slate600,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _ClinicalStatusBadge(grade),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                minHeight: 8,
+                value:
+                    (number(item, 'percentage').toDouble().clamp(0, 100)) / 100,
+                backgroundColor: AppColors.slate100,
+                valueColor: AlwaysStoppedAnimation(color),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _ClinicalInfoPill(
+                  label: 'النسبة',
+                  value: '${text(item, 'percentage', fallback: '0')}%',
+                ),
+                _ClinicalInfoPill(
+                  label: 'الدرجة',
+                  value:
+                      '${_formatClinicalMark(number(item, 'total_score').toDouble())}/${_formatClinicalMark(number(item, 'max_score').toDouble())}',
+                ),
+                _ClinicalInfoPill(
+                  label: 'الوقت',
+                  value: text(item, 'formatted_time', fallback: '-'),
+                ),
+                _ClinicalInfoPill(
+                  label: 'التاريخ',
+                  value: dateOnly(text(item, 'created_at')),
+                ),
+              ],
+            ),
+            if (feedback.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                feedback.length > 110
+                    ? '${feedback.substring(0, 110)}...'
+                    : feedback,
+                style: const TextStyle(
+                  color: AppColors.slate700,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  height: 1.5,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: const [
+                Text(
+                  'عرض التفاصيل',
+                  style: TextStyle(
+                    color: AppColors.teal,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+                SizedBox(width: 4),
+                Icon(Icons.chevron_left_rounded, color: AppColors.teal),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ClinicalInfoPill extends StatelessWidget {
+  const _ClinicalInfoPill({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.slate100),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _ClinicalIconBubble(Icons.rate_review_rounded, AppColors.success),
-          const SizedBox(width: 12),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.slate500,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'Cairo',
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value.isEmpty ? '-' : value,
+            style: const TextStyle(
+              color: AppColors.midnight,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'Cairo',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClinicalEvaluationScoreCard extends StatelessWidget {
+  const _ClinicalEvaluationScoreCard({required this.index, required this.item});
+
+  final int index;
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final checklistItem = asMap(item['checklist_item']);
+    final score = text(item, 'score');
+    final color = switch (score) {
+      'done' => AppColors.success,
+      'partial' => AppColors.goldDeep,
+      _ => AppColors.danger,
+    };
+    final obtained = number(item, 'marks_obtained').toDouble();
+    final maxMarks = number(
+      checklistItem,
+      'marks',
+      fallback: number(item, 'max_marks'),
+    ).toDouble();
+    final note = text(item, 'note').trim();
+    return _ClinicalCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              index.toString(),
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w900,
+                fontFamily: 'Cairo',
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  text(checklist, 'title', fallback: 'تقييم سريري'),
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                  text(checklistItem, 'description', fallback: 'بند تقييم'),
+                  style: const TextStyle(
+                    color: AppColors.midnight,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: 'Cairo',
+                  ),
                 ),
+                const SizedBox(height: 6),
                 Text(
-                  '${text(doctor, 'name', fallback: 'الدكتور')} | ${text(item, 'percentage', fallback: '0')}%',
+                  '${_formatClinicalMark(obtained)} من ${_formatClinicalMark(maxMarks)} درجة',
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    fontFamily: 'Cairo',
+                  ),
                 ),
+                if (note.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    note,
+                    style: const TextStyle(
+                      color: AppColors.slate600,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      fontFamily: 'Cairo',
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          _ClinicalStatusBadge(text(item, 'grade')),
+          const SizedBox(width: 8),
+          _ClinicalStatusBadge(score),
         ],
       ),
     );
@@ -2048,7 +5496,11 @@ class _ClinicalMockAttemptCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    text(checklist, 'title', fallback: 'محاولة تدريبية'),
+                    text(
+                      checklist,
+                      'title',
+                      fallback: 'محاولة تدريبية',
+                    ),
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                   Text(
@@ -2060,78 +5512,6 @@ class _ClinicalMockAttemptCard extends StatelessWidget {
             const Icon(Icons.chevron_left_rounded, color: AppColors.slate400),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ClinicalScoreItem extends StatelessWidget {
-  const _ClinicalScoreItem({
-    required this.item,
-    required this.value,
-    required this.notes,
-    required this.onChanged,
-  });
-
-  final Map<String, dynamic> item;
-  final String value;
-  final TextEditingController notes;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final marks = text(item, 'marks', fallback: '1');
-    return _ClinicalCard(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  text(item, 'description', fallback: 'عنصر تقييم'),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
-                    color: AppColors.midnight,
-                  ),
-                ),
-              ),
-              _ClinicalMiniBadge('$marks درجة'),
-            ],
-          ),
-          const SizedBox(height: 10),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(
-                value: 'done',
-                icon: Icon(Icons.check_circle_rounded),
-                label: Text('تم'),
-              ),
-              ButtonSegment(
-                value: 'partial',
-                icon: Icon(Icons.adjust_rounded),
-                label: Text('جزئي'),
-              ),
-              ButtonSegment(
-                value: 'not_done',
-                icon: Icon(Icons.cancel_rounded),
-                label: Text('لم يتم'),
-              ),
-            ],
-            selected: {value},
-            onSelectionChanged: (set) => onChanged(set.first),
-            showSelectedIcon: false,
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: notes,
-            minLines: 1,
-            maxLines: 3,
-            decoration: const InputDecoration(labelText: 'ملاحظات اختيارية'),
-          ),
-        ],
       ),
     );
   }
@@ -2158,62 +5538,117 @@ class _ClinicalMockScoreCard extends StatelessWidget {
     );
     final color = switch (scoreLabel) {
       'done' => AppColors.success,
-      'partial' => AppColors.warning,
+      'partial' => AppColors.gold,
       _ => AppColors.danger,
     };
     final label = switch (scoreLabel) {
-      'done' => 'تم',
-      'partial' => 'جزئي',
+      'done' => 'تم بالكامل',
+      'partial' => 'تم جزئياً',
       _ => 'لم يتم',
     };
-    return _ClinicalCard(
+    return Container(
       margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.slate200),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _ClinicalIconBubble(Icons.check_rounded, color),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  text(checklistItem, 'description', fallback: 'عنصر'),
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  scoreLabel == 'done'
+                      ? Icons.check_circle_rounded
+                      : scoreLabel == 'partial'
+                      ? Icons.adjust_rounded
+                      : Icons.cancel_rounded,
+                  color: color,
+                  size: 16,
                 ),
               ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      text(
+                        checklistItem,
+                        'description',
+                        fallback: 'عنصر تقييم',
+                      ),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        color: AppColors.midnight,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_formatClinicalMark(obtained)} من ${_formatClinicalMark(maxMarks)} درجة',
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: color.withValues(alpha: 0.22)),
+                  color: color.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: color.withValues(alpha: 0.15)),
                 ),
                 child: Text(
                   label,
                   style: TextStyle(
                     color: color,
                     fontWeight: FontWeight.w900,
-                    fontSize: 12,
+                    fontSize: 11,
+                    fontFamily: 'Cairo',
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            '${_formatClinicalMark(obtained)} / ${_formatClinicalMark(maxMarks)} درجة',
-            style: TextStyle(color: color, fontWeight: FontWeight.w900),
-          ),
-          if (text(item, 'notes').isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              'ملاحظات: ${text(item, 'notes')}',
-              style: const TextStyle(
-                color: AppColors.slate600,
-                fontWeight: FontWeight.w700,
+          if (text(item, 'notes').trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.slate50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.slate100),
+              ),
+              child: Text(
+                'ملاحظات: ${text(item, 'notes')}',
+                style: const TextStyle(
+                  color: AppColors.slate600,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11.5,
+                  height: 1.45,
+                  fontFamily: 'Cairo',
+                ),
               ),
             ),
           ],
@@ -2324,9 +5759,12 @@ class _RareCaseCard extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
+                      color: AppColors.midnight,
+                      fontFamily: 'Cairo',
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 const Icon(
                   Icons.chevron_left_rounded,
                   color: AppColors.slate400,
@@ -2346,6 +5784,9 @@ class _RareCaseCard extends StatelessWidget {
                 ),
                 if (text(item, 'room_number').isNotEmpty)
                   _ClinicalMiniBadge('غرفة ${text(item, 'room_number')}'),
+                _ClinicalMiniBadge(
+                  'ًں‘پï¸ڈ ${text(item, 'views_count', fallback: '0')}',
+                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -2353,7 +5794,12 @@ class _RareCaseCard extends StatelessWidget {
               text(item, 'clinical_signs', fallback: text(item, 'description')),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(height: 1.45, color: AppColors.slate700),
+              style: const TextStyle(
+                height: 1.45,
+                color: AppColors.slate700,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Cairo',
+              ),
             ),
             const SizedBox(height: 10),
             Row(
@@ -2366,19 +5812,21 @@ class _RareCaseCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'بواسطة: ${text(doctor, 'name', fallback: 'دكتور')}',
+                    'بواسطة: د. ${text(doctor, 'name', fallback: 'دكتور')}',
                     style: const TextStyle(
                       color: AppColors.slate500,
                       fontWeight: FontWeight.w700,
+                      fontFamily: 'Cairo',
                     ),
                   ),
                 ),
                 Text(
-                  dateOnly(text(item, 'created_at')),
+                  timeAgo(text(item, 'created_at')),
                   style: const TextStyle(
                     color: AppColors.slate400,
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
+                    fontFamily: 'Cairo',
                   ),
                 ),
               ],
@@ -2417,103 +5865,290 @@ class _RareCaseDetailsPanel extends ConsumerWidget {
         final attachmentUrl = _rareCaseAttachmentUrl(
           text(item, 'attachment_url', fallback: text(item, 'attachment_path')),
         );
+        final diagnosis = text(
+          item,
+          'diagnosis',
+          fallback: text(item, 'title', fallback: 'حالة نادرة'),
+        );
+        final createdAt = text(item, 'created_at');
+        final updatedAt = text(item, 'updated_at');
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              text(
-                item,
-                'diagnosis',
-                fallback: text(item, 'title', fallback: 'حالة نادرة'),
-              ),
-              style: const TextStyle(
-                color: AppColors.midnight,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            _RareCaseBentoSection(
+              title: 'البيانات الطبية والتشخيص',
+              icon: Icons.medical_information_rounded,
+              iconColor: AppColors.rose,
               children: [
-                _ClinicalMiniBadge('د. ${text(doctor, 'name', fallback: '-')}'),
-                _ClinicalMiniBadge(dateOnly(text(item, 'created_at'))),
+                _ClinicalDetailRow('التشخيص', diagnosis),
+                _ClinicalDetailRow(
+                  'اسم المريض',
+                  text(item, 'patient_name', fallback: '-'),
+                ),
+                _ClinicalDetailRow(
+                  'الدكتور المعلن',
+                  text(doctor, 'name', fallback: '-'),
+                ),
+                _ClinicalDetailRow(
+                  'حالة الإعلان',
+                  'منشورة ونشطة',
+                ),
+                _ClinicalDetailRow(
+                  'عدد المشاهدات',
+                  '${text(item, 'views_count', fallback: '0')} مشاهدة',
+                ),
+                _ClinicalDetailRow(
+                  'تاريخ النشر',
+                  dateOnly(createdAt),
+                ),
+                if (updatedAt.isNotEmpty && updatedAt != createdAt)
+                  _ClinicalDetailRow('آخر تعديل', dateOnly(updatedAt)),
+                if (text(item, 'internal_notes').isNotEmpty)
+                  _ClinicalDetailRow(
+                    'ملاحظات إضافية',
+                    text(item, 'internal_notes'),
+                  ),
               ],
             ),
-            const SizedBox(height: 16),
-            _ClinicalDetailRow(
-              'المستشفى / المركز',
-              text(item, 'hospital', fallback: '-'),
-            ),
-            _ClinicalDetailRow(
-              'القسم',
-              text(item, 'department', fallback: '-'),
-            ),
-            _ClinicalDetailRow(
-              'رقم الغرفة / الموقع',
-              text(item, 'room_number', fallback: 'غير متوفر'),
-            ),
-            if (text(item, 'clinical_signs').isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Text(
-                'العلامات السريرية والملاحظات',
-                style: TextStyle(
-                  color: AppColors.midnight,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 15,
+            _RareCaseBentoSection(
+              title: 'موقع الإقامة والسرير',
+              icon: Icons.local_hospital_rounded,
+              iconColor: AppColors.teal,
+              children: [
+                _ClinicalDetailRow(
+                  'المستشفى / المركز',
+                  text(item, 'hospital', fallback: '-'),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.slate50,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.slate200),
+                _ClinicalDetailRow(
+                  'القسم',
+                  text(item, 'department', fallback: '-'),
                 ),
-                child: Text(
-                  text(item, 'clinical_signs'),
+                _ClinicalDetailRow(
+                  'رقم الغرفة / الموقع',
+                  text(item, 'room_number', fallback: 'غير محدد'),
+                ),
+              ],
+            ),
+            _RareCaseBentoSection(
+              title: 'العلامات السريرية والملاحظات',
+              icon: Icons.biotech_rounded,
+              iconColor: AppColors.orange,
+              children: [
+                Text(
+                  text(
+                    item,
+                    'clinical_signs',
+                    fallback:
+                        'لا توجد علامات سريرية مضافة.',
+                  ),
                   style: const TextStyle(
                     height: 1.6,
+                    fontSize: 13,
                     color: AppColors.slate700,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Cairo',
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
             if (attachmentUrl.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Text(
-                'المرفقات التوضيحية',
-                style: TextStyle(
-                  color: AppColors.midnight,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 15,
-                ),
-              ),
               const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Image.network(
-                  attachmentUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    padding: const EdgeInsets.all(16),
-                    color: AppColors.slate50,
-                    child: const Text(
-                      'تعذر عرض المرفق.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: Text(
+                  'المرفقات التوضيحية',
+                  style: TextStyle(
+                    color: AppColors.midnight,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                    fontFamily: 'Cairo',
                   ),
                 ),
               ),
+              Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.slate200),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: InkWell(
+                  onTap: () => MoeenDialogs.showImage(context, attachmentUrl),
+                  child: Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      Image.network(
+                        attachmentUrl,
+                        height: 220,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            height: 220,
+                            color: AppColors.slate50,
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: AppColors.teal,
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 120,
+                            color: AppColors.slate50,
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.broken_image_rounded,
+                                  color: AppColors.slate400,
+                                  size: 36,
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  'تعذر تحميل الصورة المرفقة',
+                                  style: TextStyle(
+                                    color: AppColors.slate500,
+                                    fontFamily: 'Cairo',
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                      Positioned(
+                        top: 12,
+                        left: 12,
+                        child: _ImageOverlayButton(
+                          icon: Icons.open_in_full_rounded,
+                          onPressed: () =>
+                              MoeenDialogs.showImage(context, attachmentUrl),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 12,
+                        right: 12,
+                        child: _ImageOverlayButton(
+                          icon: Icons.download_rounded,
+                          onPressed: () async {
+                            final fileName = _extractFileName(
+                              attachmentUrl,
+                              id,
+                            );
+                            await _downloadUrlToFile(
+                              context,
+                              attachmentUrl,
+                              fileName.split('.').first,
+                              section: 'RareCases',
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
             ],
           ],
         );
       },
     );
   }
+}
+
+class _RareCaseBentoSection extends StatelessWidget {
+  const _RareCaseBentoSection({
+    required this.title,
+    required this.icon,
+    required this.iconColor,
+    required this.children,
+  });
+
+  final String title;
+  final IconData icon;
+  final Color iconColor;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.slate200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: iconColor, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.midnight,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 20, thickness: 1, color: AppColors.slate100),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _ImageOverlayButton extends StatelessWidget {
+  const _ImageOverlayButton({required this.icon, required this.onPressed});
+
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.92),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Icon(icon, color: AppColors.teal, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
+String _extractFileName(String url, int id) {
+  try {
+    final uri = Uri.parse(url);
+    final lastSegment = uri.pathSegments.last;
+    if (lastSegment.isNotEmpty && lastSegment.contains('.')) {
+      return lastSegment;
+    }
+  } catch (_) {}
+  return 'rare_case_$id.jpg';
 }
 
 String _rareCaseAttachmentUrl(String path) {
@@ -2637,14 +6272,22 @@ class _ClinicalSectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: AppColors.royalBlue, size: 20),
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: AppColors.teal.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: AppColors.teal, size: 16),
+        ),
         const SizedBox(width: 8),
         Text(
           title,
           style: const TextStyle(
-            color: AppColors.midnight,
-            fontSize: 17,
+            fontSize: 14,
             fontWeight: FontWeight.w900,
+            color: AppColors.slate800,
+            fontFamily: 'Cairo',
           ),
         ),
       ],
@@ -2656,6 +6299,7 @@ Future<void> _showClinicalLogSheet(
   BuildContext context,
   WidgetRef ref, {
   Map<String, dynamic>? existing,
+  Map<String, dynamic>? assignment,
 }) async {
   final data = ref.read(_clinicalLogbookProvider).valueOrNull;
   if (data == null) return;
@@ -2664,10 +6308,34 @@ Future<void> _showClinicalLogSheet(
   final departments = asList(options['departments']);
   final bodies = asList(options['body_systems']);
   final doctors = asList(options['doctors']);
-  final activities = asList(existing?['activities']);
-  int? centerId = number(asMap(existing?['training_center']), 'id').toInt();
-  int? departmentId = number(asMap(existing?['department']), 'id').toInt();
-  int? doctorId = number(asMap(existing?['doctor']), 'id').toInt();
+  final assignmentCase = asMap(assignment?['clinical_case']);
+  final latestAttempt = asMap(assignment?['latest_attempt']);
+  final rejectedAttemptActivities = asList(latestAttempt['grouped_activities'])
+      .map(asMap)
+      .expand((group) => asList(group['items']).map(asMap))
+      .where((item) => text(item, 'review_status') == 'rejected')
+      .toList();
+  final activities = existing != null
+      ? asList(existing['activities'])
+      : rejectedAttemptActivities;
+  int? centerId = number(
+    existing != null
+        ? asMap(existing['training_center'])
+        : asMap(assignmentCase['training_center']),
+    'id',
+  ).toInt();
+  int? departmentId = number(
+    existing != null
+        ? asMap(existing['department'])
+        : asMap(assignmentCase['clinical_department']),
+    'id',
+  ).toInt();
+  int? doctorId = number(
+    existing != null
+        ? asMap(existing['doctor'])
+        : asMap(assignment?['assigner']),
+    'id',
+  ).toInt();
   if (centerId == 0) centerId = null;
   if (departmentId == 0) departmentId = null;
   if (doctorId == 0) doctorId = null;
@@ -2696,11 +6364,15 @@ Future<void> _showClinicalLogSheet(
   );
   final formKey = GlobalKey<FormState>();
 
+  bool submitting = false;
+
   await showMoeenBottomSheet<void>(
     context: context,
-    title: existing == null ? 'تسجيل بيانات اليوم' : 'تعديل سجل اليوم',
+    title: existing == null
+        ? 'تسجيل بيانات اليوم'
+        : 'تعديل سجل اليوم',
     icon: Icons.local_hospital_rounded,
-    color: AppColors.royalBlue,
+    color: AppColors.teal,
     child: StatefulBuilder(
       builder: (sheetContext, setLocal) {
         return Form(
@@ -2708,144 +6380,280 @@ Future<void> _showClinicalLogSheet(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _ClinicalDropdown(
-                label: 'مركز التدريب',
-                value: centerId,
-                items: centers,
-                onChanged: (value) => setLocal(() => centerId = value),
+              _ClinicalFormSection(
+                title: 'البيانات الأساسية',
+                icon: Icons.local_hospital_rounded,
+                children: [
+                  _ClinicalDropdown(
+                    label: 'مركز التدريب',
+                    value: centerId,
+                    items: centers,
+                    onChanged: assignment == null
+                        ? (value) => setLocal(() => centerId = value)
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  _ClinicalDropdown(
+                    label: 'القسم',
+                    value: departmentId,
+                    items: departments,
+                    onChanged: assignment == null
+                        ? (value) => setLocal(() => departmentId = value)
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  _ClinicalDropdown(
+                    label: 'الدكتور',
+                    value: doctorId,
+                    items: doctors,
+                    onChanged: assignment == null
+                        ? (value) => setLocal(() => doctorId = value)
+                        : null,
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              _ClinicalDropdown(
-                label: 'القسم',
-                value: departmentId,
-                items: departments,
-                onChanged: (value) => setLocal(() => departmentId = value),
+              if (assignment != null) ...[
+                _ClinicalAssignmentAttemptBanner(assignment: assignment),
+                const SizedBox(height: 16),
+              ],
+              _ClinicalFormSection(
+                title: 'الأنشطة والمهارات السريرية',
+                icon: Icons.checklist_rounded,
+                children: [
+                  _ClinicalPickerGroup(
+                    title: 'القصص المرضية',
+                    bodies: bodies,
+                    selected: historyIds,
+                    onToggle: (id) => setLocal(() {
+                      historyIds.contains(id)
+                          ? historyIds.remove(id)
+                          : historyIds.add(id);
+                    }),
+                  ),
+                  const SizedBox(height: 16),
+                  _ClinicalPickerGroup(
+                    title: 'الفحوصات السريرية',
+                    bodies: bodies,
+                    selected: examIds,
+                    onToggle: (id) => setLocal(() {
+                      examIds.contains(id)
+                          ? examIds.remove(id)
+                          : examIds.add(id);
+                    }),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              _ClinicalDropdown(
-                label: 'الدكتور',
-                value: doctorId,
-                items: doctors,
-                onChanged: (value) => setLocal(() => doctorId = value),
+              _ClinicalFormSection(
+                title: 'المرور السريري والملاحظات',
+                icon: Icons.groups_rounded,
+                children: [
+                  TextField(
+                    controller: roundCases,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'حالات المرور السريري',
+                      hintText: 'افصل بين الحالات بفاصلة',
+                      prefixIcon: const Icon(
+                        Icons.groups_rounded,
+                        color: AppColors.teal,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.slate50,
+                      floatingLabelStyle: const TextStyle(
+                        fontFamily: 'Cairo',
+                        color: AppColors.teal,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      labelStyle: const TextStyle(
+                        fontFamily: 'Cairo',
+                        color: AppColors.slate500,
+                        fontSize: 12,
+                      ),
+                      hintStyle: const TextStyle(
+                        fontFamily: 'Cairo',
+                        color: AppColors.slate400,
+                        fontSize: 11,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: AppColors.slate200),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: AppColors.teal,
+                          width: 1.6,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: notes,
+                    minLines: 2,
+                    maxLines: 4,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'ملاحظات المرور',
+                      prefixIcon: const Icon(
+                        Icons.notes_rounded,
+                        color: AppColors.teal,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.slate50,
+                      floatingLabelStyle: const TextStyle(
+                        fontFamily: 'Cairo',
+                        color: AppColors.teal,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      labelStyle: const TextStyle(
+                        fontFamily: 'Cairo',
+                        color: AppColors.slate500,
+                        fontSize: 12,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: AppColors.slate200),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: AppColors.teal,
+                          width: 1.6,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              _ClinicalPickerGroup(
-                title: 'القصص المرضية',
-                bodies: bodies,
-                selected: historyIds,
-                onToggle: (id) => setLocal(() {
-                  historyIds.contains(id)
-                      ? historyIds.remove(id)
-                      : historyIds.add(id);
-                }),
-              ),
-              const SizedBox(height: 14),
-              _ClinicalPickerGroup(
-                title: 'الفحوصات السريرية',
-                bodies: bodies,
-                selected: examIds,
-                onToggle: (id) => setLocal(() {
-                  examIds.contains(id) ? examIds.remove(id) : examIds.add(id);
-                }),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: roundCases,
-                decoration: const InputDecoration(
-                  labelText: 'حالات المرور السريري',
-                  hintText: 'افصل بين الحالات بفاصلة',
-                  prefixIcon: Icon(Icons.groups_rounded),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: notes,
-                minLines: 2,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'ملاحظات المرور',
-                  prefixIcon: Icon(Icons.notes_rounded),
-                ),
-              ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 10),
               FilledButton.icon(
-                onPressed: () async {
-                  if (!(formKey.currentState?.validate() ?? false)) return;
-                  final isOnline = await ref
-                      .read(connectivityServiceProvider)
-                      .isOnline();
-                  if (!isOnline) {
-                    if (!sheetContext.mounted) return;
-                    await showMoeenInfoDialog(
-                      context: sheetContext,
-                      title: 'لا يوجد اتصال بالإنترنت',
-                      message: 'يرجى الاتصال بالإنترنت لتنفيذ هذه العملية.',
-                      icon: Icons.wifi_off_rounded,
-                      color: AppColors.danger,
-                    );
-                    return;
-                  }
-                  final rounds = roundCases.text
-                      .split(',')
-                      .map((value) => value.trim())
-                      .where((value) => value.isNotEmpty)
-                      .map((value) => {'case_name': value})
-                      .toList();
-                  final payload = {
-                    'training_center_id': centerId,
-                    'department_id': departmentId,
-                    'doctor_id': doctorId,
-                    'histories': historyIds
-                        .map((id) => {'body_system_id': id})
-                        .toList(),
-                    'exams': examIds
-                        .map((id) => {'body_system_id': id})
-                        .toList(),
-                    'did_round': rounds.isNotEmpty,
-                    'rounds': rounds,
-                    'round_notes': notes.text.trim(),
-                  };
-                  try {
-                    if (existing == null) {
-                      await ref
-                          .read(studentContentRepositoryProvider)
-                          .createClinicalLog(payload);
-                    } else {
-                      await ref
-                          .read(studentContentRepositoryProvider)
-                          .updateClinicalLog(
-                            number(existing, 'id').toInt(),
-                            payload,
+                onPressed: submitting
+                    ? null
+                    : () async {
+                        if (!(formKey.currentState?.validate() ?? false))
+                          return;
+                        final isOnline = await ref
+                            .read(connectivityServiceProvider)
+                            .isOnline();
+                        if (!isOnline) {
+                          if (!sheetContext.mounted) return;
+                          await showMoeenInfoDialog(
+                            context: sheetContext,
+                            title:
+                                'لا يوجد اتصال بالإنترنت',
+                            message:
+                                'يرجى الاتصال بالإنترنت لتنفيذ هذه العملية.',
+                            icon: Icons.wifi_off_rounded,
+                            color: AppColors.danger,
                           );
-                    }
-                    ref.invalidate(_clinicalLogbookProvider);
-                    if (sheetContext.mounted) Navigator.pop(sheetContext);
-                  } on ApiException catch (error) {
-                    if (sheetContext.mounted) {
-                      await showMoeenInfoDialog(
-                        context: sheetContext,
-                        title: 'تعذر حفظ السجل',
-                        message: error.message,
-                        icon: error.isOffline
-                            ? Icons.wifi_off_rounded
-                            : Icons.error_outline_rounded,
-                        color: AppColors.danger,
-                      );
-                    }
-                  } catch (_) {
-                    if (sheetContext.mounted) {
-                      await showMoeenInfoDialog(
-                        context: sheetContext,
-                        title: 'تعذر حفظ السجل',
-                        message: 'حدث خطأ غير متوقع. حاول مرة أخرى.',
-                        icon: Icons.error_outline_rounded,
-                        color: AppColors.danger,
-                      );
-                    }
-                  }
-                },
-                icon: const Icon(Icons.save_rounded),
-                label: const Text('حفظ السجل'),
+                          return;
+                        }
+                        final rounds = roundCases.text
+                            .split(',')
+                            .map((value) => value.trim())
+                            .where((value) => value.isNotEmpty)
+                            .map((value) => {'case_name': value})
+                            .toList();
+                        final payload = {
+                          if (assignment != null)
+                            'case_assignment_id': number(
+                              assignment,
+                              'id',
+                            ).toInt(),
+                          'training_center_id': centerId,
+                          'department_id': departmentId,
+                          'doctor_id': doctorId,
+                          'histories': historyIds
+                              .map((id) => {'body_system_id': id})
+                              .toList(),
+                          'exams': examIds
+                              .map((id) => {'body_system_id': id})
+                              .toList(),
+                          'did_round': rounds.isNotEmpty,
+                          'rounds': rounds,
+                          'round_notes': notes.text.trim(),
+                        };
+                        setLocal(() => submitting = true);
+                        try {
+                          if (existing == null) {
+                            await ref
+                                .read(studentContentRepositoryProvider)
+                                .createClinicalLog(payload);
+                          } else {
+                            await ref
+                                .read(studentContentRepositoryProvider)
+                                .updateClinicalLog(
+                                  number(existing, 'id').toInt(),
+                                  payload,
+                                );
+                          }
+                          ref.invalidate(_clinicalLogbookProvider);
+                          if (sheetContext.mounted) Navigator.pop(sheetContext);
+                        } on ApiException catch (error) {
+                          if (sheetContext.mounted) {
+                            await showMoeenInfoDialog(
+                              context: sheetContext,
+                              title: 'تعذر حفظ السجل',
+                              message: error.message,
+                              icon: error.isOffline
+                                  ? Icons.wifi_off_rounded
+                                  : Icons.error_outline_rounded,
+                              color: AppColors.danger,
+                            );
+                          }
+                        } catch (_) {
+                          if (sheetContext.mounted) {
+                            await showMoeenInfoDialog(
+                              context: sheetContext,
+                              title: 'تعذر حفظ السجل',
+                              message:
+                                  'حدث خطأ غير متوقع. حاول مرة أخرى.',
+                              icon: Icons.error_outline_rounded,
+                              color: AppColors.danger,
+                            );
+                          }
+                        } finally {
+                          if (sheetContext.mounted) {
+                            setLocal(() => submitting = false);
+                          }
+                        }
+                      },
+                icon: submitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.save_rounded),
+                label: const Text(
+                  'حفظ السجل العملي',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.teal,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 2,
+                ),
               ),
             ],
           ),
@@ -2865,6 +6673,141 @@ bool _canAccessClinical(WidgetRef ref) {
   return ref.watch(authControllerProvider).valueOrNull?.hasClinical == true;
 }
 
+class _ClinicalAssignmentAttemptBanner extends StatelessWidget {
+  const _ClinicalAssignmentAttemptBanner({required this.assignment});
+
+  final Map<String, dynamic> assignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final clinicalCase = asMap(assignment['clinical_case']);
+    final task = _clinicalActivityLabel(text(assignment, 'task_type'));
+    final patient = text(
+      clinicalCase,
+      'patient_name',
+      fallback: text(
+        clinicalCase,
+        'diagnosis_or_description',
+        fallback: 'تكليف سريري',
+      ),
+    );
+    final instructions = text(assignment, 'instructions');
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.teal.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.teal.withValues(alpha: 0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.assignment_turned_in_rounded,
+                color: AppColors.teal,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$task - $patient',
+                  style: const TextStyle(
+                    color: AppColors.midnight,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (instructions.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              instructions,
+              style: const TextStyle(
+                color: AppColors.slate700,
+                fontWeight: FontWeight.w700,
+                height: 1.5,
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          const Text(
+            'اختر العناصر التي نفذتها، ثم احفظ المحاولة وسيظهر الباركود لاعتماد الدكتور.',
+            style: TextStyle(
+              color: AppColors.slate600,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClinicalFormSection extends StatelessWidget {
+  const _ClinicalFormSection({
+    required this.title,
+    required this.icon,
+    required this.children,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.slate200),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.midnight.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.teal.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: AppColors.teal, size: 16),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
+                  color: AppColors.midnight,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
 class _ClinicalDropdown extends StatelessWidget {
   const _ClinicalDropdown({
     required this.label,
@@ -2876,21 +6819,70 @@ class _ClinicalDropdown extends StatelessWidget {
   final String label;
   final int? value;
   final List<dynamic> items;
-  final ValueChanged<int?> onChanged;
+  final ValueChanged<int?>? onChanged;
 
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<int>(
       value: value,
-      validator: (value) => value == null ? 'هذا الحقل مطلوب' : null,
+      validator: (value) =>
+          value == null ? 'هذا الحقل مطلوب' : null,
       isExpanded: true,
-      decoration: InputDecoration(labelText: label),
+      style: const TextStyle(
+        fontFamily: 'Cairo',
+        fontSize: 13.5,
+        fontWeight: FontWeight.w700,
+        color: AppColors.midnight,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: AppColors.slate50,
+        floatingLabelStyle: const TextStyle(
+          fontFamily: 'Cairo',
+          color: AppColors.teal,
+          fontWeight: FontWeight.w800,
+          fontSize: 14,
+        ),
+        labelStyle: const TextStyle(
+          fontFamily: 'Cairo',
+          color: AppColors.slate500,
+          fontSize: 12,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.slate200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.teal, width: 1.6),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.danger),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.danger, width: 1.6),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+      ),
       items: items
           .map(asMap)
           .map(
             (item) => DropdownMenuItem<int>(
               value: number(item, 'id').toInt(),
-              child: Text(text(item, 'name')),
+              child: Text(
+                text(item, 'name'),
+                style: const TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           )
           .toList(),
@@ -2922,6 +6914,8 @@ class _ClinicalPickerGroup extends StatelessWidget {
           style: const TextStyle(
             color: AppColors.midnight,
             fontWeight: FontWeight.w900,
+            fontFamily: 'Cairo',
+            fontSize: 13.5,
           ),
         ),
         const SizedBox(height: 8),
@@ -2933,8 +6927,24 @@ class _ClinicalPickerGroup extends StatelessWidget {
             final active = selected.contains(id);
             return FilterChip(
               selected: active,
+              showCheckmark: true,
               label: Text(text(item, 'name')),
               onSelected: (_) => onToggle(id),
+              selectedColor: AppColors.teal.withValues(alpha: 0.12),
+              checkmarkColor: AppColors.teal,
+              side: BorderSide(
+                color: active ? AppColors.teal : AppColors.slate200,
+                width: active ? 1.4 : 1,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              labelStyle: TextStyle(
+                color: active ? AppColors.teal : AppColors.slate700,
+                fontWeight: active ? FontWeight.w900 : FontWeight.w700,
+                fontFamily: 'Cairo',
+                fontSize: 12,
+              ),
             );
           }).toList(),
         ),
@@ -2951,7 +6961,8 @@ Future<void> _deleteClinicalLog(
   final ok = await showMoeenConfirmDialog(
     context: context,
     title: 'حذف السجل العملي',
-    message: 'هل تريد حذف هذا السجل؟ لا يمكن حذف السجل بعد اعتماده.',
+    message:
+        'هل تريد حذف هذا السجل؟ لا يمكن حذف السجل بعد اعتماده.',
     confirmLabel: 'حذف',
     icon: Icons.delete_rounded,
     color: AppColors.danger,
@@ -2961,53 +6972,6 @@ Future<void> _deleteClinicalLog(
       .read(studentContentRepositoryProvider)
       .deleteClinicalLog(number(log, 'id').toInt());
   ref.invalidate(_clinicalLogbookProvider);
-}
-
-Future<void> _submitClinicalAssignment(
-  BuildContext context,
-  WidgetRef ref,
-  Map<String, dynamic> assignment,
-) async {
-  final controller = TextEditingController();
-  await showMoeenBottomSheet<void>(
-    context: context,
-    title: 'إرسال إنجاز المهمة',
-    icon: Icons.send_rounded,
-    color: AppColors.teal,
-    child: Column(
-      children: [
-        TextField(
-          controller: controller,
-          minLines: 4,
-          maxLines: 6,
-          decoration: const InputDecoration(
-            labelText: 'ماذا أنجزت؟',
-            hintText: 'اكتب رسالة واضحة للدكتور قبل الاعتماد.',
-          ),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: () async {
-              final message = controller.text.trim();
-              if (message.length < 5) return;
-              await ref
-                  .read(studentContentRepositoryProvider)
-                  .submitClinicalAssignment(
-                    assignmentId: number(assignment, 'id').toInt(),
-                    message: message,
-                  );
-              ref.invalidate(_clinicalLogbookProvider);
-              if (context.mounted) Navigator.pop(context);
-            },
-            icon: const Icon(Icons.send_rounded),
-            label: const Text('إرسال للمراجعة'),
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 Future<void> _showCustomChecklistSheet(
@@ -3040,7 +7004,9 @@ Future<void> _showCustomChecklistSheet(
               validator: (value) => value == null || value.trim().isEmpty
                   ? 'اكتب عنوان النموذج'
                   : null,
-              decoration: const InputDecoration(labelText: 'عنوان النموذج'),
+              decoration: const InputDecoration(
+                labelText: 'عنوان النموذج',
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -3061,7 +7027,9 @@ Future<void> _showCustomChecklistSheet(
                           value == null || value.trim().isEmpty
                           ? 'مطلوب'
                           : null,
-                      decoration: InputDecoration(labelText: 'العنصر ${i + 1}'),
+                      decoration: InputDecoration(
+                        labelText: 'العنصر ${i + 1}',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -3070,8 +7038,12 @@ Future<void> _showCustomChecklistSheet(
                       controller: items[i].marks,
                       keyboardType: TextInputType.number,
                       validator: (value) =>
-                          (num.tryParse(value ?? '') ?? 0) <= 0 ? 'درجة' : null,
-                      decoration: const InputDecoration(labelText: 'الدرجة'),
+                          (num.tryParse(value ?? '') ?? 0) <= 0
+                          ? 'درجة'
+                          : null,
+                      decoration: const InputDecoration(
+                        labelText: 'الدرجة',
+                      ),
                     ),
                   ),
                   IconButton(
@@ -3147,8 +7119,13 @@ String _clinicalStatusLabel(String value) {
     'excellent' => 'ممتاز',
     'vgood' => 'جيد جدًا',
     'good' => 'جيد',
+    'acceptable' => 'مقبول',
+    'weak' => 'ضعيف',
     'pass' => 'ناجح',
     'fail' => 'راسب',
+    'done' => 'تم',
+    'partial' => 'جزئي',
+    'not_done' => 'لم يتم',
     _ => value.isEmpty ? '-' : value,
   };
 }
@@ -3162,11 +7139,14 @@ Color _clinicalStatusColor(String value) {
     'excellent' ||
     'vgood' ||
     'good' ||
+    'done' ||
     'pass' => AppColors.success,
     'partially_confirmed' ||
     'submitted_for_review' ||
+    'acceptable' ||
+    'partial' ||
     'pending' => AppColors.warning,
-    'rejected' || 'fail' => AppColors.danger,
+    'rejected' || 'weak' || 'fail' || 'not_done' => AppColors.danger,
     _ => AppColors.royalBlue,
   };
 }

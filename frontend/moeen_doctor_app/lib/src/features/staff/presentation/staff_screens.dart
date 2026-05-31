@@ -1,14 +1,17 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/downloads/download_service.dart';
 import '../../../core/network/api_exception.dart';
@@ -37,6 +40,20 @@ part 'doctor_inquiries.dart';
 part 'doctor_messages.dart';
 part 'doctor_news_notifications.dart';
 part 'doctor_clinical.dart';
+part 'doctor_clinical_assignments.dart';
+part 'doctor_clinical_body_systems.dart';
+part 'doctor_clinical_cases.dart';
+part 'doctor_clinical_checklist_form.dart';
+part 'doctor_clinical_common_widgets.dart';
+part 'doctor_clinical_departments.dart';
+part 'doctor_clinical_evaluation_flow.dart';
+part 'doctor_clinical_evaluation_results.dart';
+part 'doctor_clinical_forms.dart';
+part 'doctor_clinical_home_widgets.dart';
+part 'doctor_clinical_rare_cases.dart';
+part 'doctor_clinical_scanner.dart';
+part 'doctor_clinical_training_centers.dart';
+part 'doctor_clinical_volunteers.dart';
 
 final staffRepositoryProvider = Provider<StaffRepository>((ref) {
   final session = ref.watch(authControllerProvider).valueOrNull;
@@ -84,7 +101,9 @@ Future<void> showStaffSubscriptionRequiredDialog(
 
 final _resourceProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, StaffMenuItem>((ref, item) {
-      ref.watch(staffRefreshCoordinatorProvider.select((state) => state.version));
+      ref.watch(
+        staffRefreshCoordinatorProvider.select((state) => state.version),
+      );
       return ref.watch(staffRepositoryProvider).get(item.endpoint);
     });
 
@@ -248,9 +267,8 @@ final staffRoutes = <GoRoute>[
   ),
   GoRoute(
     path: DoctorClinicalSectionScreen.route,
-    builder: (context, state) => DoctorClinicalSectionScreen(
-      section: state.pathParameters['section']!,
-    ),
+    builder: (context, state) =>
+        DoctorClinicalSectionScreen(section: state.pathParameters['section']!),
   ),
   GoRoute(
     path: '/administrative/subscription',
@@ -736,7 +754,9 @@ class StaffDashboardScreen extends ConsumerWidget {
 
 final _dashboardProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, String>((ref, path) {
-      ref.watch(staffRefreshCoordinatorProvider.select((state) => state.version));
+      ref.watch(
+        staffRefreshCoordinatorProvider.select((state) => state.version),
+      );
       return ref.watch(staffRepositoryProvider).get(path);
     });
 
@@ -821,28 +841,124 @@ class StaffResourceScreen extends ConsumerWidget {
   }
 }
 
-class _DashboardView extends StatelessWidget {
+class _DashboardView extends ConsumerWidget {
   const _DashboardView({required this.data});
 
   final Map<String, dynamic> data;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(authControllerProvider).valueOrNull;
+    final isAdministrative =
+        session?.workspace == StaffWorkspace.administrative;
+
     final content = _payload(data);
-    final flattened = _flatten(content);
+    final List<MapEntry<String, dynamic>> displayEntries;
+
+    if (isAdministrative) {
+      // Curate administrative keys so we don't show raw DB fields
+      final college = content is Map ? content['college'] : null;
+      final stats = content is Map ? content['stats'] : null;
+
+      final collegeMap = college is Map
+          ? Map<String, dynamic>.from(college)
+          : const <String, dynamic>{};
+      final statsMap = stats is Map
+          ? Map<String, dynamic>.from(stats)
+          : const <String, dynamic>{};
+
+      final tempEntries = <MapEntry<String, dynamic>>[];
+
+      if (statsMap.containsKey('doctors_count')) {
+        tempEntries.add(MapEntry('doctors_count', statsMap['doctors_count']));
+      }
+      if (statsMap.containsKey('delegates_count')) {
+        tempEntries.add(
+          MapEntry('delegates_count', statsMap['delegates_count']),
+        );
+      }
+      if (statsMap.containsKey('students_count')) {
+        tempEntries.add(MapEntry('students_count', statsMap['students_count']));
+      }
+      if (collegeMap.containsKey('absence_deprivation_percentage')) {
+        tempEntries.add(
+          MapEntry(
+            'absence_deprivation_percentage',
+            '${collegeMap['absence_deprivation_percentage']}%',
+          ),
+        );
+      }
+      if (collegeMap.containsKey('excuses_deadline_days')) {
+        tempEntries.add(
+          MapEntry(
+            'excuses_deadline_days',
+            '${collegeMap['excuses_deadline_days']} أيام',
+          ),
+        );
+      }
+
+      // If the API returned other flat fields or we couldn't find the expected keys, fallback to standard flattening
+      if (tempEntries.isEmpty) {
+        final flattened = _flatten(content);
+        displayEntries = flattened.entries
+            .where(
+              (e) =>
+                  !e.key.contains('id') &&
+                  !e.key.contains('created_at') &&
+                  !e.key.contains('updated_at'),
+            )
+            .take(12)
+            .toList();
+      } else {
+        displayEntries = tempEntries;
+      }
+    } else {
+      // Doctor's dashboard: use standard flattening, but filter out raw DB keys just in case
+      final flattened = _flatten(content);
+      displayEntries = flattened.entries
+          .where(
+            (e) =>
+                !e.key.contains('id') &&
+                !e.key.contains('created_at') &&
+                !e.key.contains('updated_at'),
+          )
+          .take(12)
+          .toList();
+    }
+
+    final collegeName =
+        (isAdministrative && content is Map && content['college'] is Map)
+        ? (content['college']['name']?.toString() ?? '')
+        : '';
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
       children: [
-        const _HeaderCard(
-          icon: Icons.dashboard_rounded,
-          title: 'نظرة عامة',
-          subtitle: 'ملخص مباشر من لوحة الويب وواجهات الـ API.',
+        _HeaderCard(
+          icon: isAdministrative
+              ? Icons.admin_panel_settings_rounded
+              : Icons.dashboard_rounded,
+          title: isAdministrative ? 'لوحة التحكم الإدارية' : 'نظرة عامة',
+          subtitle: isAdministrative
+              ? (collegeName.isNotEmpty
+                    ? collegeName
+                    : 'إدارة العملية الأكاديمية بالكلية')
+              : 'ملخص مباشر من لوحة الويب وواجهات الـ API.',
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
+        Text(
+          isAdministrative ? 'إحصائيات الكلية' : 'الإحصائيات المباشرة',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: AppColors.midnight,
+            fontFamily: 'Cairo',
+          ),
+        ),
+        const SizedBox(height: 12),
         Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: flattened.entries.take(12).map((entry) {
+          children: displayEntries.map((entry) {
             return _StatCard(label: entry.key, value: entry.value);
           }).toList(),
         ),
@@ -1388,8 +1504,25 @@ String _humanize(String key) {
     'total': 'الإجمالي',
     'count': 'العدد',
     'balance': 'الرصيد',
+    'college.name': 'الكلية',
+    'doctors_count': 'أعضاء التدريس',
+    'delegates_count': 'المناديب',
+    'students_count': 'الطلاب المسجلين',
+    'absence_deprivation_percentage': 'نسبة الحرمان',
+    'excuses_deadline_days': 'مهلة الأعذار',
+    'majors_count': 'التخصصات',
+    'subjects_count': 'المواد الدراسية',
+    'exams_count': 'جداول الاختبارات',
+    'schedules_count': 'الجداول الدراسية',
+    'lectures_count': 'المحاضرات اليومية',
+    'assignments_count': 'التكاليف النشطة',
+    'excuses_pending_count': 'أعذار معلقة',
+    'inquiries_pending_count': 'استفسارات معلقة',
+    'quizzes_count': 'الكويزات النشطة',
   };
-  return labels[key] ?? key.replaceAll('_', ' ');
+  if (labels.containsKey(key)) return labels[key]!;
+  final cleanKey = key.split('.').last;
+  return labels[cleanKey] ?? cleanKey.replaceAll('_', ' ');
 }
 
 String _firstText(Map<String, dynamic> map, List<String> keys) {

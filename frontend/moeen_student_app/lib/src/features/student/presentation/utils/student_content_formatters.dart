@@ -549,217 +549,6 @@ TimeOfDay _parseReminderTime(String value) {
   return const TimeOfDay(hour: 8, minute: 0);
 }
 
-void _showNewsDetails(BuildContext context, Map<String, dynamic> item) {
-  final attachment = absoluteUrl(text(item, 'attachment_url'));
-  final source = text(item, 'source');
-  final color = _sourceColor(source);
-
-  showMoeenBottomSheet<void>(
-    context: context,
-    title: 'تفاصيل الإعلان',
-    icon: Icons.article_rounded,
-    color: color,
-    fullScreen: true,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (attachment.isNotEmpty && isImageUrl(attachment))
-          GestureDetector(
-            onTap: () => MoeenDialogs.showImage(context, attachment),
-            child: Container(
-              width: double.infinity,
-              height: 250,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    attachment,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) =>
-                        const _NewsImageFallback(height: 200),
-                  ),
-                  Positioned(
-                    right: 12,
-                    bottom: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(
-                            Icons.zoom_out_map_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'تكبير وعرض',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        Row(
-          children: [
-            _MiniBadge(label: _sourceLabel(source), color: color),
-            const SizedBox(width: 8),
-            _MiniBadge(
-              label: timeAgo(text(item, 'created_at')),
-              color: AppColors.slate500,
-              textColor: AppColors.slate600,
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        Text(
-          text(item, 'title', fallback: 'إعلان جديد'),
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            height: 1.3,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.slate50,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.slate100),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: color.withValues(alpha: 0.1),
-                child: Icon(Icons.person_rounded, color: color, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      text(item, 'author_name', fallback: 'النظام'),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                      ),
-                    ),
-                    Text(
-                      _sourceLabel(source),
-                      style: TextStyle(
-                        color: AppColors.slate500,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          text(item, 'body', fallback: text(item, 'excerpt')),
-          style: TextStyle(
-            fontSize: 16,
-            height: 1.8,
-            color: AppColors.slate800,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        if (attachment.isNotEmpty) ...[
-          const SizedBox(height: 30),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: color.withValues(alpha: 0.1)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.attach_file_rounded, color: color),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'مرفق مع الإعلان',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        'اضغط للتحميل أو العرض',
-                        style: TextStyle(
-                          color: AppColors.slate500,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => _downloadUrlToFile(
-                    context,
-                    attachment,
-                    text(item, 'title'),
-                  ),
-                  icon: Icon(Icons.download_rounded, color: color),
-                ),
-              ],
-            ),
-          ),
-        ],
-        const SizedBox(height: 40),
-      ],
-    ),
-  );
-}
-
 String _gradeLabel(Map<String, dynamic> grade) {
   if (grade.isEmpty) return '-';
   return '${text(grade, 'score', fallback: '0')}/${text(grade, 'max_score', fallback: '0')}';
@@ -889,6 +678,7 @@ String _notificationTypeLabel(String type) {
     'announcement' => 'إعلان',
     'exam' => 'اختبار',
     'assignment' => 'تكليف',
+    'grade_delegation' => 'تفويض درجات',
     'attendance' => 'حضور',
     'poll' => 'استطلاع',
     _ => 'تنبيه',
@@ -899,6 +689,7 @@ IconData _notificationIcon(String type) {
   return switch (type) {
     'exam' => Icons.fact_check_rounded,
     'assignment' => Icons.assignment_rounded,
+    'grade_delegation' => Icons.assignment_ind_rounded,
     'attendance' => Icons.how_to_reg_rounded,
     'poll' => Icons.poll_rounded,
     'announcement' => Icons.campaign_rounded,
@@ -910,6 +701,7 @@ Color _notificationColor(String type) {
   return switch (type) {
     'exam' => const Color(0xFF7C3AED),
     'assignment' => AppColors.orange,
+    'grade_delegation' => AppColors.royalBlue,
     'attendance' => AppColors.success,
     'poll' => AppColors.info,
     'announcement' => AppColors.royalBlue,

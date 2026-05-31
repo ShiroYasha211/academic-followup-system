@@ -1,6 +1,7 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -17,6 +18,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/downloads/download_service.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/offline/connectivity_service.dart';
+import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/moeen_dialogs.dart';
 import '../../auth/logic/auth_controller.dart';
@@ -47,6 +49,7 @@ part 'student_messages_screen.dart';
 part 'student_inquiries_screen.dart';
 part 'student_profile_screen.dart';
 part 'student_clinical_screen.dart';
+part 'student_authorized_grades_screen.dart';
 part 'student_tree_farm_screen.dart';
 part 'widgets/student_content_widgets.dart';
 part 'utils/student_content_formatters.dart';
@@ -141,6 +144,18 @@ final _notificationsProvider = FutureProvider.autoDispose
           .notifications(page: page);
     });
 
+final _authorizedGradesProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, int>((ref, tick) {
+      return ref.watch(studentContentRepositoryProvider).authorizedGrades();
+    });
+
+final _authorizedGradeDetailsProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, int>((ref, categoryId) {
+      return ref
+          .watch(studentContentRepositoryProvider)
+          .authorizedGradeDetails(categoryId);
+    });
+
 final _examsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
   return ref.watch(studentContentRepositoryProvider).exams();
 });
@@ -233,6 +248,11 @@ final _clinicalLogbookProvider =
 final _clinicalEvaluationsProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
       return ref.watch(studentContentRepositoryProvider).clinicalEvaluations();
+    });
+
+final _clinicalEvaluationProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, int>((ref, id) {
+      return ref.watch(studentContentRepositoryProvider).clinicalEvaluation(id);
     });
 
 final _clinicalMockExamsProvider =

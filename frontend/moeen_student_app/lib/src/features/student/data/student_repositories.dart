@@ -558,6 +558,30 @@ class StudentContentRepository {
     return (response['message'] ?? 'تم تسجيل التصويت بنجاح.').toString();
   }
 
+  Future<Map<String, dynamic>> authorizedGrades() async {
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.authorized_grades',
+      load: () async => _data(await _api.get('/student/authorized-grades')),
+    );
+  }
+
+  Future<Map<String, dynamic>> authorizedGradeDetails(int categoryId) async {
+    return _data(await _api.get('/student/authorized-grades/$categoryId'));
+  }
+
+  Future<String> saveAuthorizedGrades({
+    required int categoryId,
+    required List<Map<String, dynamic>> grades,
+  }) async {
+    final response = await _api.post(
+      '/student/authorized-grades/$categoryId/store',
+      data: {'grades': grades},
+    );
+    return (response['message'] ?? 'تم إرسال الدرجات إلى الدكتور للمراجعة.')
+        .toString();
+  }
+
   Future<Map<String, dynamic>> exams() async {
     return _cachedMap(
       cache: _cache,
@@ -918,6 +942,15 @@ class StudentContentRepository {
       cache: _cache,
       key: 'student.clinical.evaluations',
       load: () async => _data(await _api.get('/student/clinical/evaluations')),
+    );
+  }
+
+  Future<Map<String, dynamic>> clinicalEvaluation(int id) async {
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.clinical.evaluation.$id',
+      load: () async =>
+          _data(await _api.get('/student/clinical/evaluations/$id')),
     );
   }
 

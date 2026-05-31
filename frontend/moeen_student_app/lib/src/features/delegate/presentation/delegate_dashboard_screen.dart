@@ -33,25 +33,17 @@ class DelegateDashboardScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
               children: [
-                _HeroPanel(
+                _WelcomeBanner(
                   title:
                       '${greetingPrefix()}، ${session?.name.split(' ').first ?? 'يا مندوب'}',
                   subtitle:
                       'إليك نظرة سريعة على حالة الدفعة اليوم وما يمكنك القيام به.',
-                  icon: Icons.dashboard_customize_rounded,
-                  colors: const [AppColors.royalBlueDark, AppColors.royalBlue],
+                ),
+                const SizedBox(height: 20),
+                _DelegateQrAttendanceCard(
+                  onTap: () => context.go(DelegateRoutes.qrAttendance),
                 ),
                 const SizedBox(height: 24),
-                _ActionGrid(
-                  onQrTap: () => context.go(DelegateRoutes.qrAttendance),
-                  onStudentsTap: () => context.go(DelegateRoutes.students),
-                  onSubjectsTap: () => context.go(DelegateRoutes.subjects),
-                  onAttendanceTap: () => context.go(DelegateRoutes.attendance),
-                  onGradesTap: () =>
-                      context.go(DelegateRoutes.authorizedGrades),
-                  onMessagesTap: () => context.go(DelegateRoutes.messages),
-                ),
-                const SizedBox(height: 32),
                 const _SectionHeader(
                   title: 'أهم الإحصائيات',
                   icon: Icons.analytics_rounded,
@@ -84,6 +76,15 @@ class DelegateDashboardScreen extends ConsumerWidget {
                       AppColors.info,
                     ),
                   ],
+                ),
+                const SizedBox(height: 24),
+                _ActionGrid(
+                  onStudentsTap: () => context.go(DelegateRoutes.students),
+                  onSubjectsTap: () => context.go(DelegateRoutes.subjects),
+                  onAttendanceTap: () => context.go(DelegateRoutes.attendance),
+                  onGradesTap: () =>
+                      context.go(DelegateRoutes.authorizedGrades),
+                  onMessagesTap: () => context.go(DelegateRoutes.messages),
                 ),
                 const SizedBox(height: 32),
                 _SubjectsStrip(subjects: subjects),

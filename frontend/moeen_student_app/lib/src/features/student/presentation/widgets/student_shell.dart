@@ -558,6 +558,13 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           true,
         ),
         _DrawerItem(
+          'الدرجات المفوضة',
+          Icons.assignment_ind_rounded,
+          36,
+          StudentAuthorizedGradesScreen.route,
+          true,
+        ),
+        _DrawerItem(
           'التذكيرات',
           Icons.event_note_rounded,
           13,
@@ -893,6 +900,7 @@ int _badgeForRoute(String route, Map<String, int> unreadByScreen) {
     StudentRemindersScreen.route => 'reminders',
     StudentResourcesScreen.route => 'resources',
     StudentLibraryScreen.route => 'library',
+    StudentAuthorizedGradesScreen.route => 'authorized_grades',
     StudentStarsScreen.route => 'stars',
     StudentInquiriesScreen.route => 'inquiries',
     StudentNewsScreen.route => 'news_hub',

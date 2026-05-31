@@ -68,19 +68,33 @@ class _ChatListScreen extends ConsumerWidget {
                       itemCount: items.length,
                       itemBuilder: (context, index) {
                         final raw = items[index];
-                        final recipient = (asMap(raw)['student'] as Map?)?.isNotEmpty == true
+                        final recipient =
+                            (asMap(raw)['student'] as Map?)?.isNotEmpty == true
                             ? asMap(raw)['student']
                             : asMap(raw)['doctor'];
-                        final name = text(recipient, 'name', fallback: 'محادثة');
+                        final name = text(
+                          recipient,
+                          'name',
+                          fallback: 'محادثة',
+                        );
                         final last = asMap(raw)['last_message'];
                         final unread = number(raw, 'unread_count').toInt();
 
+                        final isDoctor =
+                            (asMap(raw)['doctor'] as Map?)?.isNotEmpty == true;
+
                         return _ConversationCard(
                           name: name,
-                          lastMessage: text(last, 'body', fallback: 'افتح المحادثة للتواصل.'),
+                          lastMessage: text(
+                            last,
+                            'body',
+                            fallback: 'افتح المحادثة للتواصل.',
+                          ),
                           time: text(last, 'created_at'),
                           unreadCount: unread,
-                          onTap: () => context.push(openPath(number(raw, 'id').toInt())),
+                          isDoctor: isDoctor,
+                          onTap: () =>
+                              context.push(openPath(number(raw, 'id').toInt())),
                         );
                       },
                     ),
@@ -167,84 +181,177 @@ class _ConversationViewState extends State<_ConversationView> {
 
   @override
   Widget build(BuildContext context) {
-    return DelegateShell(
-      currentIndex: widget.index,
-      title: widget.title,
-      child: FutureBuilder<Map<String, dynamic>>(
-        future: widget.future,
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            _cachedData = snapshot.data;
-          }
+    return FutureBuilder<Map<String, dynamic>>(
+      future: widget.future,
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          _cachedData = snapshot.data;
+        }
 
-          if (_cachedData == null && snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
+        if (_cachedData == null &&
+            snapshot.connectionState != ConnectionState.done) {
+          return Scaffold(
+            backgroundColor: AppColors.cream,
+            appBar: AppBar(
+              backgroundColor: Colors.white.withValues(alpha: 0.9),
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              leading: IconButton(
+                onPressed: () => Navigator.maybePop(context),
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: AppColors.royalBlue,
+                ),
+              ),
+            ),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
 
-          if (snapshot.hasError && _cachedData == null) {
-            return _ErrorState(
+        if (snapshot.hasError && _cachedData == null) {
+          return Scaffold(
+            backgroundColor: AppColors.cream,
+            appBar: AppBar(
+              backgroundColor: Colors.white.withValues(alpha: 0.9),
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              leading: IconButton(
+                onPressed: () => Navigator.maybePop(context),
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: AppColors.royalBlue,
+                ),
+              ),
+            ),
+            body: _ErrorState(
               message: snapshot.error.toString(),
               onRetry: widget.reload,
-            );
-          }
-
-          final data = _cachedData ?? {};
-          final messages = asList(data['messages']).map(asMap).toList();
-          final conversation = asMap(data['conversation']);
-          final recipient = (asMap(conversation['student']) as Map?)?.isNotEmpty == true
-              ? asMap(conversation['student'])
-              : asMap(conversation['doctor']);
-          final name = text(recipient, 'name', fallback: 'المحادثة');
-
-          return Column(
-            children: [
-              _ChatHeader(name: name, subtitle: widget.subtitle),
-              Expanded(
-                child: messages.isEmpty
-                    ? const _EmptyState('لا توجد رسائل في هذه المحادثة.')
-                    : ListView.builder(
-                        reverse: true,
-                        padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
-                        itemCount: messages.length,
-                        itemBuilder: (context, index) {
-                          final item = messages[messages.length - 1 - index];
-                          final sender = asMap(item['sender']);
-                          final isMine = text(sender, 'role') == 'delegate';
-
-                          // Date Divider logic
-                          bool showDate = false;
-                          String dateLabel = '';
-                          if (index == messages.length - 1) {
-                            showDate = true;
-                            dateLabel = _formatChatDate(text(item, 'created_at'));
-                          } else {
-                            final nextItem = messages[messages.length - 2 - index];
-                            final currentDate = dateOnly(text(item, 'created_at'));
-                            final nextDate = dateOnly(text(nextItem, 'created_at'));
-                            if (currentDate != nextDate) {
-                              showDate = true;
-                              dateLabel = _formatChatDate(text(item, 'created_at'));
-                            }
-                          }
-
-                          return Column(
-                            children: [
-                              if (showDate) _DateDivider(label: dateLabel),
-                              _ChatBubble(message: item, isMine: isMine),
-                            ],
-                          );
-                        },
-                      ),
-              ),
-              _MessageComposer(
-                controller: _message,
-                sending: _sending,
-                onSend: _send,
-              ),
-            ],
+            ),
           );
-        },
-      ),
+        }
+
+        final data = _cachedData ?? {};
+        final messages = asList(data['messages']).map(asMap).toList();
+        final conversation = asMap(data['conversation']);
+        final recipient =
+            (asMap(conversation['student']) as Map?)?.isNotEmpty == true
+            ? asMap(conversation['student'])
+            : asMap(conversation['doctor']);
+        final name = text(recipient, 'name', fallback: 'المحادثة');
+        final isDoctor =
+            (asMap(conversation['doctor']) as Map?)?.isNotEmpty == true;
+
+        return Scaffold(
+          backgroundColor: AppColors.cream,
+          appBar: AppBar(
+            backgroundColor: Colors.white.withValues(alpha: 0.9),
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            titleSpacing: 0,
+            leadingWidth: 54,
+            leading: IconButton(
+              onPressed: () => Navigator.maybePop(context),
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                color: AppColors.royalBlue,
+              ),
+            ),
+            title: Row(
+              children: [
+                _UserAvatar(name: name, size: 38, isDoctor: isDoctor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          color: AppColors.midnight,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                        ),
+                      ),
+                      Text(
+                        widget.subtitle,
+                        style: const TextStyle(
+                          color: AppColors.slate400,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          body: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: messages.isEmpty
+                      ? const _EmptyState('لا توجد رسائل في هذه المحادثة.')
+                      : ListView.builder(
+                          reverse: true,
+                          padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final item = messages[messages.length - 1 - index];
+                            final sender = asMap(item['sender']);
+                            final isMine = boolValue(
+                              item,
+                              'is_mine',
+                              fallback:
+                                  text(sender, 'role') == 'delegate' ||
+                                  text(sender, 'role') == 'practical_delegate',
+                            );
+
+                            // Date Divider logic
+                            bool showDate = false;
+                            String dateLabel = '';
+                            if (index == messages.length - 1) {
+                              showDate = true;
+                              dateLabel = _formatChatDate(
+                                text(item, 'created_at'),
+                              );
+                            } else {
+                              final nextItem =
+                                  messages[messages.length - 2 - index];
+                              final currentDate = dateOnly(
+                                text(item, 'created_at'),
+                              );
+                              final nextDate = dateOnly(
+                                text(nextItem, 'created_at'),
+                              );
+                              if (currentDate != nextDate) {
+                                showDate = true;
+                                dateLabel = _formatChatDate(
+                                  text(item, 'created_at'),
+                                );
+                              }
+                            }
+
+                            return Column(
+                              children: [
+                                if (showDate) _DateDivider(label: dateLabel),
+                                _ChatBubble(message: item, isMine: isMine),
+                              ],
+                            );
+                          },
+                        ),
+                ),
+                _MessageComposer(
+                  controller: _message,
+                  sending: _sending,
+                  onSend: _send,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -333,6 +440,7 @@ class _ConversationCard extends StatelessWidget {
     required this.time,
     required this.unreadCount,
     required this.onTap,
+    this.isDoctor = false,
   });
 
   final String name;
@@ -340,6 +448,7 @@ class _ConversationCard extends StatelessWidget {
   final String time;
   final int unreadCount;
   final VoidCallback onTap;
+  final bool isDoctor;
 
   @override
   Widget build(BuildContext context) {
@@ -370,7 +479,7 @@ class _ConversationCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              _UserAvatar(name: name, size: 54),
+              _UserAvatar(name: name, size: 54, isDoctor: isDoctor),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -463,33 +572,39 @@ class _ConversationCard extends StatelessWidget {
 }
 
 class _UserAvatar extends StatelessWidget {
-  const _UserAvatar({required this.name, required this.size});
+  const _UserAvatar({
+    required this.name,
+    required this.size,
+    this.isDoctor = false,
+  });
+
   final String name;
   final double size;
+  final bool isDoctor;
 
   @override
   Widget build(BuildContext context) {
-    final initials = name
-        .split(' ')
-        .take(2)
-        .map((e) => e.isNotEmpty ? e[0] : '')
-        .join()
-        .toUpperCase();
+    final initials = name.isNotEmpty
+        ? name.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
+        : '?';
+
+    final roleColor = isDoctor ? AppColors.royalBlue : AppColors.teal;
+
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.royalBlue.withValues(alpha: 0.1),
-            AppColors.royalBlue.withValues(alpha: 0.2),
+            roleColor.withValues(alpha: 0.1),
+            roleColor.withValues(alpha: 0.2),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         shape: BoxShape.circle,
         border: Border.all(
-          color: AppColors.royalBlue.withValues(alpha: 0.1),
+          color: roleColor.withValues(alpha: 0.15),
           width: 1.5,
         ),
       ),
@@ -497,61 +612,11 @@ class _UserAvatar extends StatelessWidget {
       child: Text(
         initials,
         style: TextStyle(
-          color: AppColors.royalBlue,
+          color: roleColor,
           fontWeight: FontWeight.w900,
           fontSize: size * 0.35,
+          fontFamily: 'Cairo',
         ),
-      ),
-    );
-  }
-}
-
-class _ChatHeader extends StatelessWidget {
-  const _ChatHeader({required this.name, required this.subtitle});
-  final String name;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          _UserAvatar(name: name, size: 44),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.slate400,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -573,23 +638,33 @@ class _ChatBubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isMine ? AppColors.royalBlue : Colors.white,
+          gradient: isMine
+              ? const LinearGradient(
+                  colors: [AppColors.royalBlue, AppColors.royalBlueDark],
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                )
+              : null,
+          color: isMine ? null : AppColors.slate100,
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(24),
-            topRight: const Radius.circular(24),
-            bottomLeft: Radius.circular(isMine ? 24 : 6),
-            bottomRight: Radius.circular(isMine ? 6 : 24),
+            topLeft: const Radius.circular(20),
+            topRight: const Radius.circular(20),
+            bottomLeft: Radius.circular(isMine ? 20 : 4),
+            bottomRight: Radius.circular(isMine ? 4 : 20),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
             ),
           ],
           border: isMine
               ? null
-              : Border.all(color: AppColors.slate100, width: 1.2),
+              : Border.all(
+                  color: AppColors.slate200.withValues(alpha: 0.5),
+                  width: 1.2,
+                ),
         ),
         child: Column(
           crossAxisAlignment: isMine
@@ -599,9 +674,9 @@ class _ChatBubble extends StatelessWidget {
             Text(
               text(message, 'body', fallback: text(message, 'content')),
               style: TextStyle(
-                color: isMine ? Colors.white : AppColors.slate900,
+                color: isMine ? Colors.white : AppColors.midnight,
                 fontWeight: isMine ? FontWeight.w600 : FontWeight.w700,
-                fontSize: 14.5,
+                fontSize: 14,
                 height: 1.5,
               ),
             ),
@@ -630,24 +705,24 @@ class _DateDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Row(
-        children: [
-          const Expanded(child: Divider(color: AppColors.slate100, thickness: 1)),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.slate400,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.5,
-              ),
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.slate100,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.slate500,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'Cairo',
             ),
           ),
-          const Expanded(child: Divider(color: AppColors.slate100, thickness: 1)),
-        ],
+        ),
       ),
     );
   }
@@ -669,17 +744,17 @@ class _MessageComposer extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(
         16,
-        12,
+        10,
         16,
-        12 + MediaQuery.paddingOf(context).bottom,
+        10 + MediaQuery.paddingOf(context).bottom,
       ),
       decoration: const BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black12,
-            blurRadius: 15,
-            offset: Offset(0, -5),
+            blurRadius: 10,
+            offset: Offset(0, -3),
           ),
         ],
       ),
@@ -690,8 +765,10 @@ class _MessageComposer extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 color: AppColors.slate50,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: AppColors.slate100),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: AppColors.slate200.withValues(alpha: 0.8),
+                ),
               ),
               child: TextField(
                 controller: controller,
@@ -705,43 +782,43 @@ class _MessageComposer extends StatelessWidget {
                   hintText: 'اكتب رسالتك...',
                   hintStyle: TextStyle(color: AppColors.slate400),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           GestureDetector(
             onTap: sending ? null : onSend,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 48,
-              height: 48,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: AppColors.royalBlue,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.royalBlue.withValues(alpha: 0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    color: AppColors.royalBlue.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
               alignment: Alignment.center,
               child: sending
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
+                      width: 18,
+                      height: 18,
                       child: CircularProgressIndicator(
                         color: Colors.white,
-                        strokeWidth: 2.5,
+                        strokeWidth: 2.2,
                       ),
                     )
                   : const Icon(
                       Icons.send_rounded,
                       color: Colors.white,
-                      size: 20,
+                      size: 18,
                     ),
             ),
           ),
@@ -750,7 +827,6 @@ class _MessageComposer extends StatelessWidget {
     );
   }
 }
-
 
 // Kept for screens that may reuse the compact info-row visual.
 // ignore: unused_element

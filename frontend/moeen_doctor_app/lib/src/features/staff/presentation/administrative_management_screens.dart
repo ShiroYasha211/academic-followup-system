@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -101,17 +100,111 @@ class _AdministrativeManagementScreenState
   int? _levelFilter;
   int? _termFilter;
   int? _doctorFilter;
+  int? _selectedMajorIdForSubjects;
+  Map<String, dynamic>? _selectedMajorMapForSubjects;
+  int? _selectedMajorIdForStudents;
+  Map<String, dynamic>? _selectedMajorMapForStudents;
+  int? _selectedMajorIdForDelegates;
+  Map<String, dynamic>? _selectedMajorMapForDelegates;
 
-  @override
-  void initState() {
-    super.initState();
+  void _selectMajor(Map<String, dynamic> major) {
+    _searchController.clear();
+    setState(() {
+      _selectedMajorMapForSubjects = major;
+      _selectedMajorIdForSubjects = _int(major['id']);
+      _page = 1;
+      _payload = null;
+    });
+    _load();
+  }
+
+  void _clearMajor() {
+    _searchController.clear();
+    setState(() {
+      _selectedMajorMapForSubjects = null;
+      _selectedMajorIdForSubjects = null;
+      _page = 1;
+      _payload = null;
+    });
+    _load();
+  }
+
+  void _selectMajorForStudents(Map<String, dynamic> major) {
+    _searchController.clear();
+    setState(() {
+      _selectedMajorMapForStudents = major;
+      _selectedMajorIdForStudents = _int(major['id']);
+      _page = 1;
+      _payload = null;
+    });
+    _load();
+  }
+
+  void _clearMajorForStudents() {
+    _searchController.clear();
+    setState(() {
+      _selectedMajorMapForStudents = null;
+      _selectedMajorIdForStudents = null;
+      _page = 1;
+      _payload = null;
+    });
+    _load();
+  }
+
+  void _selectMajorForDelegates(Map<String, dynamic> major) {
+    _searchController.clear();
+    setState(() {
+      _selectedMajorMapForDelegates = major;
+      _selectedMajorIdForDelegates = _int(major['id']);
+      _page = 1;
+      _payload = null;
+    });
+    _load();
+  }
+
+  void _clearMajorForDelegates() {
+    _searchController.clear();
+    setState(() {
+      _selectedMajorMapForDelegates = null;
+      _selectedMajorIdForDelegates = null;
+      _page = 1;
+      _payload = null;
+    });
     _load();
   }
 
   @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+    _load();
+  }
+
+  void _onSearchChanged() {
+    setState(() {});
+  }
+
+  @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<bool> _onBackPressed() async {
+    if (widget.section == _AdminSection.subjects && _selectedMajorIdForSubjects != null) {
+      _clearMajor();
+      return true;
+    }
+    if (widget.section == _AdminSection.students && _selectedMajorIdForStudents != null) {
+      _clearMajorForStudents();
+      return true;
+    }
+    if (widget.section == _AdminSection.delegates && _selectedMajorIdForDelegates != null) {
+      _clearMajorForDelegates();
+      return true;
+    }
+    return false;
   }
 
   _AdminMeta get _meta => _metaFor(widget.section);
@@ -119,9 +212,40 @@ class _AdministrativeManagementScreenState
   @override
   Widget build(BuildContext context) {
     final meta = _meta;
+    final isSubjectsMajorSelect =
+        widget.section == _AdminSection.subjects &&
+            _selectedMajorIdForSubjects == null;
+    final isStudentsMajorSelect =
+        widget.section == _AdminSection.students &&
+            _selectedMajorIdForStudents == null;
+    final isDelegatesMajorSelect =
+        widget.section == _AdminSection.delegates &&
+            _selectedMajorIdForDelegates == null;
+    final isMajorSelectMode = isSubjectsMajorSelect || isStudentsMajorSelect || isDelegatesMajorSelect;
+
     return StaffShell(
-      title: meta.title,
+      title: isMajorSelectMode ? 'اختيار التخصص' : meta.title,
       currentRoute: meta.route,
+      onBackPressed: _onBackPressed,
+      floatingActionButton: (widget.section == _AdminSection.delegates || isMajorSelectMode)
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _openForm(),
+              backgroundColor: meta.color,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_rounded),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              label: Text(
+                'إضافة ${meta.singleLabel}',
+                style: const TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
+              ),
+            ),
       child: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -141,84 +265,225 @@ class _AdministrativeManagementScreenState
               onRefresh: _load,
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
-                children: [
-                  _AdminHero(meta: meta),
-                  const SizedBox(height: 18),
-                  _StatsRow(stats: _stats()),
-                  const SizedBox(height: 18),
-                  _Toolbar(
-                    meta: meta,
-                    searchController: _searchController,
-                    hasCreate: widget.section != _AdminSection.delegates,
-                    onSearch: () {
-                      _page = 1;
-                      _load();
-                    },
-                    onCreate: () => _openForm(),
-                  ),
-                  if (_showFilters) ...[
-                    const SizedBox(height: 12),
-                    _FiltersBar(
-                      section: widget.section,
-                      payload: _payload ?? const {},
-                      roleFilter: _roleFilter,
-                      majorFilter: _majorFilter,
-                      levelFilter: _levelFilter,
-                      termFilter: _termFilter,
-                      doctorFilter: _doctorFilter,
-                      onRoleChanged: (value) {
-                        _roleFilter = value;
-                        _page = 1;
-                        _load();
-                      },
-                      onMajorChanged: (value) {
-                        _majorFilter = value;
-                        _levelFilter = null;
-                        _page = 1;
-                        _load();
-                      },
-                      onLevelChanged: (value) {
-                        _levelFilter = value;
-                        _page = 1;
-                        _load();
-                      },
-                      onTermChanged: (value) {
-                        _termFilter = value;
-                        _page = 1;
-                        _load();
-                      },
-                      onDoctorChanged: (value) {
-                        _doctorFilter = value;
-                        _page = 1;
-                        _load();
-                      },
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                  if (_items.isEmpty)
-                    const _EmptyState()
-                  else
-                    ..._items.map(_entityCard),
-                  const SizedBox(height: 12),
-                  _Pagination(
-                    pagination: _pagination,
-                    onPrevious: _page > 1
-                        ? () {
-                            _page--;
+                children: isMajorSelectMode
+                    ? [
+                        _AdminHero(
+                          meta: _AdminMeta(
+                            title: 'اختيار التخصص',
+                            singleLabel: 'تخصص',
+                            subtitle: isSubjectsMajorSelect
+                                ? 'حدد التخصص الدراسي أولاً لعرض وإدارة المواد الدراسية الخاصة به.'
+                                : isStudentsMajorSelect
+                                    ? 'حدد التخصص الدراسي أولاً لعرض وإدارة الطلاب الخاصين به.'
+                                    : 'حدد التخصص الدراسي أولاً لعرض وإدارة المندوبين الخاصين به.',
+                            route: widget.section == _AdminSection.subjects
+                                ? AdministrativeSubjectsScreen.route
+                                : widget.section == _AdminSection.students
+                                    ? AdministrativeStudentsScreen.route
+                                    : AdministrativeDelegatesScreen.route,
+                            endpoint: '/administrative/majors',
+                            icon: Icons.account_tree_rounded,
+                            color: isSubjectsMajorSelect
+                                ? AppColors.royalBlue
+                                : isStudentsMajorSelect
+                                    ? AppColors.teal
+                                    : AppColors.royalBlue,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        _Toolbar(
+                          meta: meta,
+                          searchController: _searchController,
+                          hasCreate: false,
+                          onSearch: () {},
+                          onCreate: () {},
+                        ),
+                        const SizedBox(height: 18),
+                        if (_items.isEmpty)
+                          const _EmptyState()
+                        else
+                          ..._items.map((major) => _SubjectMajorCard(
+                                major: major,
+                                color: isSubjectsMajorSelect
+                                    ? AppColors.royalBlue
+                                    : isStudentsMajorSelect
+                                        ? AppColors.teal
+                                        : AppColors.royalBlue,
+                                onTap: () => isSubjectsMajorSelect
+                                    ? _selectMajor(major)
+                                    : isStudentsMajorSelect
+                                        ? _selectMajorForStudents(major)
+                                        : _selectMajorForDelegates(major),
+                              )),
+                      ]
+                    : [
+                        _AdminHero(meta: meta),
+                        const SizedBox(height: 18),
+                        if ((widget.section == _AdminSection.subjects &&
+                            _selectedMajorIdForSubjects != null) ||
+                            (widget.section == _AdminSection.students &&
+                            _selectedMajorIdForStudents != null) ||
+                            (widget.section == _AdminSection.delegates &&
+                            _selectedMajorIdForDelegates != null)) ...[
+                          _buildMajorHeader(context),
+                          const SizedBox(height: 18),
+                        ],
+                        _StatsRow(stats: _stats()),
+                        const SizedBox(height: 18),
+                        _Toolbar(
+                          meta: meta,
+                          searchController: _searchController,
+                          hasCreate: false,
+                          onSearch: () {
+                            _page = 1;
                             _load();
-                          }
-                        : null,
-                    onNext: _page < _pagination.lastPage
-                        ? () {
-                            _page++;
-                            _load();
-                          }
-                        : null,
-                  ),
-                ],
+                          },
+                          onCreate: () => _openForm(),
+                        ),
+                        if (_showFilters) ...[
+                          const SizedBox(height: 12),
+                          _FiltersBar(
+                            section: widget.section,
+                            payload: _payload ?? const {},
+                            roleFilter: _roleFilter,
+                            majorFilter: _majorFilter,
+                            levelFilter: _levelFilter,
+                            termFilter: _termFilter,
+                            doctorFilter: _doctorFilter,
+                            selectedMajorForSubjects: _selectedMajorMapForSubjects,
+                            selectedMajorForStudents: _selectedMajorMapForStudents,
+                            selectedMajorForDelegates: _selectedMajorMapForDelegates,
+                            onRoleChanged: (value) {
+                              _roleFilter = value;
+                              _page = 1;
+                              _load();
+                            },
+                            onMajorChanged: (value) {
+                              _majorFilter = value;
+                              _levelFilter = null;
+                              _page = 1;
+                              _load();
+                            },
+                            onLevelChanged: (value) {
+                              _levelFilter = value;
+                              _termFilter = null;
+                              _page = 1;
+                              _load();
+                            },
+                            onTermChanged: (value) {
+                              _termFilter = value;
+                              _page = 1;
+                              _load();
+                            },
+                            onDoctorChanged: (value) {
+                              _doctorFilter = value;
+                              _page = 1;
+                              _load();
+                            },
+                          ),
+                        ],
+                        const SizedBox(height: 18),
+                        if (_items.isEmpty)
+                          const _EmptyState()
+                        else
+                          ..._items.map(_entityCard),
+                        const SizedBox(height: 12),
+                        _Pagination(
+                          pagination: _pagination,
+                          onPrevious: _page > 1
+                              ? () {
+                                  _page--;
+                                  _load();
+                                }
+                              : null,
+                          onNext: _page < _pagination.lastPage
+                              ? () {
+                                  _page++;
+                                  _load();
+                                }
+                              : null,
+                        ),
+                      ],
               ),
             ),
     );
+  }
+
+  Widget _buildMajorHeader(BuildContext context) {
+    final isStudents = widget.section == _AdminSection.students;
+    final isDelegates = widget.section == _AdminSection.delegates;
+    final major = (isStudents
+        ? _selectedMajorMapForStudents
+        : isDelegates
+            ? _selectedMajorMapForDelegates
+            : _selectedMajorMapForSubjects) ?? const {};
+    final name = (major['name'] ?? '').toString();
+    final color = isStudents
+        ? AppColors.teal
+        : isDelegates
+            ? AppColors.royalBlue
+            : AppColors.royalBlue;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'التخصص النشط حالياً',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.midnight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: isStudents
+                ? _clearMajorForStudents
+                : isDelegates
+                    ? _clearMajorForDelegates
+                    : _clearMajor,
+            style: TextButton.styleFrom(
+              foregroundColor: color,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+            label: const Text(
+              'تغيير التخصص',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          ],
+        ),
+      );
   }
 
   bool get _showFilters =>
@@ -228,18 +493,46 @@ class _AdministrativeManagementScreenState
 
   List<Map<String, dynamic>> get _items {
     final data = _payload ?? const <String, dynamic>{};
-    switch (widget.section) {
-      case _AdminSection.majors:
-        return _list(data['items']);
-      case _AdminSection.subjects:
-        return _list(data['subjects']);
-      case _AdminSection.doctors:
-        return _list(data['doctors']);
-      case _AdminSection.students:
-        return _list(data['students']);
-      case _AdminSection.delegates:
-        return _list(data['users']);
+    List<Map<String, dynamic>> list;
+    if ((widget.section == _AdminSection.subjects && _selectedMajorIdForSubjects == null) ||
+        (widget.section == _AdminSection.students && _selectedMajorIdForStudents == null) ||
+        (widget.section == _AdminSection.delegates && _selectedMajorIdForDelegates == null)) {
+      list = _list(data['items']);
+    } else {
+      switch (widget.section) {
+        case _AdminSection.majors:
+          list = _list(data['items']);
+          break;
+        case _AdminSection.subjects:
+          list = _list(data['subjects']);
+          break;
+        case _AdminSection.doctors:
+          list = _list(data['doctors']);
+          break;
+        case _AdminSection.students:
+          list = _list(data['students']);
+          break;
+        case _AdminSection.delegates:
+          list = _list(data['users']);
+          break;
+      }
     }
+
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return list;
+
+    return list.where((item) {
+      final name = (item['name'] ?? '').toString().toLowerCase();
+      final email = (item['email'] ?? '').toString().toLowerCase();
+      final studentNumber = (item['student_number'] ?? '').toString().toLowerCase();
+      final code = (item['code'] ?? '').toString().toLowerCase();
+      final description = (item['description'] ?? '').toString().toLowerCase();
+      return name.contains(query) ||
+          email.contains(query) ||
+          studentNumber.contains(query) ||
+          code.contains(query) ||
+          description.contains(query);
+    }).toList();
   }
 
   _PageInfo get _pagination {
@@ -286,7 +579,7 @@ class _AdministrativeManagementScreenState
             'المواد',
             _pagination.total.toString(),
             Icons.menu_book_rounded,
-            AppColors.violet,
+            AppColors.royalBlue,
           ),
           _AdminStat(
             'الدكاترة',
@@ -340,7 +633,7 @@ class _AdministrativeManagementScreenState
             'مندوبين',
             _items.where((s) => s['role'] == 'delegate').length.toString(),
             Icons.admin_panel_settings_rounded,
-            AppColors.goldDeep,
+            AppColors.royalBlue,
           ),
           _AdminStat(
             'تخصصات',
@@ -362,13 +655,13 @@ class _AdministrativeManagementScreenState
             'مندوبين',
             _int(stats['academic_delegates']).toString(),
             Icons.admin_panel_settings_rounded,
-            AppColors.goldDeep,
+            AppColors.royalBlue,
           ),
           _AdminStat(
             'عملي',
             _int(stats['practical_delegates']).toString(),
             Icons.medical_services_rounded,
-            AppColors.rose,
+            AppColors.teal,
           ),
         ];
     }
@@ -397,6 +690,7 @@ class _AdministrativeManagementScreenState
       case _AdminSection.students:
         return _StudentCard(
           item: item,
+          onDetails: () => _showStudentDetails(item),
           onEdit: () => _openForm(item: item),
           onDelete: () => _confirmDelete(item),
         );
@@ -404,6 +698,7 @@ class _AdministrativeManagementScreenState
         return _DelegateCard(
           item: item,
           permissionsMeta: _map(_payload?['available_permissions']),
+          onDetails: () => _showDelegateDetails(item),
           onRole: () => _openRoleForm(item),
           onPermissions: _isDelegateRole(item['role'])
               ? () => _openPermissionsForm(item)
@@ -412,15 +707,61 @@ class _AdministrativeManagementScreenState
     }
   }
 
+  Future<void> _showStudentDetails(Map<String, dynamic> item) {
+    return showMoeenBottomSheet<void>(
+      context: context,
+      title: 'تفاصيل الطالب',
+      icon: Icons.person_rounded,
+      color: AppColors.royalBlue,
+      child: _StudentDetailsSheet(item: item),
+    );
+  }
+
+  Future<void> _showDelegateDetails(Map<String, dynamic> item) {
+    return showMoeenBottomSheet<void>(
+      context: context,
+      title: 'تفاصيل المندوب',
+      icon: Icons.admin_panel_settings_rounded,
+      color: AppColors.royalBlue,
+      child: _DelegateDetailsSheet(
+        item: item,
+        permissionsMeta: _map(_payload?['available_permissions']),
+        onRole: () {
+          Navigator.of(context).pop();
+          _openRoleForm(item);
+        },
+        onPermissions: _isDelegateRole(item['role'])
+            ? () {
+                Navigator.of(context).pop();
+                _openPermissionsForm(item);
+              }
+            : null,
+      ),
+    );
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
+      final String endpoint;
+      final Map<String, dynamic> query;
+      
+      if ((widget.section == _AdminSection.subjects && _selectedMajorIdForSubjects == null) ||
+          (widget.section == _AdminSection.students && _selectedMajorIdForStudents == null) ||
+          (widget.section == _AdminSection.delegates && _selectedMajorIdForDelegates == null)) {
+        endpoint = '/administrative/majors';
+        query = {'page': 1, 'per_page': 100};
+      } else {
+        endpoint = _meta.endpoint;
+        query = _query();
+      }
+
       final response = await ref
           .read(_adminRepositoryProvider)
-          .get(_meta.endpoint, query: _query());
+          .get(endpoint, query: query);
       final data = response['data'];
       final payload = data is List
           ? {'items': data}
@@ -438,9 +779,19 @@ class _AdministrativeManagementScreenState
   }
 
   Map<String, dynamic> _query() {
-    final query = <String, dynamic>{'page': _page};
-    final search = _searchController.text.trim();
-    if (search.isNotEmpty) query['search'] = search;
+    final query = <String, dynamic>{
+      'page': _page,
+      'per_page': 100,
+    };
+    if (widget.section == _AdminSection.subjects && _selectedMajorIdForSubjects != null) {
+      query['major_id'] = _selectedMajorIdForSubjects;
+    }
+    if (widget.section == _AdminSection.students && _selectedMajorIdForStudents != null) {
+      query['major_id'] = _selectedMajorIdForStudents;
+    }
+    if (widget.section == _AdminSection.delegates && _selectedMajorIdForDelegates != null) {
+      query['major_id'] = _selectedMajorIdForDelegates;
+    }
     if (_roleFilter != null && _roleFilter != 'all') {
       query['role'] = _roleFilter;
     }
@@ -465,6 +816,11 @@ class _AdministrativeManagementScreenState
         item: item,
         payload: _payload ?? const {},
         color: _meta.color,
+        selectedMajor: widget.section == _AdminSection.subjects
+            ? _selectedMajorMapForSubjects
+            : widget.section == _AdminSection.students
+                ? _selectedMajorMapForStudents
+                : null,
         onSubmit: (data) => _save(data, item: item),
       ),
     );
@@ -628,6 +984,7 @@ class _EntityForm extends StatefulWidget {
     required this.payload,
     required this.color,
     required this.onSubmit,
+    this.selectedMajor,
   });
 
   final _AdminSection section;
@@ -635,6 +992,7 @@ class _EntityForm extends StatefulWidget {
   final Map<String, dynamic> payload;
   final Color color;
   final Future<void> Function(Map<String, dynamic> data) onSubmit;
+  final Map<String, dynamic>? selectedMajor;
 
   @override
   State<_EntityForm> createState() => _EntityFormState();
@@ -746,14 +1104,16 @@ class _EntityFormState extends State<_EntityForm> {
         return [
           _text('name', 'اسم التخصص', required: true),
           if (widget.item == null) ...[
-            _number('levels_count', 'عدد المستويات', min: 1, max: 8),
-            _number('terms_count', 'عدد الأترام لكل مستوى', min: 1, max: 4),
-            _number(
-              'semesters_per_term',
-              'عدد السيمسترات لكل ترم',
-              min: 0,
-              max: 10,
-            ),
+            _stepper('levels_count', 'عدد المستويات', min: 1, max: 8, icon: Icons.layers_rounded),
+            _stepper('terms_count', 'عدد الأترام لكل مستوى', min: 1, max: 4, icon: Icons.calendar_month_rounded),
+            if (_hasSemesters)
+              _stepper(
+                'semesters_per_term',
+                'عدد السيمسترات لكل ترم',
+                min: 1,
+                max: 10,
+                icon: Icons.view_week_rounded,
+              ),
           ],
           _switch(
             'تخصص سريري',
@@ -763,111 +1123,295 @@ class _EntityFormState extends State<_EntityForm> {
           _switch(
             'يدعم السيمسترات',
             _hasSemesters,
-            (v) => setState(() => _hasSemesters = v),
+            (v) => setState(() {
+              _hasSemesters = v;
+              if (v) {
+                if (_controllers['semesters_per_term']?.text == '0') {
+                  _controllers['semesters_per_term']?.text = '2';
+                }
+              } else {
+                _controllers['semesters_per_term']?.text = '0';
+              }
+            }),
           ),
         ];
       case _AdminSection.subjects:
-        final terms = _list(widget.payload['terms']);
-        final selectedTerm = terms.firstWhere(
+        final levels = widget.selectedMajor != null
+            ? _list(widget.selectedMajor!['levels'])
+            : <Map<String, dynamic>>[];
+            
+        List<Map<String, dynamic>> filteredTerms = [];
+        if (_levelId != null && _levelId != 0) {
+          final selectedLevel = levels.firstWhere(
+            (l) => _int(l['id']) == _levelId,
+            orElse: () => const {},
+          );
+          filteredTerms = _list(selectedLevel['terms']);
+        } else {
+          for (final l in levels) {
+            filteredTerms.addAll(_list(l['terms']));
+          }
+        }
+
+        final selectedTerm = filteredTerms.firstWhere(
           (term) => _int(term['id']) == _termId,
           orElse: () => const {},
         );
         final semesters = _list(selectedTerm['semesters']);
+
         return [
-          _text('name', 'اسم المادة', required: true),
-          _text('code', 'كود المادة', required: false),
-          _text('description', 'وصف مختصر', required: false, maxLines: 3),
-          _dropdown<int>(
-            label: 'الترم',
-            value: _termId == 0 ? null : _termId,
-            items: terms
-                .map((term) => _MenuItem(_int(term['id']), _termLabel(term)))
-                .toList(),
-            onChanged: (value) => setState(() {
-              _termId = value;
-              _semesterId = null;
-            }),
-          ),
-          if (semesters.isNotEmpty)
-            _dropdown<int>(
-              label: 'السيمستر',
-              value: _semesterId == 0 ? null : _semesterId,
-              required: false,
-              items: semesters
-                  .map(
-                    (sem) => _MenuItem(
-                      _int(sem['id']),
-                      (sem['name'] ?? '').toString(),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => _semesterId = value),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.slate200),
             ),
-          _dropdown<int>(
-            label: 'الدكتور',
-            value: _doctorId == 0 ? null : _doctorId,
-            required: false,
-            items: _list(widget.payload['doctors'])
-                .map(
-                  (doctor) => _MenuItem(
-                    _int(doctor['id']),
-                    (doctor['name'] ?? '').toString(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: AppColors.violet, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'معلومات المادة الدراسية',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _text('name', 'اسم المادة', required: true),
+                _text('code', 'كود المادة', required: false),
+                _text('description', 'وصف مختصر', required: false, maxLines: 3),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.slate200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.school_rounded, color: AppColors.violet, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'الارتباط الأكاديمي والتدريس',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _dropdown<int>(
+                  label: 'المستوى',
+                  value: _levelId == 0 ? null : _levelId,
+                  required: true,
+                  items: levels
+                      .map((l) => _MenuItem(_int(l['id']), (l['name'] ?? '').toString()))
+                      .toList(),
+                  onChanged: (value) => setState(() {
+                    _levelId = value;
+                    _termId = null;
+                    _semesterId = null;
+                  }),
+                ),
+                _dropdown<int>(
+                  label: 'الترم',
+                  value: _termId == 0 ? null : _termId,
+                  required: true,
+                  items: filteredTerms
+                      .map((term) => _MenuItem(_int(term['id']), _termLabel(term)))
+                      .toList(),
+                  onChanged: (value) => setState(() {
+                    _termId = value;
+                    _semesterId = null;
+                  }),
+                ),
+                if (semesters.isNotEmpty)
+                  _dropdown<int>(
+                    label: 'السيمستر',
+                    value: _semesterId == 0 ? null : _semesterId,
+                    required: false,
+                    items: semesters
+                        .map((sem) => _MenuItem(_int(sem['id']), (sem['name'] ?? '').toString()))
+                        .toList(),
+                    onChanged: (value) => setState(() => _semesterId = value),
                   ),
-                )
-                .toList(),
-            onChanged: (value) => setState(() => _doctorId = value),
+                _dropdown<int>(
+                  label: 'الدكتور المسؤول',
+                  value: _doctorId == 0 ? null : _doctorId,
+                  required: false,
+                  items: _list(widget.payload['doctors'])
+                      .map((doctor) => _MenuItem(_int(doctor['id']), (doctor['name'] ?? '').toString()))
+                      .toList(),
+                  onChanged: (value) => setState(() => _doctorId = value),
+                ),
+              ],
+            ),
           ),
         ];
       case _AdminSection.doctors:
         return [
-          _text('name', 'اسم الدكتور', required: true),
-          _text(
-            'email',
-            'البريد الإلكتروني',
-            required: true,
-            keyboardType: TextInputType.emailAddress,
-          ),
-          _text(
-            'password',
-            widget.item == null ? 'كلمة المرور' : 'كلمة مرور جديدة (اختياري)',
-            required: widget.item == null,
-            obscure: true,
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.slate200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.person_rounded, color: AppColors.royalBlue, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'بيانات الطبيب / الدكتور',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _text('name', 'اسم الدكتور', required: true, icon: Icons.person_rounded),
+                _text(
+                  'email',
+                  'البريد الإلكتروني',
+                  required: true,
+                  keyboardType: TextInputType.emailAddress,
+                  icon: Icons.email_rounded,
+                ),
+                _text(
+                  'password',
+                  widget.item == null ? 'كلمة المرور' : 'كلمة مرور جديدة (اختياري)',
+                  required: widget.item == null,
+                  obscure: true,
+                  icon: Icons.lock_rounded,
+                ),
+              ],
+            ),
           ),
         ];
       case _AdminSection.students:
+        final levels = widget.selectedMajor != null
+            ? _list(widget.selectedMajor!['levels'])
+            : _allLevels(widget.payload);
         return [
-          _text('name', 'اسم الطالب', required: true),
-          _text(
-            'email',
-            'البريد الإلكتروني',
-            required: true,
-            keyboardType: TextInputType.emailAddress,
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.slate200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.person_outline_rounded, color: widget.color, size: 18),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'البيانات الأساسية',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _text('name', 'اسم الطالب', required: true, icon: Icons.person_rounded),
+                _text(
+                  'email',
+                  'البريد الإلكتروني',
+                  required: true,
+                  keyboardType: TextInputType.emailAddress,
+                  icon: Icons.email_rounded,
+                ),
+                _text('student_number', 'رقم القيد', required: true, icon: Icons.badge_rounded),
+                _text(
+                  'password',
+                  widget.item == null ? 'كلمة المرور' : 'كلمة مرور جديدة (اختياري)',
+                  required: widget.item == null,
+                  obscure: true,
+                  icon: Icons.lock_rounded,
+                ),
+                _dropdown<String>(
+                  label: 'الجنس',
+                  value: _gender,
+                  items: const [
+                    _MenuItem('male', 'ذكر'),
+                    _MenuItem('female', 'أنثى'),
+                  ],
+                  onChanged: (value) => setState(() => _gender = value ?? 'male'),
+                ),
+              ],
+            ),
           ),
-          _text('student_number', 'رقم القيد', required: true),
-          _text(
-            'password',
-            widget.item == null ? 'كلمة المرور' : 'كلمة مرور جديدة (اختياري)',
-            required: widget.item == null,
-            obscure: true,
-          ),
-          _dropdown<String>(
-            label: 'الجنس',
-            value: _gender,
-            items: const [
-              _MenuItem('male', 'ذكر'),
-              _MenuItem('female', 'أنثى'),
-            ],
-            onChanged: (value) => setState(() => _gender = value ?? 'male'),
-          ),
-          _dropdown<int>(
-            label: 'المستوى الدراسي',
-            value: _levelId == 0 ? null : _levelId,
-            items: _allLevels(widget.payload)
-                .map(
-                  (level) => _MenuItem(_int(level['id']), _levelLabel(level)),
-                )
-                .toList(),
-            onChanged: (value) => setState(() => _levelId = value),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.slate200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.school_rounded, color: widget.color, size: 18),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'الارتباط الأكاديمي',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _dropdown<int>(
+                  label: 'المستوى الدراسي',
+                  value: _levelId == 0 ? null : _levelId,
+                  items: levels
+                      .map(
+                        (level) => _MenuItem(_int(level['id']), _levelLabel(level)),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() => _levelId = value),
+                ),
+              ],
+            ),
           ),
         ];
       case _AdminSection.delegates:
@@ -882,6 +1426,7 @@ class _EntityFormState extends State<_EntityForm> {
     bool obscure = false,
     int maxLines = 1,
     TextInputType? keyboardType,
+    IconData? icon,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -898,33 +1443,113 @@ class _EntityFormState extends State<_EntityForm> {
         },
         decoration: InputDecoration(
           labelText: label,
+          prefixIcon: icon != null ? Icon(icon, color: widget.color) : null,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
     );
   }
 
-  Widget _number(
+
+
+  Widget _stepper(
     String key,
     String label, {
     required int min,
     required int max,
+    required IconData icon,
+    int step = 1,
   }) {
+    final controller = _controllers[key]!;
+    void adjust(int delta) {
+      final current = int.tryParse(controller.text) ?? min;
+      final newValue = (current + delta).clamp(min, max);
+      controller.text = newValue.toString();
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
-      child: TextFormField(
-        controller: _controllers[key],
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        validator: (value) {
-          final number = int.tryParse((value ?? '').trim());
-          if (number == null) return 'أدخل رقمًا صحيحًا.';
-          if (number < min || number > max) return 'القيمة بين $min و $max.';
-          return null;
-        },
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.slate50,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.slate200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: widget.color, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    color: AppColors.midnight,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: () => adjust(-step),
+                  icon: const Icon(Icons.remove_rounded),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: widget.color,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: const BorderSide(color: AppColors.slate200),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: 60,
+                  child: TextFormField(
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      color: AppColors.midnight,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                    validator: (value) {
+                      final number = int.tryParse((value ?? '').trim());
+                      if (number == null) return 'مطلوب';
+                      if (number < min || number > max) return '$min-$max';
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                IconButton(
+                  onPressed: () => adjust(step),
+                  icon: const Icon(Icons.add_rounded),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: widget.color,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: const BorderSide(color: AppColors.slate200),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -1050,23 +1675,62 @@ class _DelegateRoleFormState extends State<_DelegateRoleForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DropdownButtonFormField<String>(
-          initialValue: _role,
-          decoration: InputDecoration(
-            labelText: 'الدور',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.slate200),
           ),
-          items: const [
-            DropdownMenuItem(value: 'student', child: Text('طالب')),
-            DropdownMenuItem(value: 'delegate', child: Text('مندوب دفعة')),
-            DropdownMenuItem(
-              value: 'practical_delegate',
-              child: Text('مندوب عملي'),
-            ),
-          ],
-          onChanged: (value) => setState(() => _role = value ?? 'student'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.manage_accounts_rounded, color: AppColors.goldDeep, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'تعديل دور المستخدم',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: AppColors.midnight,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String>(
+                initialValue: _role,
+                decoration: InputDecoration(
+                  labelText: 'الدور الجديد',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'student', child: Text('طالب')),
+                  DropdownMenuItem(value: 'delegate', child: Text('مندوب دفعة')),
+                  DropdownMenuItem(
+                    value: 'practical_delegate',
+                    child: Text('مندوب عملي'),
+                  ),
+                ],
+                onChanged: (value) => setState(() => _role = value ?? 'student'),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'تغيير دور المستخدم يؤثر مباشرة على صلاحياته والوظائف المتاحة له في التطبيق.',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.slate500,
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 20),
         FilledButton.icon(
           onPressed: _saving
               ? null
@@ -1075,8 +1739,30 @@ class _DelegateRoleFormState extends State<_DelegateRoleForm> {
                   await widget.onSubmit(_role);
                   if (mounted) setState(() => _saving = false);
                 },
-          icon: const Icon(Icons.save_rounded),
-          label: const Text('حفظ الدور'),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.goldDeep,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          icon: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.save_rounded),
+          label: Text(
+            _saving ? 'جاري حفظ التغييرات...' : 'حفظ الدور الجديد',
+            style: const TextStyle(
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ),
       ],
     );
@@ -1120,15 +1806,27 @@ class _DelegatePermissionsFormState extends State<_DelegatePermissionsForm> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  resource.value.toString(),
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                Row(
+                  children: [
+                    const Icon(Icons.security_rounded, color: AppColors.royalBlue, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      resource.value.toString(),
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 10),
                 ...actions.entries.map((action) {
                   final key = '${resource.key}.${action.key}';
                   return CheckboxListTile(
                     value: _selected.contains(key),
+                    activeColor: AppColors.royalBlue,
                     onChanged: (value) {
                       setState(() {
                         if (value == true) {
@@ -1138,7 +1836,15 @@ class _DelegatePermissionsFormState extends State<_DelegatePermissionsForm> {
                         }
                       });
                     },
-                    title: Text(action.value.toString()),
+                    title: Text(
+                      action.value.toString(),
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: AppColors.slate700,
+                      ),
+                    ),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   );
@@ -1147,7 +1853,7 @@ class _DelegatePermissionsFormState extends State<_DelegatePermissionsForm> {
             ),
           );
         }),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         FilledButton.icon(
           onPressed: _saving
               ? null
@@ -1156,8 +1862,30 @@ class _DelegatePermissionsFormState extends State<_DelegatePermissionsForm> {
                   await widget.onSubmit(_selected.toList());
                   if (mounted) setState(() => _saving = false);
                 },
-          icon: const Icon(Icons.save_rounded),
-          label: const Text('حفظ الصلاحيات'),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.royalBlue,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          icon: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.save_rounded),
+          label: Text(
+            _saving ? 'جاري حفظ التغييرات...' : 'حفظ الصلاحيات الممنوحة',
+            style: const TextStyle(
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ),
       ],
     );
@@ -1222,9 +1950,9 @@ class _AdminHero extends StatelessWidget {
               ],
             ),
           ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
   }
 }
 
@@ -1304,9 +2032,20 @@ class _Toolbar extends StatelessWidget {
             decoration: InputDecoration(
               hintText: 'بحث...',
               prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: IconButton(
-                onPressed: onSearch,
-                icon: const Icon(Icons.arrow_forward_rounded),
+              suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: searchController,
+                builder: (context, value, child) {
+                  if (value.text.isNotEmpty) {
+                    return IconButton(
+                      icon: const Icon(Icons.clear_rounded, color: AppColors.slate400),
+                      onPressed: () {
+                        searchController.clear();
+                        onSearch();
+                      },
+                    );
+                  }
+                  return const Icon(Icons.search_rounded, color: AppColors.slate300);
+                },
               ),
               filled: true,
               fillColor: Colors.white,
@@ -1350,6 +2089,9 @@ class _FiltersBar extends StatelessWidget {
     required this.onLevelChanged,
     required this.onTermChanged,
     required this.onDoctorChanged,
+    this.selectedMajorForSubjects,
+    this.selectedMajorForStudents,
+    this.selectedMajorForDelegates,
   });
 
   final _AdminSection section;
@@ -1364,6 +2106,9 @@ class _FiltersBar extends StatelessWidget {
   final ValueChanged<int?> onLevelChanged;
   final ValueChanged<int?> onTermChanged;
   final ValueChanged<int?> onDoctorChanged;
+  final Map<String, dynamic>? selectedMajorForSubjects;
+  final Map<String, dynamic>? selectedMajorForStudents;
+  final Map<String, dynamic>? selectedMajorForDelegates;
 
   @override
   Widget build(BuildContext context) {
@@ -1372,11 +2117,35 @@ class _FiltersBar extends StatelessWidget {
       (major) => _int(major['id']) == majorFilter,
       orElse: () => const {},
     );
-    final levels = section == _AdminSection.delegates && majorFilter != null
+    final levels = section == _AdminSection.delegates && selectedMajorForDelegates != null
+        ? _list(selectedMajorForDelegates!['levels'])
+        : section == _AdminSection.delegates && majorFilter != null
         ? _list(payload['levels'])
+        : section == _AdminSection.subjects && selectedMajorForSubjects != null
+        ? _list(selectedMajorForSubjects!['levels'])
+        : section == _AdminSection.students && selectedMajorForStudents != null
+        ? _list(selectedMajorForStudents!['levels'])
         : majorFilter == null
         ? _allLevels(payload)
         : _list(selectedMajor['levels']);
+
+    List<Map<String, dynamic>> terms = [];
+    if (section == _AdminSection.subjects) {
+      if (levelFilter != null) {
+        final selectedLevel = levels.firstWhere(
+          (l) => _int(l['id']) == levelFilter,
+          orElse: () => const {},
+        );
+        terms = _list(selectedLevel['terms']);
+      } else {
+        for (final l in levels) {
+          terms.addAll(_list(l['terms']));
+        }
+      }
+    } else {
+      terms = _list(payload['terms']);
+    }
+
     return Wrap(
       spacing: 10,
       runSpacing: 10,
@@ -1394,8 +2163,7 @@ class _FiltersBar extends StatelessWidget {
             ],
             onChanged: onRoleChanged,
           ),
-        if (section == _AdminSection.students ||
-            section == _AdminSection.delegates)
+        if (section == _AdminSection.delegates && selectedMajorForDelegates == null)
           _SmallDropdown<int>(
             label: 'التخصص',
             value: majorFilter,
@@ -1418,26 +2186,32 @@ class _FiltersBar extends StatelessWidget {
                 .toList(),
             onChanged: onLevelChanged,
           ),
-        if (section == _AdminSection.subjects)
+        if (section == _AdminSection.subjects) ...[
+          _SmallDropdown<int>(
+            label: 'المستوى',
+            value: levelFilter,
+            items: levels
+                .map((l) => _MenuItem(_int(l['id']), (l['name'] ?? '').toString()))
+                .toList(),
+            onChanged: onLevelChanged,
+          ),
           _SmallDropdown<int>(
             label: 'الترم',
             value: termFilter,
-            items: _list(
-              payload['terms'],
-            ).map((t) => _MenuItem(_int(t['id']), _termLabel(t))).toList(),
+            items: terms
+                .map((t) => _MenuItem(_int(t['id']), _termLabel(t)))
+                .toList(),
             onChanged: onTermChanged,
           ),
-        if (section == _AdminSection.subjects)
           _SmallDropdown<int>(
             label: 'الدكتور',
             value: doctorFilter,
             items: _list(payload['doctors'])
-                .map(
-                  (d) => _MenuItem(_int(d['id']), (d['name'] ?? '').toString()),
-                )
+                .map((d) => _MenuItem(_int(d['id']), (d['name'] ?? '').toString()))
                 .toList(),
             onChanged: onDoctorChanged,
           ),
+        ],
       ],
     );
   }
@@ -1501,17 +2275,199 @@ class _MajorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final levels = _list(item['levels']);
-    return _EntityCard(
-      icon: Icons.account_tree_rounded,
-      color: AppColors.teal,
-      title: (item['name'] ?? '').toString(),
-      subtitle: '${levels.length} مستوى دراسي',
-      chips: [
-        if (item['has_clinical'] == true) 'سريري',
-        if (item['has_semesters'] == true) 'سيمسترات',
-      ],
-      onEdit: onEdit,
-      onDelete: onDelete,
+    final levelsCount = _int(item['levels_count']);
+    final hasClinical = item['has_clinical'] == true;
+    final hasSemesters = item['has_semesters'] == true;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header Accent
+          Container(
+            height: 4,
+            color: AppColors.teal,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.teal.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.account_tree_rounded,
+                    color: AppColors.teal,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        (item['name'] ?? '').toString(),
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          color: AppColors.midnight,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${levels.length} مستوى دراسي مسجل',
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          color: AppColors.slate500,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
+                    color: AppColors.slate400,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      onEdit();
+                    } else if (value == 'delete') {
+                      onDelete();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.edit_rounded,
+                            size: 18,
+                            color: AppColors.royalBlue,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'تعديل التخصص',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outline_rounded,
+                            size: 18,
+                            color: AppColors.danger,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'حذف التخصص',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.danger,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildMajorPill(
+                  'المستويات المتاحة: $levelsCount',
+                  AppColors.royalBlue,
+                  icon: Icons.layers_rounded,
+                ),
+                _buildMajorPill(
+                  hasClinical ? 'مسار سريري' : 'مسار أكاديمي عادي',
+                  hasClinical ? AppColors.rose : AppColors.slate500,
+                  icon: hasClinical ? Icons.local_hospital_rounded : Icons.school_rounded,
+                ),
+                _buildMajorPill(
+                  hasSemesters ? 'يدعم نظام السيمسترات' : 'نظام أترام سنوي',
+                  hasSemesters ? AppColors.violet : AppColors.slate500,
+                  icon: hasSemesters ? Icons.view_week_rounded : Icons.calendar_month_rounded,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMajorPill(String text, Color color, {IconData? icon}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, color: color, size: 12),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              fontFamily: 'Cairo',
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1529,23 +2485,404 @@ class _SubjectCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _EntityCard(
-      icon: Icons.menu_book_rounded,
-      color: AppColors.violet,
-      title: (item['name'] ?? '').toString(),
-      subtitle: [
-        _map(item['major'])['name'],
-        _map(item['level'])['name'],
-        _map(item['term'])['name'],
-      ].where((v) => v != null && v.toString().isNotEmpty).join(' / '),
-      chips: [
-        if ((item['code'] ?? '').toString().isNotEmpty) item['code'].toString(),
-        'الدكتور: ${_map(item['doctor'])['name'] ?? 'غير محدد'}',
-        if (_map(item['semester']).isNotEmpty)
-          _map(item['semester'])['name'].toString(),
-      ],
-      onEdit: onEdit,
-      onDelete: onDelete,
+    final name = (item['name'] ?? '').toString();
+    final levelName = _map(item['level'])['name']?.toString() ?? '';
+    final termName = _map(item['term'])['name']?.toString() ?? '';
+    final code = (item['code'] ?? '').toString();
+    final doctorName = _map(item['doctor'])['name']?.toString() ?? 'غير محدد';
+    final semesterName = _map(item['semester'])['name']?.toString() ?? '';
+    final description = (item['description'] ?? '').toString();
+
+    final subtitleParts = [
+      if (levelName.isNotEmpty) levelName,
+      if (termName.isNotEmpty) termName,
+    ].join(' / ');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 4,
+            color: AppColors.violet,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.violet.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.menu_book_rounded,
+                    color: AppColors.violet,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          color: AppColors.midnight,
+                          height: 1.25,
+                        ),
+                      ),
+                      if (subtitleParts.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitleParts,
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            color: AppColors.slate400,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
+                    color: AppColors.slate400,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      onEdit();
+                    } else if (value == 'delete') {
+                      onDelete();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.edit_rounded,
+                            size: 18,
+                            color: AppColors.royalBlue,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'تعديل المادة',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outline_rounded,
+                            size: 18,
+                            color: AppColors.danger,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'حذف المادة',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.danger,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildSubjectPill(
+                  'الدكتور: $doctorName',
+                  AppColors.royalBlue,
+                  icon: Icons.person_rounded,
+                ),
+                if (code.isNotEmpty)
+                  _buildSubjectPill(
+                    'الكود: $code',
+                    AppColors.goldDeep,
+                    icon: Icons.tag_rounded,
+                  ),
+                if (semesterName.isNotEmpty)
+                  _buildSubjectPill(
+                    semesterName,
+                    AppColors.teal,
+                    icon: Icons.view_week_rounded,
+                  ),
+              ],
+            ),
+          ),
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.slate50,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.slate100),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.description_rounded,
+                      color: AppColors.slate400,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        description,
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          color: AppColors.slate600,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubjectPill(String text, Color color, {IconData? icon}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, color: color, size: 12),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              fontFamily: 'Cairo',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubjectMajorCard extends StatelessWidget {
+  const _SubjectMajorCard({
+    required this.major,
+    required this.onTap,
+    required this.color,
+  });
+
+  final Map<String, dynamic> major;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final levelsCount = _int(major['levels_count']);
+    final hasClinical = major['has_clinical'] == true;
+    final hasSemesters = major['has_semesters'] == true;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.slate100),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 4,
+              color: color,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(
+                      Icons.account_tree_rounded,
+                      color: color,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          (major['name'] ?? '').toString(),
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            color: AppColors.midnight,
+                            height: 1.25,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'اضغط لاستعراض وإدارة المواد الدراسية',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            color: AppColors.slate400,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: AppColors.slate300,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildMajorPill(
+                    'المستويات المتاحة: $levelsCount',
+                    AppColors.royalBlue,
+                    icon: Icons.layers_rounded,
+                  ),
+                  _buildMajorPill(
+                    hasClinical ? 'مسار سريري' : 'مسار أكاديمي عادي',
+                    hasClinical ? AppColors.rose : AppColors.slate500,
+                    icon: hasClinical ? Icons.local_hospital_rounded : Icons.school_rounded,
+                  ),
+                  _buildMajorPill(
+                    hasSemesters ? 'يدعم نظام السيمسترات' : 'نظام أترام سنوي',
+                    hasSemesters ? AppColors.violet : AppColors.slate500,
+                    icon: hasSemesters ? Icons.view_week_rounded : Icons.calendar_month_rounded,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMajorPill(String text, Color color, {IconData? icon}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, color: color, size: 12),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              fontFamily: 'Cairo',
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1563,15 +2900,206 @@ class _DoctorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final name = (item['name'] ?? '').toString();
+    final email = (item['email'] ?? '').toString();
     final subjects = _list(item['subjects']);
-    return _EntityCard(
-      icon: Icons.school_rounded,
-      color: AppColors.royalBlue,
-      title: (item['name'] ?? '').toString(),
-      subtitle: (item['email'] ?? '').toString(),
-      chips: ['${subjects.length} مادة'],
-      onEdit: onEdit,
-      onDelete: onDelete,
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 4,
+            color: AppColors.royalBlue,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.royalBlue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.school_rounded,
+                    color: AppColors.royalBlue,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          color: AppColors.midnight,
+                          height: 1.25,
+                        ),
+                      ),
+                      if (email.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          email,
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            color: AppColors.slate500,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
+                    color: AppColors.slate400,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      onEdit();
+                    } else if (value == 'delete') {
+                      onDelete();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.edit_rounded,
+                            size: 18,
+                            color: AppColors.royalBlue,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'تعديل الطبيب/الدكتور',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outline_rounded,
+                            size: 18,
+                            color: AppColors.danger,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'حذف الدكتور',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.danger,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (subjects.isEmpty)
+                  _buildDoctorPill(
+                    'لا يوجد مواد مسندة بعد',
+                    AppColors.slate400,
+                    icon: Icons.info_outline_rounded,
+                  )
+                else ...[
+                  ...subjects.take(3).map(
+                        (sub) => _buildDoctorPill(
+                          (sub['name'] ?? '').toString(),
+                          AppColors.violet,
+                          icon: Icons.menu_book_rounded,
+                        ),
+                      ),
+                  if (subjects.length > 3)
+                    _buildDoctorPill(
+                      '+${subjects.length - 3} مواد أخرى',
+                      AppColors.royalBlue,
+                      icon: Icons.more_horiz_rounded,
+                    ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDoctorPill(String text, Color color, {IconData? icon}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, color: color, size: 12),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              fontFamily: 'Cairo',
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1579,36 +3107,893 @@ class _DoctorCard extends StatelessWidget {
 class _StudentCard extends StatelessWidget {
   const _StudentCard({
     required this.item,
+    required this.onDetails,
     required this.onEdit,
     required this.onDelete,
   });
 
   final Map<String, dynamic> item;
+  final VoidCallback onDetails;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    return _EntityCard(
-      icon: Icons.person_rounded,
-      color: _isDelegateRole(item['role'])
-          ? AppColors.goldDeep
-          : AppColors.teal,
-      title: (item['name'] ?? '').toString(),
-      subtitle: (item['email'] ?? '').toString(),
-      chips: [
-        'رقم القيد: ${item['student_number'] ?? '-'}',
-        _roleLabel(item['role']),
-        '${_map(item['major'])['name'] ?? '-'} / ${_map(item['level'])['name'] ?? '-'}',
-      ],
-      onEdit: onEdit,
-      onDelete: onDelete,
+    final name = (item['name'] ?? '').toString();
+    final email = (item['email'] ?? '').toString();
+    final studentNumber = (item['student_number'] ?? '-').toString();
+    final role = (item['role'] ?? 'student').toString();
+    final gender = (item['gender'] ?? 'male').toString() == 'male' ? 'ذكر' : 'أنثى';
+    final levelName = (_map(item['level'])['name'] ?? '-').toString();
+
+    // Role styling
+    final Color roleColor;
+    final Color roleBgColor;
+    final String roleText;
+
+    if (role == 'delegate') {
+      roleColor = AppColors.royalBlue;
+      roleBgColor = AppColors.royalBlue.withValues(alpha: 0.08);
+      roleText = 'مندوب دفعة';
+    } else if (role == 'practical_delegate') {
+      roleColor = AppColors.teal;
+      roleBgColor = AppColors.teal.withValues(alpha: 0.08);
+      roleText = 'مندوب عملي';
+    } else {
+      roleColor = AppColors.slate700;
+      roleBgColor = AppColors.slate100;
+      roleText = 'طالب';
+    }
+
+    return InkWell(
+      onTap: onDetails,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: _cardDecoration(),
+        child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.teal.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.person_rounded, color: AppColors.teal),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name.isEmpty ? '-' : name,
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                    if (email.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        email,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          color: AppColors.slate500,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert_rounded, color: AppColors.slate500),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_rounded, size: 18, color: AppColors.royalBlue),
+                        SizedBox(width: 8),
+                        Text(
+                          'تعديل البيانات',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_rounded, size: 18, color: AppColors.danger),
+                        SizedBox(width: 8),
+                        Text(
+                          'حذف الطالب',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                            color: AppColors.danger,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    onEdit();
+                  } else if (value == 'delete') {
+                    onDelete();
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Chips/Badges section
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              // Role Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: roleBgColor,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: roleColor.withValues(alpha: 0.15)),
+                ),
+                child: Text(
+                  roleText,
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: roleColor,
+                  ),
+                ),
+              ),
+              // Student Number Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.slate50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.slate200),
+                ),
+                child: Text(
+                  'رقم القيد: $studentNumber',
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.slate700,
+                  ),
+                ),
+              ),
+              // Level Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.slate50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.slate200),
+                ),
+                child: Text(
+                  levelName,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.slate700,
+                  ),
+                ),
+              ),
+              // Gender Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.slate50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.slate200),
+                ),
+                child: Text(
+                  gender,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.slate700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      ),
     );
   }
 }
 
 class _DelegateCard extends StatelessWidget {
   const _DelegateCard({
+    required this.item,
+    required this.permissionsMeta,
+    required this.onDetails,
+    required this.onRole,
+    required this.onPermissions,
+  });
+
+  final Map<String, dynamic> item;
+  final Map<String, dynamic> permissionsMeta;
+  final VoidCallback onDetails;
+  final VoidCallback onRole;
+  final VoidCallback? onPermissions;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (item['name'] ?? '').toString();
+    final permissions = _list(item['delegate_permissions']);
+    final studentNumber = (item['student_number'] ?? '-').toString();
+    final role = (item['role'] ?? 'student').toString();
+    final majorName = (_map(item['major'])['name'] ?? '-').toString();
+    final levelName = (_map(item['level'])['name'] ?? '-').toString();
+
+    // Role styling
+    final Color roleColor;
+    final Color roleBgColor;
+    final String roleText;
+
+    if (role == 'delegate') {
+      roleColor = AppColors.royalBlue;
+      roleBgColor = AppColors.royalBlue.withValues(alpha: 0.08);
+      roleText = 'مندوب دفعة';
+    } else if (role == 'practical_delegate') {
+      roleColor = AppColors.teal;
+      roleBgColor = AppColors.teal.withValues(alpha: 0.08);
+      roleText = 'مندوب عملي';
+    } else {
+      roleColor = AppColors.slate700;
+      roleBgColor = AppColors.slate100;
+      roleText = 'طالب';
+    }
+
+    return InkWell(
+      onTap: onDetails,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Accent line at the top
+          Container(
+            height: 4,
+            color: AppColors.royalBlue.withValues(alpha: 0.78),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.royalBlue.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(Icons.admin_panel_settings_rounded, color: AppColors.royalBlue),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name.isEmpty ? '-' : name,
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              color: AppColors.midnight,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '$majorName / $levelName',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              color: AppColors.slate500,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert_rounded, color: AppColors.slate500),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'role',
+                          child: Row(
+                            children: [
+                              Icon(Icons.manage_accounts_rounded, size: 18, color: AppColors.goldDeep),
+                              SizedBox(width: 8),
+                              Text(
+                                'تعديل الدور',
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (onPermissions != null)
+                          const PopupMenuItem(
+                            value: 'permissions',
+                            child: Row(
+                              children: [
+                                Icon(Icons.security_rounded, size: 18, color: AppColors.royalBlue),
+                                SizedBox(width: 8),
+                                Text(
+                                  'تعديل الصلاحيات',
+                                  style: TextStyle(
+                                    fontFamily: 'Cairo',
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                      onSelected: (value) {
+                        if (value == 'role') {
+                          onRole();
+                        } else if (value == 'permissions') {
+                          onPermissions?.call();
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                // Badges
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    // Role Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: roleBgColor,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: roleColor.withValues(alpha: 0.15)),
+                      ),
+                      child: Text(
+                        roleText,
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: roleColor,
+                        ),
+                      ),
+                    ),
+                    // Permissions Count Badge
+                    if (_isDelegateRole(role))
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: permissions.isNotEmpty
+                              ? AppColors.royalBlue.withValues(alpha: 0.08)
+                              : AppColors.slate100,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: permissions.isNotEmpty
+                                ? AppColors.royalBlue.withValues(alpha: 0.15)
+                                : AppColors.slate200,
+                          ),
+                        ),
+                        child: Text(
+                          permissions.isNotEmpty ? '${permissions.length} صلاحيات نشطة' : 'بدون صلاحيات',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: permissions.isNotEmpty ? AppColors.royalBlue : AppColors.slate600,
+                          ),
+                        ),
+                      ),
+                    // Student Registration Number Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.slate50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.slate200),
+                      ),
+                      child: Text(
+                        'رقم القيد: $studentNumber',
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.slate700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+}
+
+class _StudentDetailsSheet extends StatelessWidget {
+  const _StudentDetailsSheet({required this.item});
+
+  final Map<String, dynamic> item;
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || name.isEmpty) return '؟';
+    if (parts.length == 1) return parts[0].isNotEmpty ? parts[0][0] : '؟';
+    return '${parts[0][0]}${parts[1][0]}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final major   = _map(item['major']);
+    final level   = _map(item['level']);
+    final role    = (item['role'] ?? 'student').toString();
+    final name    = (item['name'] ?? '-').toString();
+    final email   = (item['email'] ?? '').toString();
+    final number  = (item['student_number'] ?? '-').toString();
+    final gender  = (item['gender'] ?? '').toString() == 'male' ? 'ذكر' : 'أنثى';
+    final genderIcon = gender == 'ذكر'
+        ? Icons.male_rounded
+        : Icons.female_rounded;
+    final genderColor = gender == 'ذكر'
+        ? AppColors.royalBlue
+        : AppColors.rose;
+    final roleColor = _roleColor(role);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── Identity Card Header ───────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0D1B3E),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0D1B3E).withValues(alpha: 0.35),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              // Glow circle
+              Positioned(
+                top: -24, right: -24,
+                child: Container(
+                  width: 100, height: 100,
+                  decoration: BoxDecoration(
+                    color: AppColors.royalBlue.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              // Top accent line
+              Positioned(
+                top: 0, left: 0, right: 0,
+                child: Container(
+                  height: 2.5,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.royalBlue.withValues(alpha: 0),
+                        AppColors.royalBlue,
+                        AppColors.royalBlue.withValues(alpha: 0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  // Avatar with initials
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.royalBlue.withValues(alpha: 0.3),
+                          AppColors.royalBlue.withValues(alpha: 0.12),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.royalBlue.withValues(alpha: 0.4),
+                        width: 2,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _initials(name),
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                            color: Colors.white,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (email.isNotEmpty)
+                          Text(
+                            email,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11.5,
+                              color: AppColors.slate400,
+                            ),
+                          ),
+                        const SizedBox(height: 10),
+                        // Badges row
+                        Wrap(
+                          spacing: 8, runSpacing: 6,
+                          children: [
+                            _SheetBadge(
+                              label: _roleLabel(role),
+                              icon: Icons.school_rounded,
+                              color: roleColor,
+                            ),
+                            _SheetBadge(
+                              label: gender,
+                              icon: genderIcon,
+                              color: genderColor,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // ── Section: بيانات التسجيل ────────────────────────────────
+        _SheetSection(
+          title: 'بيانات التسجيل',
+          icon: Icons.badge_rounded,
+          color: AppColors.royalBlue,
+          children: [
+            _SheetInfoRow(
+              icon: Icons.tag_rounded,
+              label: 'رقم القيد',
+              value: number,
+              valueColor: AppColors.royalBlue,
+              bold: true,
+            ),
+            if (email.isNotEmpty)
+              _SheetInfoRow(
+                icon: Icons.email_outlined,
+                label: 'البريد الإلكتروني',
+                value: email,
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // ── Section: البيانات الأكاديمية ─────────────────────────────
+        _SheetSection(
+          title: 'البيانات الأكاديمية',
+          icon: Icons.school_rounded,
+          color: AppColors.goldDeep,
+          children: [
+            _SheetInfoRow(
+              icon: Icons.account_tree_rounded,
+              label: 'التخصص',
+              value: (major['name'] ?? '-').toString(),
+            ),
+            _SheetInfoRow(
+              icon: Icons.layers_rounded,
+              label: 'المستوى',
+              value: (level['name'] ?? '-').toString(),
+            ),
+            _SheetInfoRow(
+              icon: Icons.manage_accounts_rounded,
+              label: 'الدور',
+              value: _roleLabel(role),
+              valueColor: roleColor,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Sheet Badge
+// ────────────────────────────────────────────────────────────────────────────
+class _SheetBadge extends StatelessWidget {
+  const _SheetBadge({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 12),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.w900,
+              fontSize: 11,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Sheet Section — labeled group with icon
+// ────────────────────────────────────────────────────────────────────────────
+class _SheetSection extends StatelessWidget {
+  const _SheetSection({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.children,
+  });
+
+  final String title;
+  final IconData icon;
+  final Color color;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Section header
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.04),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(22),
+                topRight: Radius.circular(22),
+              ),
+              border: Border(
+                bottom: BorderSide(color: color.withValues(alpha: 0.08)),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 14),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Section rows
+          ...children.asMap().entries.map((entry) {
+            final isLast = entry.key == children.length - 1;
+            return Column(
+              children: [
+                entry.value,
+                if (!isLast)
+                  Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: AppColors.slate100,
+                  ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Sheet Info Row — single labeled field with icon
+// ────────────────────────────────────────────────────────────────────────────
+class _SheetInfoRow extends StatelessWidget {
+  const _SheetInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+    this.bold = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final bool bold;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: AppColors.slate400,
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.slate500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value.isEmpty ? '-' : value,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 13,
+                fontWeight: bold ? FontWeight.w900 : FontWeight.w800,
+                color: valueColor ?? AppColors.midnight,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _DelegateDetailsSheet extends StatelessWidget {
+  const _DelegateDetailsSheet({
     required this.item,
     required this.permissionsMeta,
     required this.onRole,
@@ -1620,189 +4005,412 @@ class _DelegateCard extends StatelessWidget {
   final VoidCallback onRole;
   final VoidCallback? onPermissions;
 
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || name.isEmpty) return '؟';
+    if (parts.length == 1) return parts[0].isNotEmpty ? parts[0][0] : '؟';
+    return '${parts[0][0]}${parts[1][0]}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final major = _map(item['major']);
+    final level = _map(item['level']);
+    final role = (item['role'] ?? 'student').toString();
+    final name = (item['name'] ?? '-').toString();
+    final email = (item['email'] ?? '').toString();
+    final number = (item['student_number'] ?? '-').toString();
     final permissions = _list(item['delegate_permissions']);
-    return _EntityCard(
-      icon: Icons.admin_panel_settings_rounded,
-      color: _isDelegateRole(item['role'])
-          ? AppColors.goldDeep
-          : AppColors.slate500,
-      title: (item['name'] ?? '').toString(),
-      subtitle:
-          '${_map(item['major'])['name'] ?? '-'} / ${_map(item['level'])['name'] ?? '-'}',
-      chips: [
-        _roleLabel(item['role']),
-        if (_isDelegateRole(item['role'])) '${permissions.length} صلاحية',
-        item['student_number']?.toString() ?? '',
-      ],
-      customActions: [
-        _IconAction(
-          icon: Icons.manage_accounts_rounded,
-          color: AppColors.goldDeep,
-          onTap: onRole,
-        ),
-        if (onPermissions != null)
-          _IconAction(
-            icon: Icons.security_rounded,
-            color: AppColors.royalBlue,
-            onTap: onPermissions!,
+    final roleColor = _roleColor(role);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── Identity Card Header ───────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0D1B3E),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0D1B3E).withValues(alpha: 0.35),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              // Glow circle
+              Positioned(
+                top: -24,
+                right: -24,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: AppColors.royalBlue.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              // Top accent line
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 2.5,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.royalBlue.withValues(alpha: 0),
+                        AppColors.royalBlue,
+                        AppColors.royalBlue.withValues(alpha: 0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  // Avatar with initials
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.royalBlue.withValues(alpha: 0.3),
+                          AppColors.royalBlue.withValues(alpha: 0.12),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.royalBlue.withValues(alpha: 0.4),
+                        width: 2,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _initials(name),
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                            color: Colors.white,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        if (email.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            email,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11.5,
+                              color: AppColors.slate400,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        // Badges row
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            _SheetBadge(
+                              label: _roleLabel(role),
+                              icon: Icons.admin_panel_settings_rounded,
+                              color: roleColor,
+                            ),
+                            _SheetBadge(
+                              label: permissions.isEmpty
+                                  ? 'بدون صلاحيات'
+                                  : '${permissions.length} صلاحيات نشطة',
+                              icon: Icons.security_rounded,
+                              color: permissions.isEmpty
+                                  ? AppColors.slate400
+                                  : AppColors.royalBlue,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // ── Section: بيانات التسجيل والأكاديمية ───────────────────────
+        _SheetSection(
+          title: 'البيانات الأكاديمية والتسجيل',
+          icon: Icons.school_rounded,
+          color: AppColors.royalBlue,
+          children: [
+            _SheetInfoRow(
+              icon: Icons.tag_rounded,
+              label: 'رقم القيد',
+              value: number,
+              valueColor: AppColors.royalBlue,
+              bold: true,
+            ),
+            _SheetInfoRow(
+              icon: Icons.account_tree_rounded,
+              label: 'التخصص',
+              value: (major['name'] ?? '-').toString(),
+            ),
+            _SheetInfoRow(
+              icon: Icons.layers_rounded,
+              label: 'المستوى',
+              value: (level['name'] ?? '-').toString(),
+            ),
+            _SheetInfoRow(
+              icon: Icons.manage_accounts_rounded,
+              label: 'الدور الحالي',
+              value: _roleLabel(role),
+              valueColor: roleColor,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // ── Section: صلاحيات المندوب ─────────────────────────────────
+        _SheetSection(
+          title: 'الصلاحيات والتراخيص الممنوحة',
+          icon: Icons.security_rounded,
+          color: AppColors.teal,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: permissions.isEmpty
+                  ? const _AdminEmptyDetailsNote(
+                      icon: Icons.lock_outline_rounded,
+                      message: 'لا توجد صلاحيات مفعلة لهذا المندوب حاليًا.',
+                    )
+                  : _PermissionsPreview(
+                      permissions: permissions,
+                      permissionsMeta: permissionsMeta,
+                    ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        // ── Action Buttons for Change Role / Change Permissions ─────
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: onRole,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.goldDeep,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 2,
+                  shadowColor: AppColors.goldDeep.withValues(alpha: 0.3),
+                ),
+                icon: const Icon(Icons.manage_accounts_rounded, size: 18),
+                label: const Text(
+                  'تغيير الدور',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+            if (onPermissions != null) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: onPermissions,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.royalBlue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 2,
+                    shadowColor: AppColors.royalBlue.withValues(alpha: 0.3),
+                  ),
+                  icon: const Icon(Icons.security_rounded, size: 18),
+                  label: const Text(
+                    'تعديل الصلاحيات',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ],
     );
   }
 }
 
-class _EntityCard extends StatelessWidget {
-  const _EntityCard({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    this.chips = const [],
-    this.onEdit,
-    this.onDelete,
-    this.customActions,
+
+
+class _AdminChip extends StatelessWidget {
+  const _AdminChip({
+    required this.label,
+    this.color = AppColors.slate700,
   });
 
-  final IconData icon;
+  final String label;
   final Color color;
-  final String title;
-  final String subtitle;
-  final List<String> chips;
-  final VoidCallback? onEdit;
-  final VoidCallback? onDelete;
-  final List<Widget>? customActions;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Cairo',
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminEmptyDetailsNote extends StatelessWidget {
+  const _AdminEmptyDetailsNote({
+    required this.icon,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.slate200),
+      ),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(icon, color: color),
+          Icon(icon, color: AppColors.slate500, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.slate600,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title.isEmpty ? '-' : title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                      ),
-                    ),
-                    if (subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.slate500,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (customActions != null)
-                Row(children: customActions!)
-              else ...[
-                if (onEdit != null)
-                  _IconAction(
-                    icon: Icons.edit_rounded,
-                    color: AppColors.royalBlue,
-                    onTap: onEdit!,
-                  ),
-                if (onDelete != null)
-                  _IconAction(
-                    icon: Icons.delete_rounded,
-                    color: AppColors.danger,
-                    onTap: onDelete!,
-                  ),
-              ],
-            ],
+            ),
           ),
-          finalChips(chips),
         ],
       ),
     );
   }
-
-  Widget finalChips(List<String> chips) {
-    final clean = chips.where((chip) => chip.trim().isNotEmpty).toList();
-    if (clean.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: clean
-            .map(
-              (chip) => Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.slate100,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Text(
-                  chip,
-                  style: const TextStyle(
-                    color: AppColors.slate600,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 11,
-                  ),
-                ),
-              ),
-            )
-            .toList(),
-      ),
-    );
-  }
 }
 
-class _IconAction extends StatelessWidget {
-  const _IconAction({
-    required this.icon,
-    required this.color,
-    required this.onTap,
+class _PermissionsPreview extends StatelessWidget {
+  const _PermissionsPreview({
+    required this.permissions,
+    required this.permissionsMeta,
   });
 
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
+  final List<Map<String, dynamic>> permissions;
+  final Map<String, dynamic> permissionsMeta;
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onTap,
-      icon: Icon(icon),
-      color: color,
-      style: IconButton.styleFrom(
-        backgroundColor: color.withValues(alpha: 0.1),
+    final resources = _map(permissionsMeta['resources']);
+    final actions = _map(permissionsMeta['actions']);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.royalBlue.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.royalBlue.withValues(alpha: 0.10)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'الصلاحيات المفعلة',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              color: AppColors.midnight,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: permissions.map((permission) {
+              final resource = (permission['resource'] ?? '').toString();
+              final action = (permission['action'] ?? '').toString();
+              final label = [
+                resources[resource] ?? resource,
+                actions[action] ?? action,
+              ].where((value) => value != null && value.toString().isNotEmpty).join(' - ');
+              return _AdminChip(
+                label: label.isEmpty ? 'صلاحية' : label,
+                color: AppColors.royalBlue,
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
 }
+
+
 
 class _Pagination extends StatelessWidget {
   const _Pagination({
@@ -1925,7 +4533,7 @@ _AdminMeta _metaFor(_AdminSection section) {
         route: AdministrativeSubjectsScreen.route,
         endpoint: '/administrative/subjects',
         icon: Icons.menu_book_rounded,
-        color: AppColors.violet,
+        color: AppColors.royalBlue,
       );
     case _AdminSection.doctors:
       return const _AdminMeta(
@@ -1955,9 +4563,21 @@ _AdminMeta _metaFor(_AdminSection section) {
         route: AdministrativeDelegatesScreen.route,
         endpoint: '/administrative/delegates',
         icon: Icons.admin_panel_settings_rounded,
-        color: AppColors.goldDeep,
+        color: AppColors.royalBlue,
       );
   }
+}
+
+Color _roleColor(String role) {
+  if (role == 'delegate') return AppColors.royalBlue;
+  if (role == 'practical_delegate') return AppColors.teal;
+  return AppColors.slate700;
+}
+
+String _roleLabel(String role) {
+  if (role == 'delegate') return 'مندوب دفعة';
+  if (role == 'practical_delegate') return 'مندوب عملي';
+  return 'طالب';
 }
 
 BoxDecoration _cardDecoration() {
@@ -1977,14 +4597,6 @@ BoxDecoration _cardDecoration() {
 
 String _titleOf(Map<String, dynamic> item) => (item['name'] ?? '-').toString();
 
-String _roleLabel(Object? role) {
-  return switch ((role ?? '').toString()) {
-    'delegate' => 'مندوب دفعة',
-    'practical_delegate' => 'مندوب عملي',
-    'doctor' => 'دكتور',
-    _ => 'طالب',
-  };
-}
 
 bool _isDelegateRole(Object? role) {
   final value = (role ?? '').toString();

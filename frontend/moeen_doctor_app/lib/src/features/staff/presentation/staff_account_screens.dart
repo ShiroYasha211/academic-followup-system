@@ -44,6 +44,7 @@ class StaffAccountDashboardScreen extends ConsumerWidget {
                     online: refreshState.online,
                     refreshing: refreshState.refreshing,
                   ),
+                  adminName: session?.name ?? 'المسؤول الإداري',
                 )
               : _DoctorDashboardView(
                   data: dashboard.raw,
@@ -432,127 +433,170 @@ class _StaffAdministrativeSettingsScreenState
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
               children: [
-                _DashboardHero(
-                  title: settings.name.isEmpty
-                      ? 'إعدادات النظام'
-                      : 'إعدادات ${settings.name}',
-                  subtitle:
-                      'تحديد قواعد الحضور، الأعذار، وتجدد رموز QR الخاصة بالكلية.',
-                  icon: Icons.settings_rounded,
-                  compact: false,
-                ),
-                const SizedBox(height: 20),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    _StatCard(
-                      label: 'نسبة الحرمان',
-                      value: '${settings.absenceDeprivationPercentage}%',
-                      icon: Icons.block_rounded,
-                      color: AppColors.danger,
-                    ),
-                    _StatCard(
-                      label: 'مهلة الأعذار',
-                      value: '${settings.excusesDeadlineDays} يوم',
-                      icon: Icons.verified_rounded,
-                      color: AppColors.teal,
-                    ),
-                    _StatCard(
-                      label: 'تجدد QR',
-                      value: '${settings.qrRotationSeconds} ثانية',
-                      icon: Icons.qr_code_2_rounded,
-                      color: AppColors.royalBlue,
-                    ),
-                  ],
-                ),
+                // ─── Premium Settings Hero ───────────────────────────────
+                _SettingsHero(collegeName: settings.name),
                 const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: _cardDecoration(radius: 24),
-                  child: Form(
-                    key: _formKey,
-                    autovalidateMode: AutovalidateMode.onUserInteraction,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _SectionTitle(
-                          title: 'القواعد التنظيمية',
-                          icon: Icons.tune_rounded,
-                        ),
-                        const SizedBox(height: 18),
-                        _SettingsNumberField(
+                Form(
+                  key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // ── Section 1: Attendance Rules ─────────────────────
+                      _SettingsSection(
+                        accentColor: AppColors.rose,
+                        icon: Icons.event_busy_rounded,
+                        title: 'قواعد الحضور والغياب',
+                        subtitle: 'تحديد نسبة الحرمان من المادة الدراسية',
+                        child: _SettingsStepperField(
                           controller: _absenceController,
                           label: 'نسبة الحرمان من المادة',
                           suffix: '%',
-                          helper:
-                              'النسبة التي يحرم بعدها الطالب من المادة بسبب الغياب.',
+                          helper: 'النسبة التي يحرم بعدها الطالب من المادة بسبب تراكم الغياب.',
                           min: 1,
                           max: 100,
+                          icon: Icons.block_rounded,
+                          accentColor: AppColors.rose,
                         ),
-                        const SizedBox(height: 16),
-                        _SettingsNumberField(
-                          controller: _deadlineController,
-                          label: 'آخر موعد لتقديم العذر',
-                          suffix: 'يوم',
-                          helper:
-                              'عدد الأيام المسموح بها لتقديم عذر بعد تاريخ الغياب.',
-                          min: 1,
-                          max: 30,
+                      ),
+                      const SizedBox(height: 16),
+                      // ── Section 2: Excuse Management ────────────────────
+                      _SettingsSection(
+                        accentColor: AppColors.goldDeep,
+                        icon: Icons.assignment_turned_in_rounded,
+                        title: 'إدارة الأعذار والتغيبات',
+                        subtitle: 'ضبط المهلة الزمنية وجهة استلام الأعذار',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SettingsStepperField(
+                              controller: _deadlineController,
+                              label: 'آخر موعد تقديم العذر',
+                              suffix: 'يوم',
+                              helper: 'عدد الأيام المسموح بها للطالب لتقديم عذر بعد تاريخ الغياب.',
+                              min: 1,
+                              max: 30,
+                              icon: Icons.calendar_today_rounded,
+                              accentColor: AppColors.goldDeep,
+                            ),
+                            const SizedBox(height: 20),
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: AppColors.slate50,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppColors.slate100),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(7),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.goldDeep.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(
+                                          Icons.route_rounded,
+                                          color: AppColors.goldDeep,
+                                          size: 16,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      const Text(
+                                        'الجهة المخولة باستلام الأعذار',
+                                        style: TextStyle(
+                                          fontFamily: 'Cairo',
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13,
+                                          color: AppColors.midnight,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _ReceiverChoice(
+                                    value: _excuseReceiver,
+                                    onChanged: (value) =>
+                                        setState(() => _excuseReceiver = value),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        _SettingsNumberField(
+                      ),
+                      const SizedBox(height: 16),
+                      // ── Section 3: QR Session Settings ──────────────────
+                      _SettingsSection(
+                        accentColor: AppColors.royalBlue,
+                        icon: Icons.qr_code_scanner_rounded,
+                        title: 'جلسات الحضور السريع (QR)',
+                        subtitle: 'ضبط سرعة تجدد رمز الاستجابة السريعة',
+                        child: _SettingsStepperField(
                           controller: _qrRotationController,
                           label: 'مدة تجدد رمز QR',
                           suffix: 'ثانية',
-                          helper:
-                              'الفترة بين كل رمز QR والرمز التالي في جلسات التحضير.',
+                          helper: 'الفترة الزمنية بين تجديد كل رمز QR خلال جلسة التحضير.',
                           min: 5,
                           max: 300,
+                          icon: Icons.timer_outlined,
+                          accentColor: AppColors.royalBlue,
+                          step: 5,
                         ),
-                        const SizedBox(height: 22),
-                        const _SectionTitle(
-                          title: 'استقبال الأعذار',
-                          icon: Icons.assignment_turned_in_rounded,
-                        ),
-                        const SizedBox(height: 14),
-                        _ReceiverChoice(
-                          value: _excuseReceiver,
-                          onChanged: (value) =>
-                              setState(() => _excuseReceiver = value),
-                        ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: _saving ? null : _save,
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 18),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              backgroundColor: AppColors.royalBlue,
+                      ),
+                      const SizedBox(height: 28),
+                      // ── Save Button ──────────────────────────────────────
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.royalBlue,
+                              AppColors.royalBlue.withValues(alpha: 0.85),
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.royalBlue.withValues(alpha: 0.35),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
                             ),
-                            icon: _saving
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(Icons.save_rounded),
-                            label: Text(
-                              _saving ? 'جاري الحفظ...' : 'حفظ الإعدادات',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                              ),
+                          ],
+                        ),
+                        child: FilledButton.icon(
+                          onPressed: _saving ? null : _save,
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                          ),
+                          icon: _saving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.check_circle_outline_rounded, size: 22),
+                          label: Text(
+                            _saving ? 'جاري حفظ الإعدادات...' : 'حفظ الإعدادات وتحديث النظام',
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -628,6 +672,7 @@ class _StaffAdministrativeSettingsScreenState
     }
   }
 }
+
 
 bool _looksLikePdf(List<int> bytes) {
   if (bytes.length < 5) return false;
@@ -969,81 +1014,208 @@ class _DoctorDashboardView extends ConsumerWidget {
   }
 }
 
+class _AdministrativeWelcomeBanner extends StatelessWidget {
+  const _AdministrativeWelcomeBanner({
+    required this.adminName,
+    required this.collegeName,
+  });
+
+  final String adminName;
+  final String collegeName;
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'صباح الخير';
+    if (hour < 17) return 'طاب يومك';
+    return 'مساء الخير';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.royalBlue,
+            AppColors.royalBlueDark,
+            Color(0xFF1E3A8A),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.royalBlue.withValues(alpha: 0.3),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
+          ),
+        ],
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: -20,
+            bottom: -30,
+            child: Icon(
+              Icons.admin_panel_settings_rounded,
+              size: 140,
+              color: Colors.white.withValues(alpha: 0.05),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${_getGreeting()}،',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+              Text(
+                adminName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.apartment_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      collegeName.isNotEmpty ? collegeName : 'لوحة التحكم الإدارية بالكلية',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AdministrativeDashboardView extends StatelessWidget {
   const _AdministrativeDashboardView({
     required this.data,
     required this.offlineBanner,
+    required this.adminName,
   });
 
   final Map<String, dynamic> data;
   final Widget offlineBanner;
+  final String adminName;
 
   @override
   Widget build(BuildContext context) {
     final college = _map(data['college']);
     final stats = _map(data['stats']);
+    final collegeName = college['name']?.toString() ?? '';
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+      padding: AppDimensions.pagePadding,
       children: [
         offlineBanner,
-        _DashboardHero(
-          title: college['name']?.toString() ?? 'لوحة الكلية',
-          subtitle: 'إدارة بيانات الكلية ومتابعة مؤشرات التشغيل الأساسية.',
-          icon: Icons.apartment_rounded,
-          compact: false,
+        _AdministrativeWelcomeBanner(
+          adminName: adminName,
+          collegeName: collegeName,
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: AppDimensions.sectionGapLarge),
+        const _SectionTitle(
+          title: 'إحصائيات الكادر والطلاب',
+          icon: Icons.groups_rounded,
+        ),
+        const SizedBox(height: 14),
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: AppDimensions.gridGap,
+          runSpacing: AppDimensions.gridGap,
           children: [
             _StatCard(
               label: 'الدكاترة',
               value: _int(stats['doctors_count']).toString(),
               icon: Icons.school_rounded,
               color: AppColors.royalBlue,
+              compact: true,
             ),
             _StatCard(
               label: 'المندوبون',
               value: _int(stats['delegates_count']).toString(),
               icon: Icons.admin_panel_settings_rounded,
               color: AppColors.teal,
+              compact: true,
             ),
             _StatCard(
               label: 'الطلاب',
               value: _int(stats['students_count']).toString(),
               icon: Icons.groups_rounded,
               color: AppColors.info,
+              compact: true,
             ),
           ],
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: AppDimensions.sectionGapLarge),
         const _SectionTitle(
-          title: 'إعدادات الكلية',
-          icon: Icons.settings_rounded,
+          title: 'قواعد وضوابط الكلية',
+          icon: Icons.rule_rounded,
         ),
         const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: _cardDecoration(radius: 24),
-          child: Column(
-            children: [
-              _InlineInfo(
-                label: 'نسبة الحرمان',
-                value: '${_int(college['absence_deprivation_percentage'])}%',
-              ),
-              const Divider(height: 28),
-              _InlineInfo(
-                label: 'مهلة الأعذار',
-                value: '${_int(college['excuses_deadline_days'])} يوم',
-              ),
-              const Divider(height: 28),
-              _InlineInfo(
-                label: 'مستقبل الأعذار',
-                value: college['excuse_receiver']?.toString() ?? '-',
-              ),
-            ],
-          ),
+        Wrap(
+          spacing: AppDimensions.gridGap,
+          runSpacing: AppDimensions.gridGap,
+          children: [
+            _StatCard(
+              label: 'نسبة الحرمان',
+              value: '${_int(college['absence_deprivation_percentage'])}%',
+              icon: Icons.block_rounded,
+              color: AppColors.danger,
+              compact: true,
+            ),
+            _StatCard(
+              label: 'مهلة الأعذار',
+              value: '${_int(college['excuses_deadline_days'])} أيام',
+              icon: Icons.verified_rounded,
+              color: AppColors.warning,
+              compact: true,
+            ),
+            _StatCard(
+              label: 'مستقبل الأعذار',
+              value: college['excuse_receiver']?.toString() == 'administrative' ? 'الإدارة' : 'الدكتور',
+              icon: Icons.assignment_turned_in_rounded,
+              color: AppColors.violet,
+              compact: true,
+            ),
+          ],
         ),
         const SizedBox(height: 28),
         const _SectionTitle(title: 'وصول سريع', icon: Icons.bolt_rounded),
@@ -1055,21 +1227,25 @@ class _AdministrativeDashboardView extends StatelessWidget {
             _QuickActionCard(
               label: 'الإشعارات',
               icon: Icons.notifications_active_rounded,
+              color: AppColors.royalBlue,
               onTap: () => context.go('/administrative/notifications'),
             ),
             _QuickActionCard(
               label: 'المندوبون',
               icon: Icons.admin_panel_settings_rounded,
+              color: AppColors.teal,
               onTap: () => context.go('/administrative/delegates'),
             ),
             _QuickActionCard(
               label: 'التقارير',
               icon: Icons.analytics_rounded,
+              color: AppColors.info,
               onTap: () => context.go('/administrative/reports'),
             ),
             _QuickActionCard(
               label: 'الإعدادات',
               icon: Icons.settings_rounded,
+              color: AppColors.goldDeep,
               onTap: () => context.go('/administrative/settings'),
             ),
           ],
@@ -2193,124 +2369,6 @@ class _DoctorWelcomeBanner extends StatelessWidget {
   }
 }
 
-class _DashboardHero extends StatelessWidget {
-  const _DashboardHero({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    this.compact = false,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final radius = compact ? AppDimensions.heroRadius : 32.0;
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.royalBlue.withValues(alpha: 0.24),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: Stack(
-          children: [
-            // Decorative background glowing circles
-            Positioned(
-              top: -40,
-              left: -40,
-              child: Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -30,
-              right: 60,
-              child: Container(
-                width: 90,
-                height: 90,
-                decoration: BoxDecoration(
-                  color: AppColors.gold.withValues(alpha: 0.08),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: compact ? AppDimensions.heroPaddingHorizontal : 24,
-                vertical: compact ? AppDimensions.heroPaddingVertical : 28,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: compact ? AppDimensions.heroIconBox : 56,
-                    height: compact ? AppDimensions.heroIconBox : 56,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.25),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Icon(
-                      icon,
-                      color: Colors.white,
-                      size: compact ? AppDimensions.heroIcon : 28,
-                    ),
-                  ),
-                  SizedBox(width: compact ? 14 : 18),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: compact ? AppDimensions.heroTitle : 18,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        SizedBox(height: compact ? 4 : 6),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            fontWeight: FontWeight.w600,
-                            fontSize: compact ? AppDimensions.heroSubtitle : 13,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title, required this.icon});
@@ -3053,63 +3111,74 @@ class _AccountDetailRow extends StatelessWidget {
   }
 }
 
-class _InlineInfo extends StatelessWidget {
-  const _InlineInfo({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.slate500,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
-      ],
-    );
-  }
-}
 
 class _QuickActionCard extends StatelessWidget {
   const _QuickActionCard({
     required this.label,
     required this.icon,
+    required this.color,
     required this.onTap,
   });
 
   final String label;
   final IconData icon;
+  final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: (MediaQuery.sizeOf(context).width - 52) / 2,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: _cardDecoration(radius: 22),
-          child: Row(
-            children: [
-              Icon(icon, color: AppColors.royalBlue),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
+      width: (MediaQuery.sizeOf(context).width - (AppDimensions.pageHorizontal * 2) - 12) / 2,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.slate100),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(24),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(icon, color: color, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13.5,
+                        fontFamily: 'Cairo',
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_left_rounded,
+                    color: AppColors.slate400,
+                    size: 18,
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -3165,14 +3234,263 @@ class _EmptyCard extends StatelessWidget {
   }
 }
 
-class _SettingsNumberField extends StatelessWidget {
-  const _SettingsNumberField({
+
+// ──────────────────────────────────────────────────────────────────────────
+// Settings Hero — Premium college identity banner
+// ──────────────────────────────────────────────────────────────────────────
+class _SettingsHero extends StatelessWidget {
+  const _SettingsHero({required this.collegeName});
+
+  final String collegeName;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayName = collegeName.isNotEmpty ? collegeName : 'الكلية';
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D1B3E),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0D1B3E).withValues(alpha: 0.4),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          // Subtle diagonal pattern
+          Positioned.fill(
+            child: CustomPaint(painter: _GridPatternPainter()),
+          ),
+          // Gold accent line at top
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: Container(
+              height: 3,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.goldDeep.withValues(alpha: 0),
+                    AppColors.goldDeep,
+                    AppColors.goldDeep.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+            child: Row(
+              children: [
+                // Icon Container
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(
+                        Icons.school_rounded,
+                        color: AppColors.goldDeep.withValues(alpha: 0.3),
+                        size: 44,
+                      ),
+                      const Icon(
+                        Icons.settings_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'إعدادات $displayName',
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 20,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.goldDeep.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.goldDeep.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: const Text(
+                          'ضبط قواعد الحضور والأعذار وجلسات QR',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11.5,
+                            color: AppColors.goldDeep,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GridPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.03)
+      ..strokeWidth = 1;
+    const spacing = 32.0;
+    for (double x = 0; x < size.width; x += spacing) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (double y = 0; y < size.height; y += spacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Settings Section — Premium card with color-coded header strip
+// ──────────────────────────────────────────────────────────────────────────
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({
+    required this.accentColor,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  final Color accentColor;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Color-coded header ──────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.06),
+              border: Border(
+                bottom: BorderSide(color: accentColor.withValues(alpha: 0.12)),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(icon, color: accentColor, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14.5,
+                          color: accentColor,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11.5,
+                          color: AppColors.slate500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // ── Content ─────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Settings Stepper Field — Enhanced with accentColor
+// ──────────────────────────────────────────────────────────────────────────
+class _SettingsStepperField extends StatelessWidget {
+  const _SettingsStepperField({
     required this.controller,
     required this.label,
     required this.suffix,
     required this.helper,
     required this.min,
     required this.max,
+    required this.icon,
+    this.step = 1,
+    this.accentColor = AppColors.royalBlue,
   });
 
   final TextEditingController controller;
@@ -3181,30 +3499,165 @@ class _SettingsNumberField extends StatelessWidget {
   final String helper;
   final int min;
   final int max;
+  final IconData icon;
+  final int step;
+  final Color accentColor;
+
+  void _adjust(int delta) {
+    final current = int.tryParse(controller.text) ?? min;
+    final newValue = (current + delta).clamp(min, max);
+    controller.text = newValue.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      validator: (value) {
-        final number = int.tryParse((value ?? '').trim());
-        if (number == null) return 'أدخل رقمًا صحيحًا.';
-        if (number < min || number > max) {
-          return 'القيمة يجب أن تكون بين $min و $max.';
-        }
-        return null;
-      },
-      decoration: InputDecoration(
-        labelText: label,
-        suffixText: suffix,
-        helperText: helper,
-        prefixIcon: const Icon(Icons.numbers_rounded),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Label + helper
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: accentColor, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.5,
+                      color: AppColors.midnight,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    helper,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11.5,
+                      color: AppColors.slate500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        // ── Stepper Control ────────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.slate50,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.slate200),
+          ),
+          child: Row(
+            children: [
+              // Minus button
+              _StepButton(
+                icon: Icons.remove_rounded,
+                accentColor: accentColor,
+                onTap: () => _adjust(-step),
+              ),
+              // Value display
+              Expanded(
+                child: Column(
+                  children: [
+                    TextFormField(
+                      controller: controller,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 32,
+                        color: accentColor,
+                        height: 1.1,
+                      ),
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        hintText: min.toString(),
+                      ),
+                      validator: (value) {
+                        final number = int.tryParse((value ?? '').trim());
+                        if (number == null) return 'أدخل رقمًا';
+                        if (number < min || number > max) {
+                          return 'القيمة بين $min و $max';
+                        }
+                        return null;
+                      },
+                    ),
+                    Text(
+                      suffix,
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                        color: accentColor.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Plus button
+              _StepButton(
+                icon: Icons.add_rounded,
+                accentColor: accentColor,
+                onTap: () => _adjust(step),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  const _StepButton({
+    required this.icon,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 52,
+        height: 52,
+        margin: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: accentColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: accentColor.withValues(alpha: 0.2)),
+        ),
+        child: Icon(icon, color: accentColor, size: 22),
       ),
     );
   }
 }
+
+
 
 class _ReceiverChoice extends StatelessWidget {
   const _ReceiverChoice({required this.value, required this.onChanged});

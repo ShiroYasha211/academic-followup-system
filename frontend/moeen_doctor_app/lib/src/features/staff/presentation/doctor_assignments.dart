@@ -28,6 +28,37 @@ class _DoctorAssignmentsScreenState
     });
   }
 
+  Future<void> _showDelegatePermissionsManager() async {
+    try {
+      final response = await ref
+          .read(staffRepositoryProvider)
+          .get('/doctor/assignments/delegate-permissions');
+      if (!mounted) return;
+      await showMoeenBottomSheet<void>(
+        context: context,
+        title: 'صلاحيات المندوبين في التكاليف',
+        icon: Icons.admin_panel_settings_rounded,
+        color: AppColors.royalBlue,
+        child: _AssignmentDelegatePermissionsPanel(
+          payload: _docMap(_docData(response)),
+          onSave: (subjectId, delegateId, permissions) async {
+            await ref.read(staffRepositoryProvider).put(
+              '/doctor/assignments/delegate-permissions',
+              {
+                'subject_id': subjectId,
+                'delegate_id': delegateId,
+                ...permissions,
+              },
+            );
+            _reload();
+          },
+        ),
+      );
+    } catch (error) {
+      if (mounted) await _docErrorDialog(context, error);
+    }
+  }
+
   List<Map<String, dynamic>> _filteredAssignments(
     List<Map<String, dynamic>> assignments,
   ) {
@@ -102,9 +133,22 @@ class _DoctorAssignmentsScreenState
                   title: 'إدارة التكاليف',
                   subtitle: 'إنشاء التكاليف ومراجعة تسليمات الطلاب وتصديرها.',
                   icon: Icons.assignment_rounded,
-                  trailing: IconButton.filledTonal(
-                    onPressed: () => _showAssignmentForm(subjects: subjects),
-                    icon: const Icon(Icons.add_rounded),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton.filledTonal(
+                        tooltip: 'صلاحيات المندوبين',
+                        onPressed: _showDelegatePermissionsManager,
+                        icon: const Icon(Icons.admin_panel_settings_rounded),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filledTonal(
+                        tooltip: 'تكليف جديد',
+                        onPressed: () =>
+                            _showAssignmentForm(subjects: subjects),
+                        icon: const Icon(Icons.add_rounded),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -705,6 +749,312 @@ class _AssignmentsFilters extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _AssignmentDelegatePermissionsPanel extends StatefulWidget {
+  const _AssignmentDelegatePermissionsPanel({
+    required this.payload,
+    required this.onSave,
+  });
+
+  final _Json payload;
+  final Future<void> Function(
+    int subjectId,
+    int delegateId,
+    Map<String, bool> permissions,
+  )
+  onSave;
+
+  @override
+  State<_AssignmentDelegatePermissionsPanel> createState() =>
+      _AssignmentDelegatePermissionsPanelState();
+}
+
+class _AssignmentDelegatePermissionsPanelState
+    extends State<_AssignmentDelegatePermissionsPanel> {
+  late final List<_Json> _subjects = _docList(widget.payload['subjects']).map((
+    group,
+  ) {
+    final map = Map<String, dynamic>.from(group);
+    map['subject'] = Map<String, dynamic>.from(_docMap(map['subject']));
+    map['delegates'] = _docList(map['delegates']).map((delegateEntry) {
+      final entry = Map<String, dynamic>.from(delegateEntry);
+      entry['delegate'] = Map<String, dynamic>.from(_docMap(entry['delegate']));
+      entry['permissions'] = Map<String, dynamic>.from(
+        _docMap(entry['permissions']),
+      );
+      return entry;
+    }).toList();
+    return map;
+  }).toList();
+
+  bool _saving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_subjects.isEmpty) {
+      return const _DocEmpty('لا توجد مواد مرتبطة بحسابك حاليًا.');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.royalBlue.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: AppColors.royalBlue.withValues(alpha: 0.12),
+            ),
+          ),
+          child: const Text(
+            'حدد ما يستطيع المندوب فعله في تكاليف كل مادة. أي صلاحية يتم سحبها ستمنع العملية من السيرفر مباشرة حتى لو بقيت الواجهة مفتوحة عند المندوب.',
+            style: TextStyle(
+              color: AppColors.midnight,
+              fontWeight: FontWeight.w800,
+              fontSize: 12.5,
+              height: 1.6,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        ..._subjects.map(_buildSubjectGroup),
+      ],
+    );
+  }
+
+  Widget _buildSubjectGroup(_Json group) {
+    final subject = _docMap(group['subject']);
+    final delegates = _docList(group['delegates']).map(_docMap).toList();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.slate200),
+      ),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: AppColors.royalBlue.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(Icons.book_rounded, color: AppColors.royalBlue),
+        ),
+        title: Text(
+          _docText(subject['name'], 'مادة دراسية'),
+          style: const TextStyle(
+            fontWeight: FontWeight.w900,
+            color: AppColors.midnight,
+          ),
+        ),
+        subtitle: Text(
+          delegates.isEmpty
+              ? 'لا يوجد مندوب مطابق لهذه المادة'
+              : '${delegates.length} مندوب متاح',
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            color: AppColors.slate500,
+            fontSize: 12,
+          ),
+        ),
+        children: delegates.isEmpty
+            ? [const _DocEmpty('لا يوجد مندوب لهذه الدفعة.')]
+            : delegates
+                  .map((entry) => _buildDelegatePermissions(subject, entry))
+                  .toList(),
+      ),
+    );
+  }
+
+  Widget _buildDelegatePermissions(_Json subject, _Json entry) {
+    final delegate = _docMap(entry['delegate']);
+    final permissions = _docMap(entry['permissions']);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.slate200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.royalBlue,
+                child: Icon(Icons.person_rounded, color: Colors.white),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _docText(delegate['name'], 'مندوب'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                    Text(
+                      _docText(delegate['student_number'], '-'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.slate500,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_saving)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _permissionChip(
+                subject,
+                delegate,
+                permissions,
+                'can_create',
+                'إنشاء',
+              ),
+              _permissionChip(
+                subject,
+                delegate,
+                permissions,
+                'can_edit_own',
+                'تعديل تكاليفه',
+              ),
+              _permissionChip(
+                subject,
+                delegate,
+                permissions,
+                'can_delete_own',
+                'حذف تكاليفه',
+              ),
+              _permissionChip(
+                subject,
+                delegate,
+                permissions,
+                'can_edit_doctor_assignments',
+                'تعديل تكاليف الدكتور',
+              ),
+              _permissionChip(
+                subject,
+                delegate,
+                permissions,
+                'can_delete_doctor_assignments',
+                'حذف تكاليف الدكتور',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _permissionChip(
+    _Json subject,
+    _Json delegate,
+    _Json permissions,
+    String key,
+    String label,
+  ) {
+    final selected = _docBool(permissions[key]);
+
+    return FilterChip(
+      selected: selected,
+      label: Text(label),
+      avatar: Icon(
+        selected ? Icons.check_circle_rounded : Icons.lock_outline_rounded,
+        size: 17,
+      ),
+      onSelected: _saving
+          ? null
+          : (value) =>
+                _togglePermission(subject, delegate, permissions, key, value),
+      selectedColor: AppColors.royalBlue.withValues(alpha: 0.14),
+      checkmarkColor: AppColors.royalBlue,
+      labelStyle: TextStyle(
+        color: selected ? AppColors.royalBlue : AppColors.slate600,
+        fontWeight: FontWeight.w900,
+        fontSize: 12,
+      ),
+      side: BorderSide(
+        color: selected
+            ? AppColors.royalBlue.withValues(alpha: 0.28)
+            : AppColors.slate200,
+      ),
+    );
+  }
+
+  Future<void> _togglePermission(
+    _Json subject,
+    _Json delegate,
+    _Json permissions,
+    String key,
+    bool value,
+  ) async {
+    final previous = _docBool(permissions[key]);
+    setState(() {
+      _saving = true;
+      permissions[key] = value;
+    });
+
+    final payload = {
+      'can_create': _docBool(permissions['can_create']),
+      'can_edit_own': _docBool(permissions['can_edit_own']),
+      'can_delete_own': _docBool(permissions['can_delete_own']),
+      'can_edit_doctor_assignments': _docBool(
+        permissions['can_edit_doctor_assignments'],
+      ),
+      'can_delete_doctor_assignments': _docBool(
+        permissions['can_delete_doctor_assignments'],
+      ),
+    };
+
+    try {
+      await widget.onSave(
+        _docInt(subject['id']),
+        _docInt(delegate['id']),
+        payload,
+      );
+      if (!mounted) return;
+      _docSnack(context, 'تم تحديث الصلاحيات.', color: AppColors.success);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => permissions[key] = previous);
+      await _docErrorDialog(context, error);
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
   }
 }
 

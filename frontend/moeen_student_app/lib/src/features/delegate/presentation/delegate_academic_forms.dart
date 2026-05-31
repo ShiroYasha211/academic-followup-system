@@ -283,9 +283,29 @@ Future<void> _assignmentSheet(
   BuildContext context,
   WidgetRef ref, {
   Map<String, dynamic>? item,
+  Set<int>? creatableSubjectIds,
 }) async {
-  final subjects = await ref.read(delegateRepositoryProvider).subjects();
+  final allSubjects = await ref.read(delegateRepositoryProvider).subjects();
+  final subjects = item == null && creatableSubjectIds != null
+      ? allSubjects
+            .where(
+              (subject) =>
+                  creatableSubjectIds.contains(number(subject, 'id').toInt()),
+            )
+            .toList()
+      : allSubjects;
   if (!context.mounted) return;
+
+  if (subjects.isEmpty) {
+    await showMoeenInfoDialog(
+      context: context,
+      title: 'ليست لديك صلاحيات',
+      message: 'لا توجد مادة يتيح لك دكتورها إنشاء تكاليف لها حاليًا.',
+      icon: Icons.lock_rounded,
+      color: AppColors.warning,
+    );
+    return;
+  }
 
   var subjectId = number(item, 'subject_id').toInt();
   final title = TextEditingController(text: text(item, 'title'));
@@ -380,7 +400,10 @@ Future<void> _assignmentSheet(
             'requires_submission': requiresSubmission ? 1 : 0,
           },
         ),
-    after: () => ref.invalidate(_delegateAssignmentsProvider),
+    after: () {
+      ref.invalidate(_delegateAssignmentsProvider);
+      ref.invalidate(_delegateAssignmentPermissionsProvider);
+    },
   );
 }
 

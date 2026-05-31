@@ -21,40 +21,6 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
 }
 
-class _ListScaffold extends StatelessWidget {
-  const _ListScaffold({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.colors,
-    required this.children,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final List<Color> colors;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 36),
-      children: [
-        _HeroPanel(
-          title: title,
-          subtitle: subtitle,
-          icon: icon,
-          colors: colors,
-        ),
-        const SizedBox(height: 18),
-        ...children,
-      ],
-    );
-  }
-}
-
 class _AsyncBody<T> extends StatelessWidget {
   const _AsyncBody({
     required this.state,
@@ -76,72 +42,114 @@ class _AsyncBody<T> extends StatelessWidget {
   }
 }
 
-class _HeroPanel extends StatelessWidget {
-  const _HeroPanel({
+class _WelcomeBanner extends StatelessWidget {
+  const _WelcomeBanner({
     required this.title,
     required this.subtitle,
-    required this.icon,
-    required this.colors,
   });
   final String title;
   final String subtitle;
-  final IconData icon;
-  final List<Color> colors;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(26),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.royalBlue,
+            AppColors.royalBlueDark,
+            const Color(0xFF1E3A8A),
+          ],
         ),
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: colors.first.withValues(alpha: 0.25),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
+            color: AppColors.royalBlue.withValues(alpha: 0.3),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
           ),
         ],
       ),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           Positioned(
-            right: -20,
-            top: -20,
+            left: -20,
+            bottom: -30,
             child: Icon(
-              icon,
-              size: 100,
-              color: Colors.white.withValues(alpha: 0.08),
+              Icons.auto_awesome_rounded,
+              size: 140,
+              color: Colors.white.withValues(alpha: 0.05),
             ),
           ),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 24,
-                        letterSpacing: -0.5,
-                      ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                            fontFamily: 'Cairo',
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 14,
-                        height: 1.4,
-                        fontWeight: FontWeight.w500,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.stars_rounded,
+                      color: AppColors.gold,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'أنت مندوب الدفعة المعتمد حالياً لمتابعة وتسيير شؤون الطلاب.',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Cairo',
+                        ),
                       ),
                     ),
                   ],
@@ -155,79 +163,81 @@ class _HeroPanel extends StatelessWidget {
   }
 }
 
-class _ActionGrid extends ConsumerWidget {
-  const _ActionGrid({
-    required this.onQrTap,
-    required this.onStudentsTap,
-    required this.onSubjectsTap,
-    required this.onAttendanceTap,
-    required this.onGradesTap,
-    required this.onMessagesTap,
+class _HeroPanel extends StatelessWidget {
+  const _HeroPanel({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.colors,
   });
 
-  final VoidCallback onQrTap;
-  final VoidCallback onStudentsTap;
-  final VoidCallback onSubjectsTap;
-  final VoidCallback onAttendanceTap;
-  final VoidCallback onGradesTap;
-  final VoidCallback onMessagesTap;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final List<Color> colors;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    const canDoQr = true;
-    // For others, we assume view permission is enough for navigation,
-    // but we can gate based on the resource name if needed.
-
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 3,
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      childAspectRatio: 0.85,
-      children: [
-        _ActionItem(
-          label: 'تحضير',
-          icon: Icons.qr_code_scanner_rounded,
-          color: AppColors.success,
-          onTap: onQrTap,
-          isEnabled: canDoQr,
-          onUnauthorized: () => _showNoPermissionSnackBar(context),
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: colors,
         ),
-        _ActionItem(
-          label: 'الطلاب',
-          icon: Icons.groups_rounded,
-          color: AppColors.teal,
-          onTap: onStudentsTap,
-        ),
-        _ActionItem(
-          label: 'المواد',
-          icon: Icons.auto_stories_rounded,
-          color: AppColors.royalBlue,
-          onTap: onSubjectsTap,
-        ),
-        _ActionItem(
-          label: 'الحضور',
-          icon: Icons.how_to_reg_rounded,
-          color: AppColors.info,
-          onTap: onAttendanceTap,
-        ),
-        _ActionItem(
-          label: 'الدرجات',
-          icon: Icons.grade_rounded,
-          color: AppColors.goldDeep,
-          onTap: onGradesTap,
-        ),
-        _ActionItem(
-          label: 'الرسائل',
-          icon: Icons.forum_rounded,
-          color: AppColors.violet,
-          onTap: onMessagesTap,
-        ),
-      ],
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: colors.first.withValues(alpha: 0.22),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(icon, color: Colors.white, size: 30),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.84),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
+
+
 
 bool isTimeInRange(String startStr, String endStr) {
   if (startStr.isEmpty || endStr.isEmpty) return false;
@@ -246,63 +256,201 @@ bool isTimeInRange(String startStr, String endStr) {
   }
 }
 
-class _ActionItem extends StatelessWidget {
-  const _ActionItem({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-    this.isEnabled = true,
-    this.onUnauthorized,
-  });
-
-  final String label;
-  final IconData icon;
-  final Color color;
+class _DelegateQrAttendanceCard extends StatelessWidget {
+  const _DelegateQrAttendanceCard({required this.onTap});
   final VoidCallback onTap;
-  final bool isEnabled;
-  final VoidCallback? onUnauthorized;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Opacity(
-          opacity: isEnabled ? 1.0 : 0.5,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: isEnabled ? onTap : onUnauthorized,
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: color.withValues(alpha: 0.15)),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F766E).withValues(alpha: 0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Material(
+          color: const Color(0xFF0F766E),
+          child: InkWell(
+            onTap: onTap,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
                 ),
-                child: Icon(icon, color: color, size: 28),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Icon(
+                      Icons.qr_code_scanner_rounded,
+                      color: Color(0xFF0F766E),
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'تحضير الطلاب السريع (QR)',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                        Text(
+                          'اضغط لبدء رصد حضور الطلاب بالدفعة الآن',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.8),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.chevron_left_rounded,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        FittedBox(
-          fit: BoxFit.scaleDown,
+      ),
+    );
+  }
+}
+
+class _ActionGrid extends ConsumerWidget {
+  const _ActionGrid({
+    required this.onStudentsTap,
+    required this.onSubjectsTap,
+    required this.onAttendanceTap,
+    required this.onGradesTap,
+    required this.onMessagesTap,
+  });
+
+  final VoidCallback onStudentsTap;
+  final VoidCallback onSubjectsTap;
+  final VoidCallback onAttendanceTap;
+  final VoidCallback onGradesTap;
+  final VoidCallback onMessagesTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final actions = [
+      _ActionData('الطلاب', Icons.groups_rounded, AppColors.teal, onStudentsTap),
+      _ActionData('المواد', Icons.auto_stories_rounded, AppColors.royalBlue, onSubjectsTap),
+      _ActionData('الحضور', Icons.how_to_reg_rounded, AppColors.info, onAttendanceTap),
+      _ActionData('الدرجات', Icons.grade_rounded, AppColors.goldDeep, onGradesTap),
+      _ActionData('الرسائل', Icons.forum_rounded, AppColors.violet, onMessagesTap),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
           child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+            'اختصارات سريعة',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
               color: AppColors.midnight,
+              fontFamily: 'Cairo',
             ),
           ),
+        ),
+        const SizedBox(height: 16),
+        GridView.builder(
+          itemCount: actions.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.9,
+          ),
+          itemBuilder: (context, index) {
+            final action = actions[index];
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(24),
+                onTap: action.onTap,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppColors.slate100),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: action.color.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(action.icon, color: action.color, size: 24),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        action.label,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                          color: AppColors.midnight,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
   }
+}
+
+class _ActionData {
+  _ActionData(this.label, this.icon, this.color, this.onTap);
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -312,26 +460,23 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppColors.royalBlue.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+    const color = AppColors.royalBlue;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: AppColors.midnight,
+            ),
           ),
-          child: Icon(icon, size: 20, color: AppColors.royalBlue),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-            color: AppColors.midnight,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -435,132 +580,190 @@ class _NewsCard extends ConsumerWidget {
     final sender = asMap(map['sender']);
     final type = text(map, 'type');
     final isUnread = map['read_at'] == null;
-    final color = _typeColor(type);
+    final color = _getNewsTypeColor(type);
 
-    return _GlassCard(
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      child: InkWell(
-        onTap: () => _showNewsDetails(context, ref, text(map, 'batch_id')),
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.035),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _showNewsDetails(context, ref, text(map, 'batch_id')),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(_getNewsTypeIcon(type), color: color, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              text(map, 'title', fallback: 'خبر جديد'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              'من: ${text(sender, 'name', fallback: 'الإدارة')}',
+                              style: const TextStyle(
+                                color: AppColors.slate500,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isUnread)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppColors.rose,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
                   ),
-                  child: Icon(_typeIcon(type), color: color, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1),
+                  ),
+                  Text(
+                    text(map, 'message', fallback: text(map, 'content')),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      height: 1.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.slate700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        text(map, 'title', fallback: 'خبر جديد'),
+                        timeText(map),
                         style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
+                          color: AppColors.slate400,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       Text(
-                        'من: ${text(sender, 'name', fallback: 'الإدارة')}',
-                        style: const TextStyle(
-                          color: AppColors.slate500,
-                          fontWeight: FontWeight.w700,
+                        'قراءة المزيد ←',
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w900,
                           fontSize: 11,
                         ),
                       ),
                     ],
                   ),
-                ),
-                if (isUnread)
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppColors.rose,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-              ],
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Divider(height: 1),
-            ),
-            Text(
-              text(map, 'message', fallback: text(map, 'content')),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                height: 1.5,
-                fontWeight: FontWeight.w600,
-                color: AppColors.slate700,
-                fontSize: 13,
+                ],
               ),
             ),
-            const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  timeText(map),
-                  style: const TextStyle(
-                    color: AppColors.slate400,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  'قراءة المزيد ←',
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
+}
 
-  IconData _typeIcon(String type) {
-    switch (type) {
-      case 'poll':
-        return Icons.poll_rounded;
-      case 'exam':
-        return Icons.fact_check_rounded;
-      case 'assignment':
-        return Icons.assignment_rounded;
-      case 'attendance':
-        return Icons.how_to_reg_rounded;
-      default:
-        return Icons.campaign_rounded;
-    }
+Color _getNewsTypeColor(String type) {
+  switch (type) {
+    case 'poll':
+      return AppColors.violet;
+    case 'exam':
+      return AppColors.danger;
+    case 'assignment':
+      return AppColors.warning;
+    case 'attendance':
+      return AppColors.success;
+    default:
+      return AppColors.orange;
   }
+}
 
-  Color _typeColor(String type) {
-    switch (type) {
-      case 'poll':
-        return AppColors.violet;
-      case 'exam':
-        return AppColors.danger;
-      case 'assignment':
-        return AppColors.warning;
-      case 'attendance':
-        return AppColors.success;
-      default:
-        return AppColors.orange;
-    }
+IconData _getNewsTypeIcon(String type) {
+  switch (type) {
+    case 'poll':
+      return Icons.poll_rounded;
+    case 'exam':
+      return Icons.fact_check_rounded;
+    case 'assignment':
+      return Icons.assignment_rounded;
+    case 'attendance':
+      return Icons.how_to_reg_rounded;
+    default:
+      return Icons.campaign_rounded;
   }
+}
+
+String _getNewsTypeTitle(String type) {
+  switch (type) {
+    case 'poll':
+      return 'استطلاع رأي للدفعة';
+    case 'exam':
+      return 'تنبيه اختبار';
+    case 'assignment':
+      return 'تكليف دراسي جديد';
+    case 'attendance':
+      return 'تنبيه حضور وغياب';
+    default:
+      return 'تعميم رسمي للدفعة';
+  }
+}
+
+Color _getRoleColor(String role) {
+  final r = role.toLowerCase();
+  if (r.contains('دكتور') || r.contains('doctor') || r.contains('أستاذ') || r.contains('طبيب') || r.contains('staff') || r.contains('تعليمي')) {
+    return AppColors.royalBlue;
+  }
+  if (r.contains('مندوب') || r.contains('delegate')) {
+    return AppColors.orange;
+  }
+  if (r.contains('إدارة') || r.contains('admin') || r.contains('مدير') || r.contains('كلية')) {
+    return AppColors.goldDeep;
+  }
+  return AppColors.teal;
+}
+
+String _getSenderInitials(String name) {
+  if (name.isEmpty) return '?';
+  final parts = name.trim().split(RegExp(r'\s+'));
+  if (parts.length > 1) {
+    return '${parts[0][0]}${parts[parts.length - 1][0]}';
+  }
+  return parts[0].isNotEmpty ? parts[0][0] : '?';
 }
 
 Future<void> _showNewsDetails(
@@ -585,11 +788,25 @@ Future<void> _showNewsDetails(
     final hasVoted = data['has_voted'] == true;
     final userVote = asMap(data['user_vote']);
 
+    final totalVotes = pollOptions.fold<int>(
+      0,
+      (sum, opt) => sum + number(asMap(opt), 'votes_count').toInt(),
+    );
+
+    final color = _getNewsTypeColor(type);
+    final icon = _getNewsTypeIcon(type);
+    final sheetTitle = _getNewsTypeTitle(type);
+
+    final senderName = text(sender, 'name', fallback: 'الإدارة الكلية');
+    final senderRole = text(sender, 'role', fallback: 'إدارة');
+    final roleColor = _getRoleColor(senderRole);
+    final initials = _getSenderInitials(senderName);
+
     showMoeenBottomSheet(
       context: context,
-      title: 'تفاصيل الخبر',
-      icon: Icons.newspaper_rounded,
-      color: AppColors.orange,
+      title: sheetTitle,
+      icon: icon,
+      color: color,
       child: StatefulBuilder(
         builder: (context, setModalState) => Column(
           mainAxisSize: MainAxisSize.min,
@@ -598,10 +815,16 @@ Future<void> _showNewsDetails(
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: AppColors.slate100,
-                  child: const Icon(
-                    Icons.person_rounded,
-                    color: AppColors.slate400,
+                  radius: 22,
+                  backgroundColor: roleColor.withValues(alpha: 0.1),
+                  child: Text(
+                    initials,
+                    style: TextStyle(
+                      color: roleColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      fontFamily: 'Cairo',
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -609,14 +832,28 @@ Future<void> _showNewsDetails(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      text(sender, 'name'),
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                    Text(
-                      text(sender, 'role'),
+                      senderName,
                       style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.slate500,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: roleColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        senderRole,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: roleColor,
+                          fontFamily: 'Cairo',
+                        ),
                       ),
                     ),
                   ],
@@ -627,11 +864,12 @@ Future<void> _showNewsDetails(
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.slate400,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             Text(
               text(notification, 'title'),
               style: const TextStyle(
@@ -640,27 +878,46 @@ Future<void> _showNewsDetails(
                 color: AppColors.midnight,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              text(notification, 'message'),
-              style: const TextStyle(
-                height: 1.6,
-                fontSize: 14,
-                color: AppColors.slate700,
-                fontWeight: FontWeight.w600,
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.slate50,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppColors.slate200.withValues(alpha: 0.5),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                text(notification, 'message', fallback: text(notification, 'content')),
+                style: const TextStyle(
+                  height: 1.6,
+                  fontSize: 14,
+                  color: AppColors.slate800,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             if (type == 'poll') ...[
               const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Divider(),
+                padding: EdgeInsets.symmetric(vertical: 18),
+                child: Divider(height: 1),
               ),
-              const Text(
-                'شاركنا برأيك:',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.violet,
-                ),
+              Row(
+                children: [
+                  Icon(Icons.bar_chart_rounded, color: AppColors.violet, size: 20),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'شاركنا برأيك:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                      color: AppColors.violet,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               for (final opt in pollOptions)
@@ -670,6 +927,8 @@ Future<void> _showNewsDetails(
                       number(userVote, 'poll_option_id').toInt() ==
                       number(opt, 'id').toInt(),
                   hasVoted: hasVoted,
+                  votesCount: number(asMap(opt), 'votes_count').toInt(),
+                  totalVotes: totalVotes,
                   onTap: () async {
                     if (hasVoted) return;
                     await _run(
@@ -706,49 +965,100 @@ class _PollOptionTile extends StatelessWidget {
     required this.option,
     required this.isSelected,
     required this.hasVoted,
+    required this.votesCount,
+    required this.totalVotes,
     required this.onTap,
   });
 
   final Map<String, dynamic> option;
   final bool isSelected;
   final bool hasVoted;
+  final int votesCount;
+  final int totalVotes;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected ? AppColors.violet : AppColors.slate200;
+    final double percent = totalVotes > 0 ? (votesCount / totalVotes) * 100 : 0.0;
+    final color = isSelected
+        ? AppColors.violet
+        : (hasVoted ? AppColors.slate300 : AppColors.slate200);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: color, width: 2),
-            borderRadius: BorderRadius.circular(12),
-            color: isSelected
-                ? color.withValues(alpha: 0.05)
-                : Colors.transparent,
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: color,
+            width: isSelected ? 2 : 1.5,
           ),
-          child: Row(
+          borderRadius: BorderRadius.circular(16),
+          color: isSelected
+              ? AppColors.violet.withValues(alpha: 0.06)
+              : Colors.transparent,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: hasVoted ? null : onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
             children: [
-              Expanded(
-                child: Text(
-                  text(option, 'option_text'),
-                  style: TextStyle(
-                    fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                    color: isSelected ? AppColors.violet : AppColors.slate700,
+              if (hasVoted)
+                Positioned.fill(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return FractionallySizedBox(
+                          widthFactor: percent / 100,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.violet.withValues(alpha: 0.12)
+                                  : AppColors.slate100,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
-              ),
-              if (isSelected)
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: AppColors.violet,
-                  size: 20,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        text(option, 'option_text'),
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                          color: isSelected ? AppColors.violet : AppColors.slate800,
+                        ),
+                      ),
+                    ),
+                    if (hasVoted) ...[
+                      Text(
+                        '${percent.toStringAsFixed(1)}% ($votesCount)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: isSelected ? AppColors.violet : AppColors.slate600,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (isSelected)
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppColors.violet,
+                        size: 20,
+                      )
+                    else if (hasVoted)
+                      const SizedBox(width: 20),
+                  ],
                 ),
+              ),
             ],
           ),
         ),
@@ -769,14 +1079,13 @@ class _StatsGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        mainAxisSpacing: 14,
-        crossAxisSpacing: 14,
-        childAspectRatio: 1.15,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio: 1.1,
       ),
       itemBuilder: (context, index) {
         final item = items[index];
         return Container(
-          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
@@ -784,48 +1093,65 @@ class _StatsGrid extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: item.color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -10,
+                  top: -10,
+                  child: Icon(
+                    item.icon,
+                    size: 60,
+                    color: item.color.withValues(alpha: 0.05),
+                  ),
                 ),
-                child: Icon(item.icon, color: item.color, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      item.value,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.midnight,
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: item.color.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(item.icon, color: item.color, size: 20),
                       ),
-                    ),
-                    Text(
-                      item.label,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.slate400,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.value,
+                            style: const TextStyle(
+                              color: AppColors.midnight,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                          Text(
+                            item.label,
+                            style: const TextStyle(
+                              color: AppColors.slate500,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },

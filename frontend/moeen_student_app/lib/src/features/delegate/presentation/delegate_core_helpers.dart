@@ -61,11 +61,13 @@ String value(Object? source, String key, {String fallback = '0'}) {
 }
 
 String timeText(Object? source) {
-  return text(
+  final val = text(
     source,
     'created_at',
-    fallback: text(source, 'updated_at', fallback: '-'),
+    fallback: text(source, 'updated_at'),
   );
+  if (val.isEmpty) return '-';
+  return timeAgo(val);
 }
 
 String dateOnly(String value) {

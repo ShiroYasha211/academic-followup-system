@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/refresh/staff_refresh_coordinator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/moeen_dialogs.dart';
 import '../../../shared/widgets/moeen_logo.dart';
@@ -14,6 +15,44 @@ import '../../auth/logic/auth_controller.dart';
 import '../../auth/presentation/login_screen.dart';
 import '../logic/staff_account_controllers.dart';
 import 'staff_screens.dart';
+
+final staffAttentionCountsProvider =
+    FutureProvider.autoDispose<_StaffAttentionCounts>((ref) async {
+      final session = ref.watch(authControllerProvider).valueOrNull;
+      ref.watch(
+        staffRefreshCoordinatorProvider.select((state) => state.version),
+      );
+
+      if (session?.workspace != StaffWorkspace.doctor) {
+        return const _StaffAttentionCounts();
+      }
+
+      try {
+        final response = await ref
+            .watch(staffRepositoryProvider)
+            .get('/doctor/badges');
+        final data = _staffShellMap(response['data'] ?? response);
+        return _StaffAttentionCounts(
+          notifications: _staffShellInt(data['notifications_unread']),
+          messages: _staffShellInt(data['messages_unread']),
+          inquiries: _staffShellInt(data['inquiries_pending']),
+        );
+      } catch (_) {
+        return const _StaffAttentionCounts();
+      }
+    });
+
+class _StaffAttentionCounts {
+  const _StaffAttentionCounts({
+    this.notifications = 0,
+    this.messages = 0,
+    this.inquiries = 0,
+  });
+
+  final int notifications;
+  final int messages;
+  final int inquiries;
+}
 
 class StaffShell extends ConsumerWidget {
   const StaffShell({
@@ -81,7 +120,7 @@ class StaffShell extends ConsumerWidget {
   }
 }
 
-class _StaffAppBar extends StatelessWidget implements PreferredSizeWidget {
+class _StaffAppBar extends ConsumerWidget implements PreferredSizeWidget {
   const _StaffAppBar({
     required this.title,
     required this.session,
@@ -98,7 +137,14 @@ class _StaffAppBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 8);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final attentionCounts =
+        ref.watch(staffAttentionCountsProvider).valueOrNull ??
+        const _StaffAttentionCounts();
+    final notificationRoute =
+        session?.workspace == StaffWorkspace.administrative
+        ? '/administrative/notifications'
+        : '/doctor/notifications';
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
@@ -162,6 +208,10 @@ class _StaffAppBar extends StatelessWidget implements PreferredSizeWidget {
             ],
           ),
           actions: [
+            _AppBarNotificationButton(
+              route: notificationRoute,
+              count: attentionCounts.notifications,
+            ),
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 12),
               child: _StaffBadge(workspace: session?.workspace),
@@ -198,6 +248,9 @@ class _StaffDrawerState extends ConsumerState<_StaffDrawer> {
         .valueOrNull;
     final isSubscribed = subscription?.isSubscribed == true;
     final groups = _groups(workspace);
+    final attentionCounts =
+        ref.watch(staffAttentionCountsProvider).valueOrNull ??
+        const _StaffAttentionCounts();
 
     return Drawer(
       backgroundColor: Colors.white,
@@ -313,6 +366,10 @@ class _StaffDrawerState extends ConsumerState<_StaffDrawer> {
                                 item: item,
                                 selected: item.route == widget.currentRoute,
                                 isSubscribed: isSubscribed,
+                                badgeCount: _drawerBadgeCount(
+                                  item,
+                                  attentionCounts,
+                                ),
                                 onTap: () => _go(item, workspace),
                               ),
                           ],
@@ -674,6 +731,18 @@ List<_DrawerGroup> _groups(StaffWorkspace workspace) {
         '/doctor/clinical',
         true,
       ),
+      _DrawerItem(
+        'إعلان حالات نادرة',
+        Icons.campaign_rounded,
+        DoctorClinicalSectionScreen.rareCasesRoute,
+        true,
+      ),
+      _DrawerItem(
+        'سجل المتطوعين',
+        Icons.groups_rounded,
+        DoctorClinicalSectionScreen.volunteersRoute,
+        true,
+      ),
     ]),
     _DrawerGroup('التواصل والمحتوى', [
       _DrawerItem(
@@ -845,12 +914,14 @@ class _DrawerTile extends StatelessWidget {
     required this.item,
     required this.selected,
     required this.isSubscribed,
+    required this.badgeCount,
     required this.onTap,
   });
 
   final _DrawerItem item;
   final bool selected;
   final bool isSubscribed;
+  final int badgeCount;
   final VoidCallback onTap;
 
   @override
@@ -868,29 +939,145 @@ class _DrawerTile extends StatelessWidget {
               )
             : null,
       ),
-      child: ListTile(
-        onTap: onTap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        leading: Icon(
-          item.icon,
-          color: selected ? AppColors.royalBlue : AppColors.slate500,
-          size: 22,
-        ),
-        title: Text(
-          item.label,
-          style: TextStyle(
-            color: selected ? AppColors.royalBlue : AppColors.midnight,
-            fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-            fontSize: 14,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            child: Row(
+              children: [
+                Icon(
+                  item.icon,
+                  color: selected ? AppColors.royalBlue : AppColors.slate500,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected
+                          ? AppColors.royalBlue
+                          : AppColors.midnight,
+                      fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                if (item.requiresSubscription && !isSubscribed) ...[
+                  const SizedBox(width: 8),
+                  const SizedBox(
+                    width: 24,
+                    child: Icon(
+                      Icons.lock_rounded,
+                      size: 16,
+                      color: AppColors.slate300,
+                    ),
+                  ),
+                ] else if (badgeCount > 0) ...[
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 34,
+                    child: Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: _UnreadBadge(count: badgeCount),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
-        trailing: item.requiresSubscription && !isSubscribed
-            ? const Icon(
-                Icons.lock_rounded,
-                size: 16,
-                color: AppColors.slate300,
-              )
-            : null,
+      ),
+    );
+  }
+}
+
+class _AppBarNotificationButton extends StatelessWidget {
+  const _AppBarNotificationButton({required this.route, required this.count});
+
+  final String route;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsetsDirectional.only(end: 8),
+        child: InkWell(
+          onTap: () => context.go(route),
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.warning.withValues(alpha: 0.14),
+              ),
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Center(
+                  child: Icon(
+                    Icons.notifications_rounded,
+                    color: AppColors.warning,
+                    size: 21,
+                  ),
+                ),
+                if (count > 0)
+                  PositionedDirectional(
+                    top: -3,
+                    end: -3,
+                    child: _UnreadBadge(count: count, compact: true),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count, this.compact = false});
+
+  final int count;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = count > 99 ? '99+' : count.toString();
+    return Container(
+      constraints: BoxConstraints(
+        minWidth: compact ? 18 : 24,
+        minHeight: compact ? 18 : 22,
+      ),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 5 : 7,
+        vertical: compact ? 2 : 3,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.danger,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: Colors.white, width: compact ? 1.5 : 1),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: compact ? 9 : 10,
+          fontWeight: FontWeight.w900,
+          height: 1,
+        ),
       ),
     );
   }
@@ -942,6 +1129,27 @@ class _StaffBadge extends StatelessWidget {
 
 String _workspaceBadgeLabel(StaffWorkspace? workspace) {
   return workspace == StaffWorkspace.administrative ? 'إداري' : 'دكتور';
+}
+
+int _drawerBadgeCount(_DrawerItem item, _StaffAttentionCounts counts) {
+  return switch (item.route) {
+    '/doctor/notifications' => counts.notifications,
+    '/doctor/messages' => counts.messages,
+    '/doctor/inquiries' => counts.inquiries,
+    _ => 0,
+  };
+}
+
+Map<String, dynamic> _staffShellMap(Object? value) {
+  return value is Map
+      ? value.map((key, item) => MapEntry(key.toString(), item))
+      : const <String, dynamic>{};
+}
+
+int _staffShellInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
 }
 
 String _subscriptionRoute(StaffWorkspace workspace) {

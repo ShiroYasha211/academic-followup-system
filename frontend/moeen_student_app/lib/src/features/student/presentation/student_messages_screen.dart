@@ -137,88 +137,186 @@ class _StudentConversationScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(_conversationProvider(widget.conversationId));
-    return StudentShell(
-      currentIndex: 16,
-      title: 'المحادثة',
-      child: _AsyncBody(
-        state: state,
-        onRetry: () =>
-            ref.invalidate(_conversationProvider(widget.conversationId)),
-        builder: (data) {
-          final conversation = asMap(data['conversation']);
-          final delegate = asMap(conversation['delegate']);
-          final messages = asList(data['messages']).map(asMap).toList();
-          if (!_refreshedUnreadCount) {
-            _refreshedUnreadCount = true;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              ref.invalidate(_messagesProvider);
-              ref.invalidate(studentUnreadMessagesCountProvider);
-            });
-          }
+    return state.when(
+      loading: () => Scaffold(
+        backgroundColor: AppColors.cream,
+        appBar: AppBar(
+          backgroundColor: Colors.white.withValues(alpha: 0.9),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: IconButton(
+            onPressed: () => Navigator.maybePop(context),
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: AppColors.royalBlue,
+            ),
+          ),
+          title: const Text(
+            'المحادثة',
+            style: TextStyle(
+              color: AppColors.midnight,
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              fontFamily: 'Cairo',
+            ),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, _) => Scaffold(
+        backgroundColor: AppColors.cream,
+        appBar: AppBar(
+          backgroundColor: Colors.white.withValues(alpha: 0.9),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: IconButton(
+            onPressed: () => Navigator.maybePop(context),
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: AppColors.royalBlue,
+            ),
+          ),
+          title: const Text(
+            'المحادثة',
+            style: TextStyle(
+              color: AppColors.midnight,
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              fontFamily: 'Cairo',
+            ),
+          ),
+        ),
+        body: ErrorState(
+          message: error.toString(),
+          onRetry: () => ref.invalidate(_conversationProvider(widget.conversationId)),
+        ),
+      ),
+      data: (data) {
+        final conversation = asMap(data['conversation']);
+        final delegate = asMap(conversation['delegate']);
+        final messages = asList(data['messages']).map(asMap).toList();
+        final name = text(delegate, 'name', fallback: 'المندوب');
 
-          return Column(
-            children: [
-              _ChatHeader(delegate: delegate),
-              Expanded(
-                child: messages.isEmpty
-                    ? const EmptyState(
-                        message: 'لا توجد رسائل في هذه المحادثة.',
-                      )
-                    : ListView.builder(
-                        reverse: true,
-                        padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
-                        itemCount: messages.length,
-                        itemBuilder: (context, index) {
-                          final item = messages[messages.length - 1 - index];
-                          final sender = asMap(item['sender']);
-                          final isMine =
-                              text(sender, 'role') == 'student' ||
-                              text(item, 'type') == 'student_to_delegate';
+        if (!_refreshedUnreadCount) {
+          _refreshedUnreadCount = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            ref.invalidate(_messagesProvider);
+            ref.invalidate(studentUnreadMessagesCountProvider);
+          });
+        }
 
-                          // Date Divider logic
-                          bool showDate = false;
-                          String dateLabel = '';
-                          if (index == messages.length - 1) {
-                            showDate = true;
-                            dateLabel = _formatChatDate(
-                              text(item, 'created_at'),
-                            );
-                          } else {
-                            final nextItem =
-                                messages[messages.length - 2 - index];
-                            final currentDate = dateOnly(
-                              text(item, 'created_at'),
-                            );
-                            final nextDate = dateOnly(
-                              text(nextItem, 'created_at'),
-                            );
-                            if (currentDate != nextDate) {
+        return Scaffold(
+          backgroundColor: AppColors.cream,
+          appBar: AppBar(
+            backgroundColor: Colors.white.withValues(alpha: 0.9),
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            titleSpacing: 0,
+            leadingWidth: 54,
+            leading: IconButton(
+              onPressed: () => Navigator.maybePop(context),
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                color: AppColors.royalBlue,
+              ),
+            ),
+            title: Row(
+              children: [
+                _UserAvatar(name: name, size: 38),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          color: AppColors.midnight,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                      const Text(
+                        'المندوب',
+                        style: TextStyle(
+                          color: AppColors.slate400,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10.5,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          body: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: messages.isEmpty
+                      ? const EmptyState(
+                          message: 'لا توجد رسائل في هذه المحادثة.',
+                        )
+                      : ListView.builder(
+                          reverse: true,
+                          padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final item = messages[messages.length - 1 - index];
+                            final sender = asMap(item['sender']);
+                            final isMine =
+                                text(sender, 'role') == 'student' ||
+                                text(item, 'type') == 'student_to_delegate';
+
+                            // Date Divider logic
+                            bool showDate = false;
+                            String dateLabel = '';
+                            if (index == messages.length - 1) {
                               showDate = true;
                               dateLabel = _formatChatDate(
                                 text(item, 'created_at'),
                               );
+                            } else {
+                              final nextItem =
+                                  messages[messages.length - 2 - index];
+                              final currentDate = dateOnly(
+                                text(item, 'created_at'),
+                              );
+                              final nextDate = dateOnly(
+                                text(nextItem, 'created_at'),
+                              );
+                              if (currentDate != nextDate) {
+                                showDate = true;
+                                dateLabel = _formatChatDate(
+                                  text(item, 'created_at'),
+                                );
+                              }
                             }
-                          }
 
-                          return Column(
-                            children: [
-                              if (showDate) _DateDivider(label: dateLabel),
-                              _ChatBubble(message: item, isMine: isMine),
-                            ],
-                          );
-                        },
-                      ),
-              ),
-              _MessageComposer(
-                controller: _message,
-                sending: _sending,
-                onSend: _send,
-              ),
-            ],
-          );
-        },
-      ),
+                            return Column(
+                              children: [
+                                if (showDate) _DateDivider(label: dateLabel),
+                                _ChatBubble(message: item, isMine: isMine),
+                              ],
+                            );
+                          },
+                        ),
+                ),
+                _MessageComposer(
+                  controller: _message,
+                  sending: _sending,
+                  onSend: _send,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -302,6 +400,7 @@ class _UnreadMessagesHeader extends StatelessWidget {
                 color: hasUnread ? AppColors.danger : AppColors.slate500,
                 fontSize: 13,
                 fontWeight: FontWeight.w900,
+                fontFamily: 'Cairo',
               ),
             ),
           ),
@@ -360,6 +459,7 @@ class _DelegateHeader extends StatelessWidget {
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
+                    fontFamily: 'Cairo',
                   ),
                 ),
                 Text(
@@ -368,6 +468,7 @@ class _DelegateHeader extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
+                    fontFamily: 'Cairo',
                   ),
                 ),
               ],
@@ -438,15 +539,17 @@ class _ConversationCard extends StatelessWidget {
                                   : FontWeight.w800,
                               fontSize: 16,
                               color: AppColors.slate900,
+                              fontFamily: 'Cairo',
                             ),
                           ),
                         ),
                         Text(
                           timeAgo(text(last, 'created_at')),
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 11,
                             color: AppColors.slate500,
                             fontWeight: FontWeight.w600,
+                            fontFamily: 'Cairo',
                           ),
                         ),
                       ],
@@ -464,6 +567,7 @@ class _ConversationCard extends StatelessWidget {
                             ? FontWeight.w700
                             : FontWeight.w500,
                         fontSize: 13,
+                        fontFamily: 'Cairo',
                       ),
                     ),
                   ],
@@ -493,13 +597,14 @@ class _ConversationCard extends StatelessWidget {
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
                       fontSize: 11,
+                      fontFamily: 'Cairo',
                     ),
                   ),
                 )
               else
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 12),
-                  child: const Icon(
+                const Padding(
+                  padding: EdgeInsetsDirectional.only(start: 12),
+                  child: Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 14,
                     color: AppColors.slate300,
@@ -520,12 +625,10 @@ class _UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = name
-        .split(' ')
-        .take(2)
-        .map((e) => e.isNotEmpty ? e[0] : '')
-        .join()
-        .toUpperCase();
+    final initials = name.isNotEmpty
+        ? name.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
+        : '?';
+
     return Container(
       width: size,
       height: size,
@@ -540,7 +643,7 @@ class _UserAvatar extends StatelessWidget {
         ),
         shape: BoxShape.circle,
         border: Border.all(
-          color: AppColors.royalBlue.withValues(alpha: 0.1),
+          color: AppColors.royalBlue.withValues(alpha: 0.15),
           width: 1.5,
         ),
       ),
@@ -551,58 +654,8 @@ class _UserAvatar extends StatelessWidget {
           color: AppColors.royalBlue,
           fontWeight: FontWeight.w900,
           fontSize: size * 0.35,
+          fontFamily: 'Cairo',
         ),
-      ),
-    );
-  }
-}
-
-class _ChatHeader extends StatelessWidget {
-  const _ChatHeader({required this.delegate});
-  final Map<String, dynamic> delegate;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = text(delegate, 'name', fallback: 'المندوب');
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          _UserAvatar(name: name, size: 44),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                  ),
-                ),
-                const Text(
-                  'المندوب',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.slate400,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -624,23 +677,33 @@ class _ChatBubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isMine ? AppColors.royalBlue : Colors.white,
+          gradient: isMine
+              ? const LinearGradient(
+                  colors: [AppColors.royalBlue, AppColors.royalBlueDark],
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                )
+              : null,
+          color: isMine ? null : AppColors.slate100,
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(24),
-            topRight: const Radius.circular(24),
-            bottomLeft: Radius.circular(isMine ? 24 : 6),
-            bottomRight: Radius.circular(isMine ? 6 : 24),
+            topLeft: const Radius.circular(20),
+            topRight: const Radius.circular(20),
+            bottomLeft: Radius.circular(isMine ? 20 : 4),
+            bottomRight: Radius.circular(isMine ? 4 : 20),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
             ),
           ],
           border: isMine
               ? null
-              : Border.all(color: AppColors.slate100, width: 1.2),
+              : Border.all(
+                  color: AppColors.slate200.withValues(alpha: 0.5),
+                  width: 1.2,
+                ),
         ),
         child: Column(
           crossAxisAlignment: isMine
@@ -648,12 +711,13 @@ class _ChatBubble extends StatelessWidget {
               : CrossAxisAlignment.start,
           children: [
             Text(
-              text(message, 'body'),
+              text(message, 'body', fallback: text(message, 'content')),
               style: TextStyle(
-                color: isMine ? Colors.white : AppColors.slate900,
+                color: isMine ? Colors.white : AppColors.midnight,
                 fontWeight: isMine ? FontWeight.w600 : FontWeight.w700,
-                fontSize: 14.5,
+                fontSize: 14,
                 height: 1.5,
+                fontFamily: 'Cairo',
               ),
             ),
             const SizedBox(height: 6),
@@ -665,6 +729,7 @@ class _ChatBubble extends StatelessWidget {
                     : AppColors.slate400,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
+                fontFamily: 'Cairo',
               ),
             ),
           ],
@@ -681,24 +746,24 @@ class _DateDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Row(
-        children: [
-          Expanded(child: Divider(color: AppColors.slate100, thickness: 1)),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: AppColors.slate400,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.5,
-              ),
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.slate100,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.slate500,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'Cairo',
             ),
           ),
-          Expanded(child: Divider(color: AppColors.slate100, thickness: 1)),
-        ],
+        ),
       ),
     );
   }
@@ -720,17 +785,17 @@ class _MessageComposer extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(
         16,
-        12,
+        10,
         16,
-        12 + MediaQuery.paddingOf(context).bottom,
+        10 + MediaQuery.paddingOf(context).bottom,
       ),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, -5),
+            color: Colors.black12,
+            blurRadius: 10,
+            offset: Offset(0, -3),
           ),
         ],
       ),
@@ -741,8 +806,10 @@ class _MessageComposer extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 color: AppColors.slate50,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: AppColors.slate100),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: AppColors.slate200.withValues(alpha: 0.8),
+                ),
               ),
               child: TextField(
                 controller: controller,
@@ -751,48 +818,49 @@ class _MessageComposer extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
+                  fontFamily: 'Cairo',
                 ),
                 decoration: const InputDecoration(
                   hintText: 'اكتب رسالتك...',
-                  hintStyle: TextStyle(color: AppColors.slate400),
+                  hintStyle: TextStyle(color: AppColors.slate400, fontFamily: 'Cairo'),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           GestureDetector(
             onTap: sending ? null : onSend,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 48,
-              height: 48,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: AppColors.royalBlue,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.royalBlue.withValues(alpha: 0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    color: AppColors.royalBlue.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
               alignment: Alignment.center,
               child: sending
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
+                      width: 18,
+                      height: 18,
                       child: CircularProgressIndicator(
                         color: Colors.white,
-                        strokeWidth: 2.5,
+                        strokeWidth: 2.2,
                       ),
                     )
                   : const Icon(
                       Icons.send_rounded,
                       color: Colors.white,
-                      size: 20,
+                      size: 18,
                     ),
             ),
           ),

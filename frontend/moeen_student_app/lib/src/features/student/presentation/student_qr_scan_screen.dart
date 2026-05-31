@@ -135,8 +135,12 @@ class _StudentQrScanScreenState extends ConsumerState<StudentQrScanScreen> with 
     try {
       final message = await ref.read(studentContentRepositoryProvider).scanQrAttendance(token);
       if (!mounted) return;
-      await _scanner.stop();
-      if (!mounted) return;
+      
+      // Stop scanner in the background to avoid blocking the UI/future execution
+      _scanner.stop().catchError((e) {
+        debugPrint('Error stopping scanner: $e');
+      });
+
       await showMoeenInfoDialog(
         context: context,
         title: 'تم تسجيل الحضور',
@@ -145,10 +149,11 @@ class _StudentQrScanScreenState extends ConsumerState<StudentQrScanScreen> with 
         color: AppColors.success,
       );
       if (mounted) context.go(StudentDashboardScreen.route);
-    } on ApiException catch (error) {
+    } catch (error) {
       if (!mounted) return;
+      final message = error is ApiException ? error.message : 'حدث خطأ غير متوقع أثناء تسجيل الحضور.';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message), backgroundColor: AppColors.danger),
+        SnackBar(content: Text(message), backgroundColor: AppColors.danger),
       );
     } finally {
       if (mounted) setState(() => _processing = false);

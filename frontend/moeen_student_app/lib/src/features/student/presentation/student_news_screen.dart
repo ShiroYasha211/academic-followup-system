@@ -430,3 +430,340 @@ class _NewsImageFallback extends StatelessWidget {
     );
   }
 }
+
+class StudentNewsDetailsScreen extends StatelessWidget {
+  const StudentNewsDetailsScreen({super.key, required this.item});
+
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final attachment = absoluteUrl(text(item, 'attachment_url'));
+    final source = text(item, 'source');
+    final color = _sourceColor(source);
+    final isImage = attachment.isNotEmpty && isImageUrl(attachment);
+    final title = text(item, 'title', fallback: 'إعلان جديد');
+    final body = text(item, 'body', fallback: text(item, 'excerpt'));
+    final authorName = text(item, 'author_name', fallback: 'النظام');
+    final createdAt = text(item, 'created_at');
+
+    return Scaffold(
+      backgroundColor: AppColors.slate50,
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverAppBar(
+              expandedHeight: isImage ? 300.0 : 160.0,
+              floating: false,
+              pinned: true,
+              stretch: true,
+              backgroundColor: isImage ? Colors.transparent : color,
+              elevation: 0,
+              automaticallyImplyLeading: false,
+              leading: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: CircleAvatar(
+                  backgroundColor: isImage
+                      ? Colors.white.withValues(alpha: 0.85)
+                      : Colors.white.withValues(alpha: 0.2),
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_rounded,
+                      color: isImage ? AppColors.slate800 : Colors.white,
+                      size: 20,
+                    ),
+                    onPressed: () => Navigator.maybePop(context),
+                  ),
+                ),
+              ),
+              flexibleSpace: FlexibleSpaceBar(
+                stretchModes: const [
+                  StretchMode.zoomBackground,
+                  StretchMode.blurBackground,
+                ],
+                background: isImage
+                    ? Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.network(
+                            attachment,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                const _NewsImageFallback(height: 300),
+                          ),
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.4),
+                                  Colors.black.withValues(alpha: 0.0),
+                                  Colors.black.withValues(alpha: 0.7),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: 16,
+                            bottom: 16,
+                            child: GestureDetector(
+                              onTap: () =>
+                                  MoeenDialogs.showImage(context, attachment),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.6),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(
+                                      Icons.zoom_out_map_rounded,
+                                      color: Colors.white,
+                                      size: 14,
+                                    ),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'تكبير وعرض',
+                                      style: TextStyle(
+                                        fontFamily: 'Cairo',
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topRight,
+                            end: Alignment.bottomLeft,
+                            colors: [
+                              color,
+                              color.withValues(alpha: 0.8),
+                            ],
+                          ),
+                        ),
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              left: -20,
+                              bottom: -20,
+                              child: Icon(
+                                Icons.campaign_rounded,
+                                size: 180,
+                                color: Colors.white.withValues(alpha: 0.08),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+            ),
+          ];
+        },
+        body: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _MiniBadge(label: _sourceLabel(source), color: color),
+                      const SizedBox(width: 8),
+                      _MiniBadge(
+                        label: timeAgo(createdAt),
+                        color: AppColors.slate500,
+                        textColor: AppColors.slate600,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.slate900,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.slate50,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: AppColors.slate100),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.slate500.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            source == 'doctor'
+                                ? Icons.school_rounded
+                                : source == 'delegate'
+                                    ? Icons.groups_rounded
+                                    : Icons.account_balance_rounded,
+                            color: color,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                authorName,
+                                style: const TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                  color: AppColors.slate900,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _sourceLabel(source),
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  color: color,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Text(
+                    body,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 16,
+                      height: 1.9,
+                      color: AppColors.slate800,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (attachment.isNotEmpty) ...[
+                    const SizedBox(height: 32),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: color.withValues(alpha: 0.1)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child:
+                                Icon(Icons.attach_file_rounded, color: color),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'مرفق مع الإعلان',
+                                  style: TextStyle(
+                                    fontFamily: 'Cairo',
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                    color: AppColors.slate900,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'انقر لتحميل أو عرض الملف المرفق',
+                                  style: TextStyle(
+                                    fontFamily: 'Cairo',
+                                    color: AppColors.slate500,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: color.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                              onPressed: () => _downloadUrlToFile(
+                                context,
+                                attachment,
+                                title,
+                              ),
+                              icon: const Icon(Icons.download_rounded,
+                                  color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

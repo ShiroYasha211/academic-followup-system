@@ -68,7 +68,9 @@ class _DoctorQuizzesScreenState extends ConsumerState<DoctorQuizzesScreen> {
           final query = _search.text.trim().toLowerCase();
           final filteredQuizzes = quizzes.where((quiz) {
             final title = _docText(quiz['title']).toLowerCase();
-            final subjectName = _docText(_docMap(quiz['subject'])['name']).toLowerCase();
+            final subjectName = _docText(
+              _docMap(quiz['subject'])['name'],
+            ).toLowerCase();
             return title.contains(query) || subjectName.contains(query);
           }).toList();
 
@@ -136,11 +138,16 @@ class _DoctorQuizzesScreenState extends ConsumerState<DoctorQuizzesScreen> {
                     fillColor: Colors.white,
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: AppColors.slate200.withValues(alpha: 0.8)),
+                      borderSide: BorderSide(
+                        color: AppColors.slate200.withValues(alpha: 0.8),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: AppColors.royalBlue, width: 1.4),
+                      borderSide: const BorderSide(
+                        color: AppColors.royalBlue,
+                        width: 1.4,
+                      ),
                     ),
                   ),
                 ),
@@ -188,9 +195,11 @@ class _DoctorQuizzesScreenState extends ConsumerState<DoctorQuizzesScreen> {
                 ),
                 const SizedBox(height: 16),
                 if (filteredQuizzes.isEmpty)
-                  _DocEmpty(quizzes.isEmpty
-                      ? 'لا توجد كويزات في هذا التصنيف.'
-                      : 'لا توجد نتائج مطابقة لبحثك.')
+                  _DocEmpty(
+                    quizzes.isEmpty
+                        ? 'لا توجد كويزات في هذا التصنيف.'
+                        : 'لا توجد نتائج مطابقة لبحثك.',
+                  )
                 else
                   ...filteredQuizzes.map(
                     (quiz) => _QuizCard(
@@ -536,7 +545,10 @@ class _QuizCard extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: color.withValues(alpha: 0.14), width: 1.2),
+                      border: Border.all(
+                        color: color.withValues(alpha: 0.14),
+                        width: 1.2,
+                      ),
                     ),
                   ),
                 ),
@@ -554,9 +566,15 @@ class _QuizCard extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: color.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: color.withValues(alpha: 0.16)),
+                              border: Border.all(
+                                color: color.withValues(alpha: 0.16),
+                              ),
                             ),
-                            child: Icon(_quizStatusIcon(status), color: color, size: 20),
+                            child: Icon(
+                              _quizStatusIcon(status),
+                              color: color,
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -742,6 +760,8 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
   }
 
   Future<void> _results() async {
+    context.push(DoctorQuizResultsScreen.path(widget.quizId));
+    /*
     await showMoeenBottomSheet<void>(
       context: context,
       title: 'نتائج الكويز',
@@ -750,6 +770,7 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
       fullScreen: true,
       child: _QuizResultsPanel(quizId: widget.quizId),
     );
+    */
   }
 
   Future<void> _shareResults(String visibility) {
@@ -825,9 +846,24 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
     required ValueChanged<String> onChanged,
   }) {
     final choices = [
-      {'value': 'hidden', 'label': 'مخفية للكل', 'icon': Icons.visibility_off_rounded, 'color': AppColors.danger},
-      {'value': 'individual', 'label': 'فردية للطلاب', 'icon': Icons.person_rounded, 'color': AppColors.warning},
-      {'value': 'public', 'label': 'عامة للجميع', 'icon': Icons.public_rounded, 'color': AppColors.success},
+      {
+        'value': 'hidden',
+        'label': 'مخفية للكل',
+        'icon': Icons.visibility_off_rounded,
+        'color': AppColors.danger,
+      },
+      {
+        'value': 'individual',
+        'label': 'فردية للطلاب',
+        'icon': Icons.person_rounded,
+        'color': AppColors.warning,
+      },
+      {
+        'value': 'public',
+        'label': 'عامة للجميع',
+        'icon': Icons.public_rounded,
+        'color': AppColors.success,
+      },
     ];
 
     return Row(
@@ -927,7 +963,9 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
           foregroundColor: buttonColor,
           disabledForegroundColor: AppColors.slate400,
           side: BorderSide(
-            color: isDisabled ? AppColors.slate200 : color.withValues(alpha: 0.5),
+            color: isDisabled
+                ? AppColors.slate200
+                : color.withValues(alpha: 0.5),
             width: 1.2,
           ),
           shape: RoundedRectangleBorder(
@@ -1261,7 +1299,12 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
         final statusColor = _docStatusColor(status);
 
         final darkenColor = HSLColor.fromColor(statusColor)
-            .withLightness((HSLColor.fromColor(statusColor).lightness - 0.12).clamp(0.0, 1.0))
+            .withLightness(
+              (HSLColor.fromColor(statusColor).lightness - 0.12).clamp(
+                0.0,
+                1.0,
+              ),
+            )
             .toColor();
 
         return Column(
@@ -1369,12 +1412,14 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
                   icon: Icons.timer_rounded,
                 ),
                 _DocPill(
-                  _docText(quiz['results_visibility'] == 'hidden'
-                      ? 'النتائج مخفية'
-                      : quiz['results_visibility'] == 'individual'
-                          ? 'نتائج فردية'
-                          : 'نتائج عامة',
-                      'النتائج مخفية'),
+                  _docText(
+                    quiz['results_visibility'] == 'hidden'
+                        ? 'النتائج مخفية'
+                        : quiz['results_visibility'] == 'individual'
+                        ? 'نتائج فردية'
+                        : 'نتائج عامة',
+                    'النتائج مخفية',
+                  ),
                   AppColors.royalBlue,
                   icon: Icons.visibility_rounded,
                 ),
@@ -1472,7 +1517,9 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: isExpanded ? AppColors.royalBlue.withValues(alpha: 0.2) : AppColors.slate200,
+                          color: isExpanded
+                              ? AppColors.royalBlue.withValues(alpha: 0.2)
+                              : AppColors.slate200,
                           width: isExpanded ? 1.4 : 1,
                         ),
                         boxShadow: [
@@ -1486,9 +1533,9 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
                         ],
                       ),
                       child: Theme(
-                        data: Theme.of(context).copyWith(
-                          dividerColor: Colors.transparent,
-                        ),
+                        data: Theme.of(
+                          context,
+                        ).copyWith(dividerColor: Colors.transparent),
                         child: ExpansionTile(
                           key: PageStorageKey(modelId),
                           initiallyExpanded: isExpanded,
@@ -1512,7 +1559,9 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
                             ),
                             child: Icon(
                               Icons.ballot_rounded,
-                              color: isExpanded ? AppColors.royalBlue : AppColors.slate600,
+                              color: isExpanded
+                                  ? AppColors.royalBlue
+                                  : AppColors.slate600,
                               size: 20,
                             ),
                           ),
@@ -1538,19 +1587,28 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
                             if (questions.isEmpty)
                               const Padding(
                                 padding: EdgeInsets.all(16),
-                                child: _DocEmpty('لا توجد أسئلة في هذا النموذج.'),
+                                child: _DocEmpty(
+                                  'لا توجد أسئلة في هذا النموذج.',
+                                ),
                               )
                             else
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: questions.asMap().entries.map((qEntry) {
+                                  children: questions.asMap().entries.map((
+                                    qEntry,
+                                  ) {
                                     final qIdx = qEntry.key;
                                     final q = qEntry.value;
                                     final qText = _docText(q['question_text']);
                                     final qScore = _docText(q['score'], '1');
-                                    final timeLimit = _docText(q['time_limit_seconds']);
+                                    final timeLimit = _docText(
+                                      q['time_limit_seconds'],
+                                    );
                                     final note = _docText(q['correction_note']);
                                     final source = _docText(q['info_source']);
                                     final options = _docList(q['options']);
@@ -1561,27 +1619,34 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
                                       decoration: BoxDecoration(
                                         color: AppColors.slate50,
                                         borderRadius: BorderRadius.circular(18),
-                                        border: Border.all(color: AppColors.slate200),
+                                        border: Border.all(
+                                          color: AppColors.slate200,
+                                        ),
                                       ),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Row(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Container(
                                                 width: 26,
                                                 height: 26,
                                                 decoration: BoxDecoration(
-                                                  color: AppColors.royalBlue.withValues(alpha: 0.1),
+                                                  color: AppColors.royalBlue
+                                                      .withValues(alpha: 0.1),
                                                   shape: BoxShape.circle,
                                                 ),
                                                 child: Center(
                                                   child: Text(
                                                     '${qIdx + 1}',
                                                     style: const TextStyle(
-                                                      color: AppColors.royalBlue,
-                                                      fontWeight: FontWeight.w900,
+                                                      color:
+                                                          AppColors.royalBlue,
+                                                      fontWeight:
+                                                          FontWeight.w900,
                                                       fontSize: 11,
                                                     ),
                                                   ),
@@ -1590,13 +1655,16 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
                                               const SizedBox(width: 10),
                                               Expanded(
                                                 child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
                                                   children: [
                                                     Text(
                                                       qText,
                                                       style: const TextStyle(
-                                                        color: AppColors.midnight,
-                                                        fontWeight: FontWeight.w800,
+                                                        color:
+                                                            AppColors.midnight,
+                                                        fontWeight:
+                                                            FontWeight.w800,
                                                         fontSize: 13,
                                                         fontFamily: 'Cairo',
                                                         height: 1.45,
@@ -1607,38 +1675,64 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
                                               ),
                                               const SizedBox(width: 8),
                                               Column(
-                                                crossAxisAlignment: CrossAxisAlignment.end,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.end,
                                                 children: [
                                                   Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 8,
+                                                          vertical: 4,
+                                                        ),
                                                     decoration: BoxDecoration(
-                                                      color: AppColors.royalBlue.withValues(alpha: 0.08),
-                                                      borderRadius: BorderRadius.circular(8),
+                                                      color: AppColors.royalBlue
+                                                          .withValues(
+                                                            alpha: 0.08,
+                                                          ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
                                                     ),
                                                     child: Text(
                                                       '$qScore درجة',
                                                       style: const TextStyle(
-                                                        color: AppColors.royalBlue,
+                                                        color:
+                                                            AppColors.royalBlue,
                                                         fontSize: 10,
-                                                        fontWeight: FontWeight.w900,
+                                                        fontWeight:
+                                                            FontWeight.w900,
                                                         fontFamily: 'Cairo',
                                                       ),
                                                     ),
                                                   ),
-                                                  if (timeLimit.isNotEmpty && timeLimit != '0') ...[
+                                                  if (timeLimit.isNotEmpty &&
+                                                      timeLimit != '0') ...[
                                                     const SizedBox(height: 4),
                                                     Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 6,
+                                                            vertical: 3,
+                                                          ),
                                                       decoration: BoxDecoration(
-                                                        color: AppColors.warning.withValues(alpha: 0.08),
-                                                        borderRadius: BorderRadius.circular(8),
+                                                        color: AppColors.warning
+                                                            .withValues(
+                                                              alpha: 0.08,
+                                                            ),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              8,
+                                                            ),
                                                       ),
                                                       child: Text(
                                                         '$timeLimit ثانية',
                                                         style: const TextStyle(
-                                                          color: AppColors.warning,
+                                                          color:
+                                                              AppColors.warning,
                                                           fontSize: 9,
-                                                          fontWeight: FontWeight.w900,
+                                                          fontWeight:
+                                                              FontWeight.w900,
                                                           fontFamily: 'Cairo',
                                                         ),
                                                       ),
@@ -1651,20 +1745,37 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
                                           const SizedBox(height: 12),
                                           Column(
                                             children: options.map((opt) {
-                                              final optText = _docText(opt['option_text']);
-                                              final isCorrect = _docBool(opt['is_correct']);
+                                              final optText = _docText(
+                                                opt['option_text'],
+                                              );
+                                              final isCorrect = _docBool(
+                                                opt['is_correct'],
+                                              );
 
                                               return Container(
-                                                margin: const EdgeInsets.only(bottom: 6),
-                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                                margin: const EdgeInsets.only(
+                                                  bottom: 6,
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 8,
+                                                    ),
                                                 decoration: BoxDecoration(
                                                   color: isCorrect
-                                                      ? AppColors.success.withValues(alpha: 0.08)
+                                                      ? AppColors.success
+                                                            .withValues(
+                                                              alpha: 0.08,
+                                                            )
                                                       : Colors.white,
-                                                  borderRadius: BorderRadius.circular(10),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
                                                   border: Border.all(
                                                     color: isCorrect
-                                                        ? AppColors.success.withValues(alpha: 0.35)
+                                                        ? AppColors.success
+                                                              .withValues(
+                                                                alpha: 0.35,
+                                                              )
                                                         : AppColors.slate200,
                                                     width: isCorrect ? 1.2 : 1,
                                                   ),
@@ -1672,8 +1783,14 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
                                                 child: Row(
                                                   children: [
                                                     Icon(
-                                                      isCorrect ? Icons.check_circle_rounded : Icons.radio_button_off_rounded,
-                                                      color: isCorrect ? AppColors.success : AppColors.slate400,
+                                                      isCorrect
+                                                          ? Icons
+                                                                .check_circle_rounded
+                                                          : Icons
+                                                                .radio_button_off_rounded,
+                                                      color: isCorrect
+                                                          ? AppColors.success
+                                                          : AppColors.slate400,
                                                       size: 16,
                                                     ),
                                                     const SizedBox(width: 10),
@@ -1681,8 +1798,14 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
                                                       child: Text(
                                                         optText,
                                                         style: TextStyle(
-                                                          color: isCorrect ? AppColors.success : AppColors.midnight,
-                                                          fontWeight: isCorrect ? FontWeight.w900 : FontWeight.w700,
+                                                          color: isCorrect
+                                                              ? AppColors
+                                                                    .success
+                                                              : AppColors
+                                                                    .midnight,
+                                                          fontWeight: isCorrect
+                                                              ? FontWeight.w900
+                                                              : FontWeight.w700,
                                                           fontSize: 12,
                                                           fontFamily: 'Cairo',
                                                         ),
@@ -1693,25 +1816,39 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
                                               );
                                             }).toList(),
                                           ),
-                                          if (note.isNotEmpty || source.isNotEmpty) ...[
+                                          if (note.isNotEmpty ||
+                                              source.isNotEmpty) ...[
                                             const SizedBox(height: 8),
-                                            Divider(color: AppColors.slate200, height: 1),
+                                            Divider(
+                                              color: AppColors.slate200,
+                                              height: 1,
+                                            ),
                                             const SizedBox(height: 8),
                                             if (note.isNotEmpty)
                                               Padding(
-                                                padding: const EdgeInsets.only(bottom: 4),
+                                                padding: const EdgeInsets.only(
+                                                  bottom: 4,
+                                                ),
                                                 child: Row(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
                                                   children: [
-                                                    const Icon(Icons.fact_check_rounded, color: AppColors.royalBlue, size: 14),
+                                                    const Icon(
+                                                      Icons.fact_check_rounded,
+                                                      color:
+                                                          AppColors.royalBlue,
+                                                      size: 14,
+                                                    ),
                                                     const SizedBox(width: 6),
                                                     Expanded(
                                                       child: Text(
                                                         'ملاحظة التصحيح: $note',
                                                         style: const TextStyle(
-                                                          color: AppColors.slate600,
+                                                          color: AppColors
+                                                              .slate600,
                                                           fontSize: 11,
-                                                          fontWeight: FontWeight.w700,
+                                                          fontWeight:
+                                                              FontWeight.w700,
                                                           fontFamily: 'Cairo',
                                                         ),
                                                       ),
@@ -1721,17 +1858,24 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
                                               ),
                                             if (source.isNotEmpty)
                                               Row(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
-                                                  const Icon(Icons.source_rounded, color: AppColors.slate500, size: 14),
+                                                  const Icon(
+                                                    Icons.source_rounded,
+                                                    color: AppColors.slate500,
+                                                    size: 14,
+                                                  ),
                                                   const SizedBox(width: 6),
                                                   Expanded(
                                                     child: Text(
                                                       'المصدر: $source',
                                                       style: const TextStyle(
-                                                        color: AppColors.slate600,
+                                                        color:
+                                                            AppColors.slate600,
                                                         fontSize: 11,
-                                                        fontWeight: FontWeight.w700,
+                                                        fontWeight:
+                                                            FontWeight.w700,
                                                         fontFamily: 'Cairo',
                                                       ),
                                                     ),
@@ -1823,7 +1967,9 @@ class _QuizDetailsPanelState extends ConsumerState<_QuizDetailsPanel> {
               onPressed: _delete,
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.danger,
-                side: BorderSide(color: AppColors.danger.withValues(alpha: 0.35)),
+                side: BorderSide(
+                  color: AppColors.danger.withValues(alpha: 0.35),
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -1904,6 +2050,7 @@ class _QuizInfoCard extends StatelessWidget {
   }
 }
 
+/*
 class _QuizResultsPanel extends ConsumerStatefulWidget {
   const _QuizResultsPanel({required this.quizId});
 
@@ -2127,6 +2274,967 @@ class _QuizResultsPanelState extends ConsumerState<_QuizResultsPanel> {
     );
   }
 }
+*/
+
+class DoctorQuizResultsScreen extends ConsumerStatefulWidget {
+  const DoctorQuizResultsScreen({super.key, required this.quizId});
+
+  static const route = '/doctor/quizzes/:quizId/results';
+  static String path(int quizId) => '/doctor/quizzes/$quizId/results';
+
+  final int quizId;
+
+  @override
+  ConsumerState<DoctorQuizResultsScreen> createState() =>
+      _DoctorQuizResultsScreenState();
+}
+
+class _DoctorQuizResultsScreenState
+    extends ConsumerState<DoctorQuizResultsScreen> {
+  late Future<Map<String, dynamic>> _future;
+  bool _exporting = false;
+
+  // Filter states
+  String _searchQuery = '';
+  String _selectedModel = 'الكل';
+  String _selectedStatus = 'الكل'; // الكل, ممتاز, متوسط, ضعيف
+  String _sortBy = 'date_desc'; // date_desc, date_asc, score_desc, score_asc
+
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  void _loadData() {
+    _future = ref
+        .read(staffRepositoryProvider)
+        .get('/doctor/quizzes/${widget.quizId}/results');
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _export() async {
+    setState(() => _exporting = true);
+    try {
+      final bytes = await ref
+          .read(staffRepositoryProvider)
+          .download('/doctor/quizzes/${widget.quizId}/results/export');
+      final result = await DownloadService.saveBytes(
+        bytes: bytes,
+        fileName: 'quiz_results_${widget.quizId}.csv',
+        section: 'QuizReports',
+      );
+      if (!mounted) return;
+      await showMoeenInfoDialog(
+        context: context,
+        title: 'تم تصدير النتائج',
+        message: 'تم حفظ الملف في:\n${result.path}',
+        icon: Icons.file_download_done_rounded,
+        color: AppColors.success,
+      );
+    } catch (error) {
+      if (mounted) await _docErrorDialog(context, error);
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return 'ط';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}';
+    }
+    return parts[0].isNotEmpty ? parts[0][0] : 'ط';
+  }
+
+  String _formatShortDate(String dateStr) {
+    if (dateStr.isEmpty) return '';
+    try {
+      final parsed = DateTime.tryParse(dateStr.trim());
+      if (parsed != null) {
+        final local = parsed.toLocal();
+        final day = local.day.toString().padLeft(2, '0');
+        final month = local.month.toString().padLeft(2, '0');
+        final year = local.year.toString();
+        final hour = local.hour.toString().padLeft(2, '0');
+        final minute = local.minute.toString().padLeft(2, '0');
+        return '$day/$month/$year - $hour:$minute';
+      }
+
+      final parts = dateStr.trim().split(RegExp(r'\s+'));
+      if (parts.length >= 2) {
+        final dateParts = parts[0].split('-');
+        final timeParts = parts[1].split(':');
+        final shortDate = dateParts.length >= 3
+            ? '${dateParts[2]}/${dateParts[1]}/${dateParts[0]}'
+            : parts[0];
+        final shortTime = timeParts.length >= 2
+            ? '${timeParts[0]}:${timeParts[1]}'
+            : parts[1];
+        return '$shortDate - $shortTime';
+      }
+      return dateStr;
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  Widget _buildHeaderMeta(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.white70, size: 12),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Cairo',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderCard(double width, Map<String, dynamic> quiz) {
+    final isNarrow = width < 600;
+
+    final metaContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _docText(quiz['title'], 'نتائج الكويز'),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 15,
+            fontFamily: 'Cairo',
+          ),
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 10,
+          runSpacing: 4,
+          children: [
+            if (quiz['subject_name'] != null)
+              _buildHeaderMeta(
+                Icons.book_outlined,
+                _docText(quiz['subject_name'], ''),
+              ),
+            if (quiz['level_name'] != null)
+              _buildHeaderMeta(
+                Icons.school_outlined,
+                _docText(quiz['level_name'], ''),
+              ),
+            if (quiz['major_name'] != null)
+              _buildHeaderMeta(
+                Icons.account_balance_outlined,
+                _docText(quiz['major_name'], ''),
+              ),
+          ],
+        ),
+      ],
+    );
+
+    final exportButton = FilledButton.icon(
+      onPressed: _exporting ? null : _export,
+      style: FilledButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.primary,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      icon: _exporting
+          ? const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+            )
+          : const Icon(Icons.table_chart_rounded, size: 16),
+      label: const Text(
+        'تصدير',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+          fontFamily: 'Cairo',
+        ),
+      ),
+    );
+
+    if (isNarrow) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.assignment_turned_in_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: metaContent),
+              ],
+            ),
+            const SizedBox(height: 16),
+            exportButton,
+          ],
+        ),
+      );
+    } else {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.royalBlue.withValues(alpha: 0.12),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.assignment_turned_in_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(child: metaContent),
+            const SizedBox(width: 14),
+            exportButton,
+          ],
+        ),
+      );
+    }
+  }
+
+  Widget _buildStatCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.slate500,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: AppColors.midnight,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color.withValues(alpha: 0.8),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBentoStats(
+    double width,
+    int total,
+    double avg,
+    double high,
+    double low,
+  ) {
+    final crossAxisCount = width > 750 ? 4 : 2;
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: crossAxisCount,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      childAspectRatio: width > 750 ? 1.7 : 1.5,
+      children: [
+        _buildStatCard(
+          title: 'إجمالي المحاولات',
+          value: '$total',
+          subtitle: 'طالب وطالبة',
+          icon: Icons.people_alt_rounded,
+          color: AppColors.royalBlue,
+        ),
+        _buildStatCard(
+          title: 'متوسط الدرجات',
+          value: '${avg.toStringAsFixed(1)}%',
+          subtitle: 'معدل أداء الدفعة',
+          icon: Icons.analytics_rounded,
+          color: AppColors.success,
+        ),
+        _buildStatCard(
+          title: 'أعلى درجة',
+          value: '${high.toStringAsFixed(1)}%',
+          subtitle: 'أعلى نسبة مسجلة',
+          icon: Icons.trending_up_rounded,
+          color: AppColors.primary,
+        ),
+        _buildStatCard(
+          title: 'أقل درجة',
+          value: '${low.toStringAsFixed(1)}%',
+          subtitle: 'أدنى نسبة مسجلة',
+          icon: Icons.trending_down_rounded,
+          color: AppColors.danger,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDropdown<T>({
+    required T value,
+    required List<T> items,
+    required String label,
+    required ValueChanged<T?> onChanged,
+    Map<T, String>? labels,
+  }) {
+    return DropdownButtonFormField<T>(
+      initialValue: value,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(
+          color: AppColors.slate500,
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Cairo',
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 10,
+        ),
+        filled: true,
+        fillColor: AppColors.slate50,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(
+            color: AppColors.slate200.withValues(alpha: 0.5),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+      ),
+      icon: const Icon(
+        Icons.arrow_drop_down_rounded,
+        color: AppColors.slate500,
+      ),
+      items: items.map((T item) {
+        final text = labels != null
+            ? (labels[item] ?? item.toString())
+            : item.toString();
+        return DropdownMenuItem<T>(
+          value: item,
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Cairo',
+            ),
+          ),
+        );
+      }).toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildFiltersPanel(BuildContext context, Set<String> models) {
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width > 900;
+
+    final searchField = TextField(
+      controller: _searchController,
+      onChanged: (val) {
+        setState(() {
+          _searchQuery = val;
+        });
+      },
+      decoration: InputDecoration(
+        hintText: 'البحث عن طالب أو رقم جامعي...',
+        hintStyle: const TextStyle(fontFamily: 'Cairo', fontSize: 13),
+        prefixIcon: const Icon(Icons.search_rounded, color: AppColors.slate400),
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear_rounded, size: 18),
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() {
+                    _searchQuery = '';
+                  });
+                },
+              )
+            : null,
+        filled: true,
+        fillColor: AppColors.slate50,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: AppColors.slate200.withValues(alpha: 0.5),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+      ),
+    );
+
+    final modelFilter = _buildDropdown<String>(
+      value: _selectedModel,
+      items: models.toList(),
+      label: 'النموذج',
+      onChanged: (val) {
+        if (val != null) {
+          setState(() {
+            _selectedModel = val;
+          });
+        }
+      },
+    );
+
+    final statusFilter = _buildDropdown<String>(
+      value: _selectedStatus,
+      items: const ['الكل', 'ممتاز', 'متوسط', 'ضعيف'],
+      label: 'التقدير',
+      onChanged: (val) {
+        if (val != null) {
+          setState(() {
+            _selectedStatus = val;
+          });
+        }
+      },
+    );
+
+    final sortFilter = _buildDropdown<String>(
+      value: _sortBy,
+      items: const ['date_desc', 'date_asc', 'score_desc', 'score_asc'],
+      labels: const {
+        'date_desc': 'الأحدث تقديماً',
+        'date_asc': 'الأقدم تقديماً',
+        'score_desc': 'الأعلى درجة',
+        'score_asc': 'الأقل درجة',
+      },
+      label: 'الترتيب',
+      onChanged: (val) {
+        if (val != null) {
+          setState(() {
+            _sortBy = val;
+          });
+        }
+      },
+    );
+
+    if (isDesktop) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.slate200.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          children: [
+            Expanded(flex: 3, child: searchField),
+            const SizedBox(width: 12),
+            Expanded(flex: 2, child: modelFilter),
+            const SizedBox(width: 12),
+            Expanded(flex: 2, child: statusFilter),
+            const SizedBox(width: 12),
+            Expanded(flex: 2, child: sortFilter),
+          ],
+        ),
+      );
+    } else {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.slate200.withValues(alpha: 0.5)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            searchField,
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: modelFilter),
+                const SizedBox(width: 8),
+                Expanded(child: statusFilter),
+              ],
+            ),
+            const SizedBox(height: 12),
+            sortFilter,
+          ],
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StaffShell(
+      title: 'نتائج الكويز',
+      currentRoute: DoctorQuizzesScreen.route,
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(40),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          if (snapshot.hasError) return _ErrorView(error: snapshot.error!);
+
+          final data = _docMap(_docData(snapshot.data ?? const {}));
+          final quiz = _docMap(data['quiz']);
+          final attempts = _docList(data['attempts']);
+
+          final stats = _docMap(data['stats']);
+          final attemptPercentages = attempts
+              .map(
+                (attempt) => _docNum(_docMap(attempt)['percentage']).toDouble(),
+              )
+              .toList();
+          final totalAttempts = _docInt(
+            stats['total_attempts'],
+            attempts.length,
+          );
+          final avgPct = stats.containsKey('avg_score')
+              ? _docNum(stats['avg_score']).toDouble()
+              : (attemptPercentages.isEmpty
+                    ? 0.0
+                    : attemptPercentages.reduce((a, b) => a + b) /
+                          attemptPercentages.length);
+          final highPct = stats.containsKey('highest_score')
+              ? _docNum(stats['highest_score']).toDouble()
+              : (attemptPercentages.isEmpty
+                    ? 0.0
+                    : attemptPercentages.reduce((a, b) => a > b ? a : b));
+          final lowPct = stats.containsKey('lowest_score')
+              ? _docNum(stats['lowest_score']).toDouble()
+              : (attemptPercentages.isEmpty
+                    ? 0.0
+                    : attemptPercentages.reduce((a, b) => a < b ? a : b));
+
+          // Collect models dynamically
+          final models = {'الكل'};
+          for (var a in attempts) {
+            final model = _docMap(a['quiz_model']);
+            final mName = _docText(model['name'], '');
+            if (mName.isNotEmpty) {
+              models.add(mName);
+            }
+          }
+
+          // Filter and Sort attempts
+          final filteredAttempts = attempts.where((attempt) {
+            final student = _docMap(attempt['student']);
+            final model = _docMap(attempt['quiz_model']);
+            final name = _docText(student['name'], '').toLowerCase();
+            final num = _docText(student['student_number'], '').toLowerCase();
+            final modelName = _docText(model['name'], '');
+            final percentage = _docNum(attempt['percentage']);
+
+            // Search filter
+            final query = _searchQuery.toLowerCase();
+            if (query.isNotEmpty &&
+                !name.contains(query) &&
+                !num.contains(query)) {
+              return false;
+            }
+
+            // Model filter
+            if (_selectedModel != 'الكل' && modelName != _selectedModel) {
+              return false;
+            }
+
+            // Status filter
+            if (_selectedStatus != 'الكل') {
+              if (_selectedStatus == 'ممتاز' && percentage < 80) {
+                return false;
+              }
+              if (_selectedStatus == 'متوسط' &&
+                  (percentage < 50 || percentage >= 80)) {
+                return false;
+              }
+              if (_selectedStatus == 'ضعيف' && percentage >= 50) {
+                return false;
+              }
+            }
+
+            return true;
+          }).toList();
+
+          // Sort
+          filteredAttempts.sort((a, b) {
+            if (_sortBy == 'score_desc') {
+              return _docNum(
+                b['percentage'],
+              ).compareTo(_docNum(a['percentage']));
+            } else if (_sortBy == 'score_asc') {
+              return _docNum(
+                a['percentage'],
+              ).compareTo(_docNum(b['percentage']));
+            } else if (_sortBy == 'date_asc') {
+              final da = _docText(a['submitted_at'], '');
+              final db = _docText(b['submitted_at'], '');
+              return da.compareTo(db);
+            } else {
+              // default date_desc
+              final da = _docText(a['submitted_at'], '');
+              final db = _docText(b['submitted_at'], '');
+              return db.compareTo(da);
+            }
+          });
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              setState(() {
+                _loadData();
+              });
+            },
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+
+                return SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // --- Header Card ---
+                      _buildHeaderCard(width, quiz),
+
+                      const SizedBox(height: 24),
+
+                      // --- Bento Statistics Grid ---
+                      _buildBentoStats(
+                        width,
+                        totalAttempts,
+                        avgPct,
+                        highPct,
+                        lowPct,
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // --- Filters and Controls Panel ---
+                      _buildFiltersPanel(context, models),
+
+                      const SizedBox(height: 24),
+
+                      // --- Table Header / Title Row ---
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'نتائج الطلاب (${filteredAttempts.length} من $totalAttempts)',
+                            style: const TextStyle(
+                              color: AppColors.midnight,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'Cairo',
+                            ),
+                          ),
+                          if (filteredAttempts.length < totalAttempts)
+                            TextButton.icon(
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _searchQuery = '';
+                                  _selectedModel = 'الكل';
+                                  _selectedStatus = 'الكل';
+                                  _sortBy = 'date_desc';
+                                });
+                              },
+                              icon: const Icon(
+                                Icons.restart_alt_rounded,
+                                size: 16,
+                              ),
+                              label: const Text(
+                                'إعادة تعيين الفلاتر',
+                                style: TextStyle(fontFamily: 'Cairo'),
+                              ),
+                            ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // --- List of attempts ---
+                      if (filteredAttempts.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40),
+                          child: _DocEmpty(
+                            'لا توجد نتائج تطابق الفلاتر المحددة.',
+                          ),
+                        )
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: filteredAttempts.length,
+                          itemBuilder: (context, index) {
+                            final attempt = filteredAttempts[index];
+                            final student = _docMap(attempt['student']);
+                            final model = _docMap(attempt['quiz_model']);
+                            final percentage = _docNum(attempt['percentage']);
+                            final color = percentage >= 80
+                                ? AppColors.success
+                                : percentage >= 50
+                                ? AppColors.warning
+                                : AppColors.danger;
+
+                            final duration = attempt['duration'] != null
+                                ? '${_docText(attempt['duration'], '')} دقيقة'
+                                : null;
+                            final submittedAt = _docText(
+                              attempt['submitted_at_label'],
+                              _docText(attempt['submitted_at']),
+                            );
+                            final formattedDate = submittedAt.isNotEmpty
+                                ? _formatShortDate(submittedAt)
+                                : null;
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: color.withValues(alpha: 0.12),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: color.withValues(alpha: 0.03),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 18,
+                                        backgroundColor: color.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        child: Text(
+                                          _getInitials(
+                                            _docText(student['name'], 'طالب'),
+                                          ),
+                                          style: TextStyle(
+                                            color: color,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w900,
+                                            fontFamily: 'Cairo',
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _docText(student['name'], 'طالب'),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: AppColors.midnight,
+                                                fontWeight: FontWeight.w900,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              'رقم جامعي: ${_docText(student['student_number'], '-')}  •  ${_docText(model['name'], '-')}',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: AppColors.slate500,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      _DocPill(
+                                        '${_docText(attempt['percentage'], '0')}%',
+                                        color,
+                                        icon: Icons.percent_rounded,
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  const Divider(
+                                    height: 1,
+                                    color: AppColors.slate100,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: [
+                                      _DocPill(
+                                        'الدرجة ${_docText(attempt['score'], '0')} / ${_docText(attempt['max_score'], '0')}',
+                                        AppColors.success,
+                                        icon: Icons.grade_rounded,
+                                      ),
+                                      _DocPill(
+                                        'صحيح ${_docText(attempt['correct_count'], '0')}',
+                                        AppColors.royalBlue,
+                                        icon: Icons.check_circle_rounded,
+                                      ),
+                                      _DocPill(
+                                        'خاطئ ${_docText(attempt['wrong_count'], '0')}',
+                                        AppColors.danger,
+                                        icon: Icons.cancel_rounded,
+                                      ),
+                                      if (duration != null)
+                                        _DocPill(
+                                          duration,
+                                          AppColors.slate600,
+                                          icon: Icons.timer_outlined,
+                                        ),
+                                      if (formattedDate != null &&
+                                          formattedDate.isNotEmpty)
+                                        _DocPill(
+                                          formattedDate,
+                                          AppColors.slate600,
+                                          icon: Icons.calendar_today_rounded,
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
 
 class _QuizFormSheet extends ConsumerStatefulWidget {
   const _QuizFormSheet({
@@ -2226,7 +3334,10 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
               DropdownButtonFormField<int>(
                 initialValue: _subjectId,
                 isExpanded: true,
-                decoration: _quizInputDecoration('المادة', Icons.menu_book_rounded),
+                decoration: _quizInputDecoration(
+                  'المادة',
+                  Icons.menu_book_rounded,
+                ),
                 items: widget.subjects
                     .map(
                       (subject) => DropdownMenuItem(
@@ -2241,7 +3352,10 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _title,
-                decoration: _quizInputDecoration('عنوان الكويز', Icons.title_rounded),
+                decoration: _quizInputDecoration(
+                  'عنوان الكويز',
+                  Icons.title_rounded,
+                ),
                 validator: (value) =>
                     _docText(value).isEmpty ? 'اكتب عنوان الكويز.' : null,
               ),
@@ -2249,7 +3363,11 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
               TextField(
                 controller: _description,
                 maxLines: 3,
-                decoration: _quizInputDecoration('الوصف', Icons.notes_rounded, alignLabel: true),
+                decoration: _quizInputDecoration(
+                  'الوصف',
+                  Icons.notes_rounded,
+                  alignLabel: true,
+                ),
               ),
             ],
           ),
@@ -2284,7 +3402,10 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
                   scrollPadding: EdgeInsets.only(
                     bottom: MediaQuery.viewInsetsOf(context).bottom + 160,
                   ),
-                  decoration: _quizInputDecoration('مدة الاختبار بالدقائق', Icons.schedule_rounded),
+                  decoration: _quizInputDecoration(
+                    'مدة الاختبار بالدقائق',
+                    Icons.schedule_rounded,
+                  ),
                   validator: (value) => int.tryParse(_docText(value)) == null
                       ? 'اكتب مدة صحيحة.'
                       : null,
@@ -2298,7 +3419,9 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
                       controller: _scheduledAt,
                       readOnly: true,
                       onTap: () async {
-                        final current = DateTime.tryParse(_scheduledAt.text.trim()) ?? DateTime.now();
+                        final current =
+                            DateTime.tryParse(_scheduledAt.text.trim()) ??
+                            DateTime.now();
                         final date = await showDatePicker(
                           context: context,
                           initialDate: current,
@@ -2314,24 +3437,34 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
                         if (time == null) return;
                         if (!mounted) return;
                         setState(() {
-                          _scheduledAt.text = _docDateTimeForApi(DateTime(
-                            date.year,
-                            date.month,
-                            date.day,
-                            time.hour,
-                            time.minute,
-                          ));
+                          _scheduledAt.text = _docDateTimeForApi(
+                            DateTime(
+                              date.year,
+                              date.month,
+                              date.day,
+                              time.hour,
+                              time.minute,
+                            ),
+                          );
                         });
                       },
-                      decoration: _quizInputDecoration('تاريخ البدء', Icons.event_available_rounded).copyWith(
-                        hintText: 'النشر فوراً',
-                        suffixIcon: _scheduledAt.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear_rounded, color: AppColors.danger),
-                                onPressed: () => setState(() => _scheduledAt.clear()),
-                              )
-                            : const Icon(Icons.calendar_month_rounded),
-                      ),
+                      decoration:
+                          _quizInputDecoration(
+                            'تاريخ البدء',
+                            Icons.event_available_rounded,
+                          ).copyWith(
+                            hintText: 'النشر فوراً',
+                            suffixIcon: _scheduledAt.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(
+                                      Icons.clear_rounded,
+                                      color: AppColors.danger,
+                                    ),
+                                    onPressed: () =>
+                                        setState(() => _scheduledAt.clear()),
+                                  )
+                                : const Icon(Icons.calendar_month_rounded),
+                          ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -2340,7 +3473,9 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
                       controller: _closesAt,
                       readOnly: true,
                       onTap: () async {
-                        final current = DateTime.tryParse(_closesAt.text.trim()) ?? DateTime.now();
+                        final current =
+                            DateTime.tryParse(_closesAt.text.trim()) ??
+                            DateTime.now();
                         final date = await showDatePicker(
                           context: context,
                           initialDate: current,
@@ -2356,24 +3491,34 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
                         if (time == null) return;
                         if (!mounted) return;
                         setState(() {
-                          _closesAt.text = _docDateTimeForApi(DateTime(
-                            date.year,
-                            date.month,
-                            date.day,
-                            time.hour,
-                            time.minute,
-                          ));
+                          _closesAt.text = _docDateTimeForApi(
+                            DateTime(
+                              date.year,
+                              date.month,
+                              date.day,
+                              time.hour,
+                              time.minute,
+                            ),
+                          );
                         });
                       },
-                      decoration: _quizInputDecoration('تاريخ الإغلاق', Icons.event_busy_rounded).copyWith(
-                        hintText: 'غير محدد',
-                        suffixIcon: _closesAt.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear_rounded, color: AppColors.danger),
-                                onPressed: () => setState(() => _closesAt.clear()),
-                              )
-                            : const Icon(Icons.calendar_month_rounded),
-                      ),
+                      decoration:
+                          _quizInputDecoration(
+                            'تاريخ الإغلاق',
+                            Icons.event_busy_rounded,
+                          ).copyWith(
+                            hintText: 'غير محدد',
+                            suffixIcon: _closesAt.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(
+                                      Icons.clear_rounded,
+                                      color: AppColors.danger,
+                                    ),
+                                    onPressed: () =>
+                                        setState(() => _closesAt.clear()),
+                                  )
+                                : const Icon(Icons.calendar_month_rounded),
+                          ),
                     ),
                   ),
                 ],
@@ -2381,7 +3526,10 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _resultsVisibility,
-                decoration: _quizInputDecoration('ظهور النتائج', Icons.visibility_rounded),
+                decoration: _quizInputDecoration(
+                  'ظهور النتائج',
+                  Icons.visibility_rounded,
+                ),
                 items: const [
                   DropdownMenuItem(value: 'hidden', child: Text('مخفية')),
                   DropdownMenuItem(value: 'individual', child: Text('فردية')),
@@ -2593,7 +3741,9 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
     for (var modelIndex = 0; modelIndex < _models.length; modelIndex++) {
       final model = _models[modelIndex];
       final modelName = model.name.text.trim();
-      final modelLabel = modelName.isEmpty ? 'النموذج ${modelIndex + 1}' : modelName;
+      final modelLabel = modelName.isEmpty
+          ? 'النموذج ${modelIndex + 1}'
+          : modelName;
 
       if (modelName.isEmpty) {
         _quizValidationError('اكتب اسم النموذج رقم ${modelIndex + 1}.');
@@ -2610,7 +3760,11 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
         return false;
       }
 
-      for (var questionIndex = 0; questionIndex < model.questions.length; questionIndex++) {
+      for (
+        var questionIndex = 0;
+        questionIndex < model.questions.length;
+        questionIndex++
+      ) {
         final question = model.questions[questionIndex];
         final questionLabel = 'السؤال ${questionIndex + 1} في $modelLabel';
         final score = num.tryParse(question.score.text.trim());
@@ -2621,7 +3775,9 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
         }
 
         if (score == null || score <= 0) {
-          _quizValidationError('اكتب درجة صحيحة أكبر من صفر في $questionLabel.');
+          _quizValidationError(
+            'اكتب درجة صحيحة أكبر من صفر في $questionLabel.',
+          );
           return false;
         }
 
@@ -2630,14 +3786,22 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
           return false;
         }
 
-        for (var optionIndex = 0; optionIndex < question.options.length; optionIndex++) {
+        for (
+          var optionIndex = 0;
+          optionIndex < question.options.length;
+          optionIndex++
+        ) {
           if (question.options[optionIndex].text.text.trim().isEmpty) {
-            _quizValidationError('اكتب نص الخيار ${optionIndex + 1} في $questionLabel.');
+            _quizValidationError(
+              'اكتب نص الخيار ${optionIndex + 1} في $questionLabel.',
+            );
             return false;
           }
         }
 
-        final correctCount = question.options.where((option) => option.isCorrect).length;
+        final correctCount = question.options
+            .where((option) => option.isCorrect)
+            .length;
         if (correctCount == 0) {
           _quizValidationError('حدد إجابة صحيحة في $questionLabel.');
           return false;
@@ -2661,11 +3825,7 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
   }
 
   void _quizValidationError(String message) {
-    _docSnack(
-      context,
-      message,
-      color: AppColors.warning,
-    );
+    _docSnack(context, message, color: AppColors.warning);
   }
 }
 
@@ -2823,13 +3983,19 @@ class _QuizModelEditorState extends State<_QuizModelEditor> {
           const SizedBox(height: 14),
           TextField(
             controller: widget.model.name,
-            decoration: _quizInputDecoration('اسم النموذج', Icons.bookmark_rounded),
+            decoration: _quizInputDecoration(
+              'اسم النموذج',
+              Icons.bookmark_rounded,
+            ),
           ),
           if (widget.useAccessCode) ...[
             const SizedBox(height: 12),
             TextField(
               controller: widget.model.accessCode,
-              decoration: _quizInputDecoration('كود الدخول للنموذج', Icons.password_rounded),
+              decoration: _quizInputDecoration(
+                'كود الدخول للنموذج',
+                Icons.password_rounded,
+              ),
             ),
           ],
           const SizedBox(height: 14),
@@ -2966,22 +4132,26 @@ class _QuizQuestionEditorState extends State<_QuizQuestionEditor> {
           TextField(
             controller: widget.question.question,
             maxLines: 3,
-            decoration: _quizInputDecoration('نص السؤال', Icons.edit_note_rounded, alignLabel: true),
+            decoration: _quizInputDecoration(
+              'نص السؤال',
+              Icons.edit_note_rounded,
+              alignLabel: true,
+            ),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: widget.question.type,
             isExpanded: true,
-            decoration: _quizInputDecoration('نوع السؤال', Icons.category_rounded),
+            decoration: _quizInputDecoration(
+              'نوع السؤال',
+              Icons.category_rounded,
+            ),
             items: const [
               DropdownMenuItem(
                 value: 'multiple_choice',
                 child: Text('اختيار من متعدد'),
               ),
-              DropdownMenuItem(
-                value: 'true_false',
-                child: Text('صح/خطأ'),
-              ),
+              DropdownMenuItem(value: 'true_false', child: Text('صح/خطأ')),
             ],
             onChanged: (value) => setState(() {
               widget.question.type = value ?? 'multiple_choice';
@@ -3000,7 +4170,10 @@ class _QuizQuestionEditorState extends State<_QuizQuestionEditor> {
                   scrollPadding: EdgeInsets.only(
                     bottom: MediaQuery.viewInsetsOf(context).bottom + 160,
                   ),
-                  decoration: _quizInputDecoration('الدرجة', Icons.grade_rounded),
+                  decoration: _quizInputDecoration(
+                    'الدرجة',
+                    Icons.grade_rounded,
+                  ),
                 ),
               ),
               if (widget.timerMode == 'per_question') ...[
@@ -3009,7 +4182,10 @@ class _QuizQuestionEditorState extends State<_QuizQuestionEditor> {
                   child: TextField(
                     controller: widget.question.timeLimit,
                     keyboardType: TextInputType.number,
-                    decoration: _quizInputDecoration('الوقت (ثواني)', Icons.av_timer_rounded),
+                    decoration: _quizInputDecoration(
+                      'الوقت (ثواني)',
+                      Icons.av_timer_rounded,
+                    ),
                   ),
                 ),
               ],
@@ -3018,12 +4194,18 @@ class _QuizQuestionEditorState extends State<_QuizQuestionEditor> {
           const SizedBox(height: 12),
           TextField(
             controller: widget.question.correctionNote,
-            decoration: _quizInputDecoration('ملاحظة التصحيح', Icons.fact_check_rounded),
+            decoration: _quizInputDecoration(
+              'ملاحظة التصحيح',
+              Icons.fact_check_rounded,
+            ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: widget.question.infoSource,
-            decoration: _quizInputDecoration('مصدر المعلومة', Icons.source_rounded),
+            decoration: _quizInputDecoration(
+              'مصدر المعلومة',
+              Icons.source_rounded,
+            ),
           ),
           const SizedBox(height: 14),
           const Text(
@@ -3118,7 +4300,11 @@ class _QuizQuestionEditorState extends State<_QuizQuestionEditor> {
 }
 
 class _QuizModelDraft {
-  _QuizModelDraft({required this.name, required this.accessCode, required this.questions});
+  _QuizModelDraft({
+    required this.name,
+    required this.accessCode,
+    required this.questions,
+  });
 
   final TextEditingController name;
   final TextEditingController accessCode;
@@ -3263,7 +4449,11 @@ class _QuizOptionDraft {
   void dispose() => text.dispose();
 }
 
-InputDecoration _quizInputDecoration(String label, IconData icon, {bool alignLabel = false}) {
+InputDecoration _quizInputDecoration(
+  String label,
+  IconData icon, {
+  bool alignLabel = false,
+}) {
   return InputDecoration(
     labelText: label,
     alignLabelWithHint: alignLabel,
@@ -3292,4 +4482,3 @@ InputDecoration _quizInputDecoration(String label, IconData icon, {bool alignLab
     ),
   );
 }
-

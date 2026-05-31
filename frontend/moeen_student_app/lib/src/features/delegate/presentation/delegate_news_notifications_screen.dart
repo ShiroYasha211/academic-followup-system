@@ -11,17 +11,6 @@ class DelegateNewsScreen extends ConsumerWidget {
     return DelegateShell(
       currentIndex: 1,
       title: 'أخبار الدفعة',
-      actions: [
-        IconButton(
-          onPressed: () => _run(
-            context,
-            () => ref.read(delegateRepositoryProvider).markAllNewsAsRead(),
-            after: () => ref.invalidate(_delegateNewsProvider),
-          ),
-          icon: const Icon(Icons.done_all_rounded),
-          tooltip: 'تحديد الكل كمقروء',
-        ),
-      ],
       child: _AsyncBody(
         state: state,
         onRetry: () => ref.invalidate(_delegateNewsProvider),
@@ -30,16 +19,29 @@ class DelegateNewsScreen extends ConsumerWidget {
 
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(_delegateNewsProvider),
-            child: _ListScaffold(
-              title: 'المركز الإخباري',
-              subtitle: 'استعراض التعميمات والاستبيانات الرسمية من الكلية.',
-              icon: Icons.newspaper_rounded,
-              colors: const [AppColors.orange, AppColors.goldDeep],
-              children: [
-                if (items.isEmpty)
-                  const _EmptyState('لا توجد أخبار أو تعميمات حالياً.')
-                else
-                  for (final item in items) _NewsCard(item: item),
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: _NewsHero(total: items.length.toString()),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 36),
+                  sliver: items.isEmpty
+                      ? const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(
+                            child: _EmptyState('لا توجد أخبار أو تعميمات حالياً.'),
+                          ),
+                        )
+                      : SliverList.builder(
+                          itemCount: items.length,
+                          itemBuilder: (context, index) => _NewsCard(item: items[index]),
+                        ),
+                ),
               ],
             ),
           );
@@ -434,4 +436,101 @@ class _NotificationCard extends StatelessWidget {
         'announcement' => 'تعميم رسمي',
         _ => 'تنبيه نظام',
       };
+}
+
+class _NewsHero extends StatelessWidget {
+  const _NewsHero({required this.total});
+
+  final String total;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.orange,
+        borderRadius: BorderRadius.circular(32),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.orange,
+            AppColors.goldDeep,
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.orange.withValues(alpha: 0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned(
+            left: -20,
+            bottom: -20,
+            child: Icon(
+              Icons.campaign_rounded,
+              size: 140,
+              color: Colors.white.withValues(alpha: 0.1),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome_rounded,
+                        color: AppColors.gold,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'المركز الإخباري للدفعة',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'لديك $total تحديثات جديدة',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'استعرض التعميمات والاستبيانات الرسمية من الكلية.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

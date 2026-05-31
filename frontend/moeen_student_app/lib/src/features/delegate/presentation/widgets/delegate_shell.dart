@@ -254,7 +254,7 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
     final isSubscribed = subscription?.isSubscribed == true;
     final unread =
         ref.watch(delegateUnreadNotificationsCountProvider).valueOrNull ?? 0;
-    final groups = _groups();
+    final groups = _groups(session);
 
     return Drawer(
       backgroundColor: Colors.white,
@@ -404,165 +404,172 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
     );
   }
 
-  List<_DrawerGroup> _groups() => const [
-    _DrawerGroup('القائمة الرئيسية', [
-      _DrawerItem(
-        'الرئيسية',
-        Icons.dashboard_rounded,
-        0,
-        DelegateRoutes.dashboard,
-        false,
-      ),
-    ]),
-    _DrawerGroup('إدارة الحساب', [
-      _DrawerItem(
-        'الملف الشخصي',
-        Icons.person_rounded,
-        20,
-        DelegateRoutes.profile,
-        false,
-      ),
-      _DrawerItem(
-        'الاشتراك والرصيد',
-        Icons.workspace_premium_rounded,
-        18,
-        DelegateRoutes.subscription,
-        false,
-      ),
-      _DrawerItem(
-        'كشف الحساب',
-        Icons.receipt_long_rounded,
-        19,
-        DelegateRoutes.ledger,
-        false,
-      ),
-    ]),
-    _DrawerGroup('إدارة الدفعة والمهام', [
-      _DrawerItem(
-        'الطلاب',
-        Icons.groups_rounded,
-        3,
-        DelegateRoutes.students,
-        true,
-      ),
-      _DrawerItem(
-        'المواد',
-        Icons.auto_stories_rounded,
-        4,
-        DelegateRoutes.subjects,
-        true,
-      ),
-      _DrawerItem(
-        'الجدول الدراسي',
-        Icons.calendar_month_rounded,
-        5,
-        DelegateRoutes.schedules,
-        true,
-      ),
-      _DrawerItem(
-        'جداول الاختبارات',
-        Icons.fact_check_rounded,
-        6,
-        DelegateRoutes.exams,
-        true,
-      ),
-      _DrawerItem(
-        'التكاليف والواجبات',
-        Icons.assignment_turned_in_rounded,
-        7,
-        DelegateRoutes.assignments,
-        true,
-      ),
-      _DrawerItem(
-        'مصادر المقرر',
-        Icons.folder_special_rounded,
-        8,
-        DelegateRoutes.resources,
-        true,
-      ),
-      _DrawerItem(
-        'المكتبة المشتركة',
-        Icons.library_add_rounded,
-        9,
-        DelegateRoutes.libraryImport,
-        true,
-      ),
-      _DrawerItem(
-        'التذكيرات',
-        Icons.event_note_rounded,
-        10,
-        DelegateRoutes.reminders,
-        true,
-      ),
-      _DrawerItem(
-        'إعلانات الدفعة',
-        Icons.campaign_rounded,
-        11,
-        DelegateRoutes.announcements,
-        true,
-      ),
-    ]),
-    _DrawerGroup('الحضور والدرجات', [
-      _DrawerItem(
-        'رصد الحضور',
-        Icons.how_to_reg_rounded,
-        12,
-        DelegateRoutes.attendance,
-        true,
-      ),
-      _DrawerItem(
-        'إنذارات الغياب',
-        Icons.warning_rounded,
-        13,
-        DelegateRoutes.absenceAlerts,
-        true,
-      ),
-      _DrawerItem(
-        'الدرجات المفوضة',
-        Icons.grade_rounded,
-        14,
-        DelegateRoutes.authorizedGrades,
-        true,
-      ),
-    ]),
-    _DrawerGroup('التواصل والتنبيهات', [
-      _DrawerItem(
-        'أخبار الدفعة',
-        Icons.newspaper_rounded,
-        1,
-        DelegateRoutes.news,
-        true,
-      ),
-      _DrawerItem(
-        'التنبيهات',
-        Icons.notifications_active_rounded,
-        2,
-        DelegateRoutes.notifications,
-        true,
-      ),
-      _DrawerItem(
-        'رسائل الطلاب',
-        Icons.forum_rounded,
-        15,
-        DelegateRoutes.messages,
-        true,
-      ),
-      _DrawerItem(
-        'محادثات الدكاترة',
-        Icons.medical_services_rounded,
-        16,
-        DelegateRoutes.doctorChats,
-        true,
-      ),
-      _DrawerItem(
-        'استفسارات الدكتور',
-        Icons.contact_support_rounded,
-        17,
-        DelegateRoutes.inquiries,
-        true,
-      ),
-    ]),
-  ];
+  List<_DrawerGroup> _groups(AuthSession? session) {
+    final isPracticalDelegate = session?.isPracticalDelegate == true;
+
+    return [
+      _DrawerGroup('القائمة الرئيسية', [
+        if (!isPracticalDelegate)
+          _DrawerItem(
+            'الرئيسية',
+            Icons.dashboard_rounded,
+            0,
+            DelegateRoutes.dashboard,
+            false,
+          ),
+      ]),
+      _DrawerGroup('إدارة الحساب', [
+        _DrawerItem(
+          'الملف الشخصي',
+          Icons.person_rounded,
+          20,
+          DelegateRoutes.profile,
+          false,
+        ),
+        _DrawerItem(
+          'الاشتراك والرصيد',
+          Icons.workspace_premium_rounded,
+          18,
+          DelegateRoutes.subscription,
+          false,
+        ),
+        _DrawerItem(
+          'كشف الحساب',
+          Icons.receipt_long_rounded,
+          19,
+          DelegateRoutes.ledger,
+          false,
+        ),
+      ]),
+      _DrawerGroup('إدارة الدفعة والمهام', [
+        _DrawerItem(
+          'الطلاب',
+          Icons.groups_rounded,
+          3,
+          DelegateRoutes.students,
+          true,
+        ),
+        _DrawerItem(
+          'المواد',
+          Icons.auto_stories_rounded,
+          4,
+          DelegateRoutes.subjects,
+          true,
+        ),
+        _DrawerItem(
+          'الجدول الدراسي',
+          Icons.calendar_month_rounded,
+          5,
+          DelegateRoutes.schedules,
+          true,
+        ),
+        _DrawerItem(
+          'جداول الاختبارات',
+          Icons.fact_check_rounded,
+          6,
+          DelegateRoutes.exams,
+          true,
+        ),
+        _DrawerItem(
+          'التكاليف والواجبات',
+          Icons.assignment_turned_in_rounded,
+          7,
+          DelegateRoutes.assignments,
+          true,
+        ),
+        _DrawerItem(
+          'مصادر المقرر',
+          Icons.folder_special_rounded,
+          8,
+          DelegateRoutes.resources,
+          true,
+        ),
+        _DrawerItem(
+          'المكتبة المشتركة',
+          Icons.library_add_rounded,
+          9,
+          DelegateRoutes.libraryImport,
+          true,
+        ),
+        _DrawerItem(
+          'التذكيرات',
+          Icons.event_note_rounded,
+          10,
+          DelegateRoutes.reminders,
+          true,
+        ),
+        _DrawerItem(
+          'إعلانات الدفعة',
+          Icons.campaign_rounded,
+          11,
+          DelegateRoutes.announcements,
+          true,
+        ),
+      ]),
+      _DrawerGroup('الحضور والدرجات', [
+        _DrawerItem(
+          'رصد الحضور',
+          Icons.how_to_reg_rounded,
+          12,
+          DelegateRoutes.attendance,
+          true,
+        ),
+        _DrawerItem(
+          'إنذارات الغياب',
+          Icons.warning_rounded,
+          13,
+          DelegateRoutes.absenceAlerts,
+          true,
+        ),
+        _DrawerItem(
+          'الدرجات المفوضة',
+          Icons.grade_rounded,
+          14,
+          DelegateRoutes.authorizedGrades,
+          true,
+        ),
+      ]),
+      _DrawerGroup('التواصل والتنبيهات', [
+        _DrawerItem(
+          'أخبار الدفعة',
+          Icons.newspaper_rounded,
+          1,
+          DelegateRoutes.news,
+          true,
+        ),
+        _DrawerItem(
+          'التنبيهات',
+          Icons.notifications_active_rounded,
+          2,
+          DelegateRoutes.notifications,
+          true,
+        ),
+        if (!isPracticalDelegate)
+          _DrawerItem(
+            'رسائل الطلاب',
+            Icons.forum_rounded,
+            15,
+            DelegateRoutes.messages,
+            true,
+          ),
+        _DrawerItem(
+          'محادثات الدكاترة',
+          Icons.medical_services_rounded,
+          16,
+          DelegateRoutes.doctorChats,
+          true,
+        ),
+        if (!isPracticalDelegate)
+          _DrawerItem(
+            'استفسارات الدكتور',
+            Icons.contact_support_rounded,
+            17,
+            DelegateRoutes.inquiries,
+            true,
+          ),
+      ]),
+    ];
+  }
 
   Future<void> _go(_DrawerItem item) async {
     if (!item.requiresSubscription) {

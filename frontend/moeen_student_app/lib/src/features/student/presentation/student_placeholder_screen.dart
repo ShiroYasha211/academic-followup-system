@@ -15,6 +15,7 @@ class StudentPlaceholderScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = _labels[feature] ?? 'مسار قادم';
+    final isWorkingOn = feature == 'flashcards' || feature == 'tree-farm';
 
     return StudentShell(
       currentIndex: 3,
@@ -46,7 +47,9 @@ class StudentPlaceholderScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'تم تجهيز المسار داخل التطبيق. سيتم بناء الصفحة الكاملة في المرحلة القادمة.',
+                  isWorkingOn
+                      ? 'جاري العمل على هذه الخدمة في الوقت الحالي وسيتم إطلاقها قريباً.'
+                      : 'تم تجهيز المسار داخل التطبيق. سيتم بناء الصفحة الكاملة في المرحلة القادمة.',
                   style: Theme.of(context).textTheme.bodyLarge,
                   textAlign: TextAlign.center,
                 ),
@@ -66,5 +69,7 @@ class StudentPlaceholderScreen extends StatelessWidget {
     'study-center': 'مركز الدراسة',
     'qr': 'مسح QR',
     'more': 'باقي خدمات الطالب',
+    'flashcards': 'One Line Shot',
+    'tree-farm': 'مزرعة الأشجار',
   };
 }

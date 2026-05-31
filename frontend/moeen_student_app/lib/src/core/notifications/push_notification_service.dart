@@ -39,8 +39,7 @@ class PushNotificationService {
   static StreamSubscription<String>? _tokenRefreshSubscription;
   static String? _pendingNavigationPath;
 
-  static Stream<String> get navigationRequests =>
-      _navigationController.stream;
+  static Stream<String> get navigationRequests => _navigationController.stream;
   static Stream<Map<String, dynamic>> get refreshRequests =>
       _refreshController.stream;
 
@@ -259,10 +258,14 @@ class PushNotificationService {
       'reminders' || 'reminder' => '/student/reminders',
       'resources' || 'resource' => '/student/resources',
       'library' => '/student/library',
+      'authorized_grades' || 'grade_delegation' => '/student/authorized-grades',
       'stars' || 'star' => '/student/stars',
       'inquiries' || 'inquiry' || 'doctor_inquiry' => '/student/inquiries',
       'messages' || 'message' => '/student/messages',
       'news' || 'news_hub' || 'announcement' || 'alert' => '/student/news',
+      'rare_case' || 'rare_cases' => '/student/clinical/rare-cases',
+      'clinical_assignment' => '/student/clinical/assignments',
+      'clinical' => '/student/clinical',
       'notifications' => '/student/notifications',
       _ => '/student/notifications',
     };

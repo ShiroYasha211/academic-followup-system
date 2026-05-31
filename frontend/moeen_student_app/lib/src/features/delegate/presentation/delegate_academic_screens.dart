@@ -653,7 +653,11 @@ class DelegateExamSchedulesScreen extends ConsumerWidget {
                         subtitle:
                             'تنظيم وتعديل جداول الاختبارات الفصلية للطلاب في تخصصك.',
                         icon: Icons.fact_check_rounded,
-                        colors: const [AppColors.danger, AppColors.orange],
+                        colors: const [
+                          Color(0xFF8B1E3F), // Deep Crimson
+                          Color(0xFF2E1065), // Dark Indigo
+                          Color(0xFF0F172A), // Midnight Navy
+                        ],
                       ),
                     ],
                   ),
@@ -703,6 +707,7 @@ class _AddExamFAB extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const fabColor = Color(0xFF8B1E3F);
     return Opacity(
       opacity: isEnabled ? 1.0 : 0.5,
       child: Container(
@@ -710,7 +715,7 @@ class _AddExamFAB extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: AppColors.danger.withValues(alpha: isEnabled ? 0.35 : 0.1),
+              color: fabColor.withValues(alpha: isEnabled ? 0.35 : 0.1),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -718,7 +723,7 @@ class _AddExamFAB extends StatelessWidget {
         ),
         child: FloatingActionButton.extended(
           onPressed: isEnabled ? onPressed : onUnauthorized,
-          backgroundColor: AppColors.danger,
+          backgroundColor: fabColor,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
@@ -888,14 +893,26 @@ class _DelegateAssignmentsScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(_delegateAssignmentsProvider);
+    final permissionsState = ref.watch(_delegateAssignmentPermissionsProvider);
+    final creatableSubjectIds = permissionsState.maybeWhen(
+      data: _creatableSubjectIds,
+      orElse: () => const <int>{},
+    );
+    final canCreate = creatableSubjectIds.isNotEmpty;
 
     return DelegateShell(
       currentIndex: 7,
       title: 'التكاليف الدراسية',
       floatingActionButton: Opacity(
-        opacity: 1.0,
+        opacity: canCreate ? 1.0 : 0.45,
         child: FloatingActionButton.extended(
-          onPressed: () => _assignmentSheet(context, ref),
+          onPressed: canCreate
+              ? () => _assignmentSheet(
+                  context,
+                  ref,
+                  creatableSubjectIds: creatableSubjectIds,
+                )
+              : () => _showNoPermissionSnackBar(context),
           icon: const Icon(Icons.add_task_rounded),
           label: const Text(
             'تكليف جديد',
@@ -907,7 +924,10 @@ class _DelegateAssignmentsScreenState
       ),
       child: _AsyncBody<List<dynamic>>(
         state: state,
-        onRetry: () => ref.invalidate(_delegateAssignmentsProvider),
+        onRetry: () {
+          ref.invalidate(_delegateAssignmentsProvider);
+          ref.invalidate(_delegateAssignmentPermissionsProvider);
+        },
         builder: (data) {
           final now = DateTime.now();
           final allAssignments = data.map(asMap).toList();
@@ -982,6 +1002,15 @@ class _DelegateAssignmentsScreenState
         },
       ),
     );
+  }
+
+  Set<int> _creatableSubjectIds(Map<String, dynamic> payload) {
+    return asList(payload['subjects'])
+        .map(asMap)
+        .where((item) => boolValue(asMap(item['permissions']), 'can_create'))
+        .map((item) => number(asMap(item['subject']), 'id').toInt())
+        .where((id) => id > 0)
+        .toSet();
   }
 }
 
@@ -1074,9 +1103,6 @@ class _AssignmentListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const canUpdate = true;
-    const canDelete = true;
-
     if (items.isEmpty) {
       return const Center(
         child: Column(
@@ -1102,13 +1128,16 @@ class _AssignmentListView extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 100),
       itemCount: items.length,
-      itemBuilder: (context, i) => _DelegateAssignmentCard(
-        item: items[i],
-        ref: ref,
-        canUpdate: canUpdate,
-        canDelete: canDelete,
-        onUnauthorized: () => _showNoPermissionSnackBar(context),
-      ),
+      itemBuilder: (context, i) {
+        final item = items[i];
+        return _DelegateAssignmentCard(
+          item: item,
+          ref: ref,
+          canUpdate: boolValue(item, 'can_edit'),
+          canDelete: boolValue(item, 'can_delete'),
+          onUnauthorized: () => _showNoPermissionSnackBar(context),
+        );
+      },
     );
   }
 }
@@ -1168,7 +1197,9 @@ class _DelegateAssignmentCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        onTap: () => _assignmentSheet(context, ref, item: item),
+        onTap: canUpdate
+            ? () => _assignmentSheet(context, ref, item: item)
+            : onUnauthorized,
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Column(
@@ -1227,6 +1258,8 @@ class _DelegateAssignmentCard extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
+              _AssignmentOwnerChip(label: text(item, 'owner_label')),
               const SizedBox(height: 16),
               if (isUrgent)
                 Container(
@@ -1771,6 +1804,49 @@ class _ResourceIconButton extends StatelessWidget {
   }
 }
 
+class _AssignmentOwnerChip extends StatelessWidget {
+  const _AssignmentOwnerChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDoctor = label.contains('الدكتور');
+    final color = isDoctor ? AppColors.primary : AppColors.orange;
+
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withValues(alpha: 0.16)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isDoctor ? Icons.school_rounded : Icons.person_rounded,
+              size: 14,
+              color: color,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label.isEmpty ? 'مصدر التكليف' : label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DelegateResourceCard extends StatelessWidget {
   const _DelegateResourceCard({
     required this.resource,
@@ -2045,7 +2121,10 @@ class _DelegateExamScheduleCardState extends State<_DelegateExamScheduleCard> {
     final items = asList(widget.schedule['items']).map(asMap).toList()
       ..sort((a, b) => text(a, 'exam_date').compareTo(text(b, 'exam_date')));
     final term = asMap(widget.schedule['term']);
-    final color = AppColors.danger;
+    final isOfficial = boolValue(widget.schedule, 'is_official');
+    final color = isOfficial
+        ? const Color(0xFF0F172A)
+        : const Color(0xFF8B1E3F);
 
     int daysDiff = -1;
     if (items.isNotEmpty) {
@@ -2061,7 +2140,10 @@ class _DelegateExamScheduleCardState extends State<_DelegateExamScheduleCard> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: color.withValues(alpha: 0.15), width: 1.5),
+        border: Border.all(
+          color: color.withValues(alpha: 0.15),
+          width: isOfficial ? 1.5 : 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: color.withValues(alpha: 0.08),
@@ -2090,13 +2172,53 @@ class _DelegateExamScheduleCardState extends State<_DelegateExamScheduleCard> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _ActionMenu(
-                        onEdit: widget.onEdit,
-                        onDelete: widget.onDelete,
-                        iconColor: Colors.white,
-                        canUpdate: widget.canUpdate,
-                        canDelete: widget.canDelete,
-                        onUnauthorized: widget.onUnauthorized,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isOfficial
+                                      ? Icons.verified_rounded
+                                      : Icons.person_pin_rounded,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isOfficial ? 'جدول معتمد' : 'بواسطة المندوب',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _ActionMenu(
+                            onEdit: widget.onEdit,
+                            onDelete: widget.onDelete,
+                            iconColor: Colors.white,
+                            canUpdate: widget.canUpdate,
+                            canDelete: widget.canDelete,
+                            onUnauthorized: widget.onUnauthorized,
+                          ),
+                        ],
                       ),
                       Container(
                         width: 32,
@@ -2265,10 +2387,10 @@ class _ExamTimelineItem extends StatelessWidget {
           ),
           Expanded(
             child: Container(
-              margin: EdgeInsets.only(
+              margin: EdgeInsetsDirectional.only(
                 bottom: isLast ? 10 : 20,
-                left: 20,
-                right: 4,
+                start: 20,
+                end: 4,
               ),
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(

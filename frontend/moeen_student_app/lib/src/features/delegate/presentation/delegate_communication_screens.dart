@@ -6,6 +6,17 @@ class DelegateMessagesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(authControllerProvider).valueOrNull;
+    if (session?.isPracticalDelegate == true) {
+      return const DelegateShell(
+        currentIndex: 15,
+        title: 'رسائل الطلاب',
+        child: _EmptyState(
+          'رسائل الطلاب مخصصة للمندوب الأكاديمي فقط. يمكنك استخدام محادثات الدكاترة للتواصل العملي.',
+        ),
+      );
+    }
+
     return _ChatListScreen(
       title: 'رسائل الطلاب',
       index: 15,
@@ -155,6 +166,16 @@ class _DelegateInquiriesScreenState
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(authControllerProvider).valueOrNull;
+    if (session?.isPracticalDelegate == true) {
+      return const DelegateShell(
+        currentIndex: 17,
+        title: 'استفسارات الدكتور',
+        child: _EmptyState(
+          'استفسارات الدكتور مخصصة للمندوب الأكاديمي فقط. استخدم محادثات الدكاترة للتواصل العملي.',
+        ),
+      );
+    }
+
     final canUpdate = session?.hasPermission('students', 'update') ?? false;
     final state = ref.watch(_delegateInquiriesProvider(_status));
     return DelegateShell(
