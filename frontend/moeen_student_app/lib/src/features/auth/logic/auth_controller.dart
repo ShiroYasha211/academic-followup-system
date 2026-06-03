@@ -9,7 +9,10 @@ import '../data/auth_repository.dart';
 import '../data/auth_session.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return AuthRepository(ref.watch(apiClientProvider));
+  return AuthRepository(
+    ref.watch(apiClientProvider),
+    ref.watch(deviceIdentityServiceProvider),
+  );
 });
 
 final authControllerProvider =

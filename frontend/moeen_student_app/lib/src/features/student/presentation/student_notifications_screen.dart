@@ -195,16 +195,77 @@ class StudentNotificationsScreen extends ConsumerWidget {
 
 String? _routeForNotification(Map<String, dynamic> item) {
   final data = asMap(item['data']);
-  final target =
-      (text(data, 'target_screen').isNotEmpty
-              ? text(data, 'target_screen')
-              : text(data, 'screen'))
-          .trim();
+  final target = (text(data, 'target_screen').isNotEmpty
+          ? text(data, 'target_screen')
+          : text(data, 'screen'))
+      .trim();
   final type = text(item, 'type');
   final key = target.isNotEmpty ? target : type;
+
+  final scheduleItemId = text(data, 'schedule_item_id').isNotEmpty
+      ? text(data, 'schedule_item_id')
+      : (text(data, 'study_item_id').isNotEmpty
+          ? text(data, 'study_item_id')
+          : text(data, 'item_id'));
+
+  if ((key == 'study_session' || key == 'study_reminder') && scheduleItemId.isNotEmpty) {
+    return '/student/study-center/$scheduleItemId/session';
+  }
+
+  final inquiryId = text(data, 'inquiry_id');
+  if (key == 'inquiry' && inquiryId.isNotEmpty) {
+    return '/student/inquiries/$inquiryId';
+  }
+
+  final assignmentId = text(data, 'assignment_id');
+  if (key == 'assignment' && assignmentId.isNotEmpty) {
+    return '/student/assignments/$assignmentId';
+  }
+
+  final conversationId = text(data, 'conversation_id').isNotEmpty
+      ? text(data, 'conversation_id')
+      : text(data, 'doctor_conversation_id');
+  if (key == 'message' && conversationId.isNotEmpty) {
+    return '/student/messages/$conversationId';
+  }
+
+  final packId = text(data, 'pack_id');
+  if ((key == 'flashcard_assignment' || key == 'flashcard_review' || key == 'flashcards') && packId.isNotEmpty) {
+    return '/student/flashcards/$packId';
+  }
+
+  final subjectId = text(data, 'subject_id');
+  if (subjectId.isNotEmpty) {
+    if (key == 'attendance' ||
+        key == 'absence_warning' ||
+        key == 'lecture_report' ||
+        key == 'excuse') {
+      return '/student/subjects/$subjectId?tab=attendance';
+    }
+  }
+
   return switch (key) {
-    'grade_delegation' ||
-    'authorized_grades' => StudentAuthorizedGradesScreen.route,
+    'study_center' || 'study' || 'study_reminder' => StudentStudyCenterScreen.route,
+    'quizzes' || 'quiz' => StudentQuizzesScreen.route,
+    'assignments' || 'assignment' => StudentAssignmentsScreen.route,
+    'schedule' || 'schedules' => StudentScheduleScreen.route,
+    'reminders' || 'reminder' => StudentRemindersScreen.route,
+    'resources' || 'resource' => StudentResourcesScreen.route,
+    'library' => StudentLibraryScreen.route,
+    'authorized_grades' || 'grade_delegation' => StudentAuthorizedGradesScreen.route,
+    'stars' || 'star' || 'tree_farm' => StudentStarsScreen.route,
+    'inquiries' || 'inquiry' || 'doctor_inquiry' => StudentInquiriesScreen.route,
+    'messages' || 'message' => StudentMessagesScreen.route,
+    'news' || 'news_hub' || 'announcement' || 'alert' || 'absence_warning' => StudentNewsScreen.route,
+    'rare_case' || 'rare_cases' => StudentClinicalRareCasesScreen.route,
+    'clinical_assignment' => StudentClinicalAssignmentsScreen.route,
+    'clinical' => StudentClinicalScreen.route,
+    'one_line_shot' ||
+    'one_line_shot_quick_review' ||
+    'flashcards' ||
+    'flashcard_review' ||
+    'flashcard_assignment' => '/student/flashcards/quick-review',
+    'notifications' => StudentNotificationsScreen.route,
     _ => null,
   };
 }
@@ -315,6 +376,106 @@ class _NotificationCard extends StatelessWidget {
     final votedId = number(poll, 'voted_option_id').toInt();
     final canOpen = _routeForNotification(item) != null;
 
+    final data = asMap(item['data']);
+    Widget? detailsWidget;
+    String? ctaLabel;
+
+    if (type == 'assignment') {
+      final subjectName = text(data, 'subject_name');
+      final dueDate = text(data, 'due_date');
+      ctaLabel = 'عرض تفاصيل التكليف 📝';
+
+      detailsWidget = Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (subjectName.isNotEmpty)
+              _NotificationInfoRow(label: 'المادة', value: subjectName, icon: Icons.book_rounded),
+            if (dueDate.isNotEmpty)
+              _NotificationInfoRow(label: 'تاريخ التسليم', value: dateOnly(dueDate), icon: Icons.event_rounded),
+          ],
+        ),
+      );
+    } else if (type == 'attendance' || type == 'absence_warning' || type == 'lecture_report') {
+      final subjectName = text(data, 'subject_name');
+      final date = text(data, 'date');
+      final count = text(data, 'absence_count');
+      ctaLabel = type == 'lecture_report' ? 'سجل المحاضرات 🗓️' : 'تفاصيل الغياب 🥀';
+
+      detailsWidget = Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (subjectName.isNotEmpty)
+              _NotificationInfoRow(label: 'المادة', value: subjectName, icon: Icons.school_rounded),
+            if (date.isNotEmpty)
+              _NotificationInfoRow(label: 'التاريخ', value: dateOnly(date), icon: Icons.calendar_today_rounded),
+            if (count.isNotEmpty)
+              _NotificationInfoRow(label: 'عدد مرات الغياب', value: count, icon: Icons.warning_rounded),
+          ],
+        ),
+      );
+    } else if (type == 'tree_farm') {
+      final coins = text(data, 'coins_amount');
+      final stars = text(data, 'stars_amount');
+      final status = text(data, 'status');
+      ctaLabel = 'عرض رصيد النجوم ⭐';
+
+      String statusText = status == 'approved' ? 'مقبول 🎉' : (status == 'rejected' ? 'مرفوض ❌' : 'قيد الانتظار ⏳');
+      Color statusColor = status == 'approved' ? AppColors.success : (status == 'rejected' ? AppColors.danger : AppColors.warning);
+
+      detailsWidget = Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (coins.isNotEmpty && stars.isNotEmpty)
+              _NotificationInfoRow(
+                label: 'التحويل',
+                value: '$coins عملة 🪙 ➔ $stars نجوم ⭐',
+                icon: Icons.swap_horiz_rounded,
+              ),
+            _NotificationInfoRow(
+              label: 'حالة الطلب',
+              value: statusText,
+              valueColor: statusColor,
+              icon: Icons.check_circle_outline_rounded,
+            ),
+          ],
+        ),
+      );
+    } else if (type == 'message') {
+      ctaLabel = 'فتح المحادثة 💬';
+    } else if (type == 'flashcard_assignment') {
+      ctaLabel = 'ابدأ المراجعة الآن ⚡';
+    } else if (type == 'inquiry' || type == 'announcement') {
+      ctaLabel = 'تفاصيل الاستفسار 👨‍⚕️';
+    } else if (type == 'study_reminder') {
+      ctaLabel = 'بدء الجلسة ⏱️';
+    } else if (canOpen) {
+      ctaLabel = 'عرض التفاصيل 🔍';
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
@@ -415,6 +576,7 @@ class _NotificationCard extends StatelessWidget {
                               : FontWeight.w500,
                         ),
                       ),
+                      if (detailsWidget != null) detailsWidget,
                       if (options.isNotEmpty) ...[
                         const SizedBox(height: 18),
                         _PollWidget(
@@ -425,27 +587,43 @@ class _NotificationCard extends StatelessWidget {
                           onVote: onVote,
                         ),
                       ],
-                      if (unread) ...[
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: AlignmentDirectional.centerEnd,
-                          child: TextButton.icon(
-                            onPressed: onRead,
-                            style: TextButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              foregroundColor: color,
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          if (canOpen && ctaLabel != null)
+                            TextButton.icon(
+                              onPressed: onRead,
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                foregroundColor: color,
+                              ),
+                              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                              label: Text(
+                                ctaLabel,
+                                style: const TextStyle(fontWeight: FontWeight.w900),
+                              ),
+                            )
+                          else
+                            const SizedBox.shrink(),
+                          if (unread)
+                            TextButton.icon(
+                              onPressed: onRead,
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                foregroundColor: AppColors.slate600,
+                              ),
+                              icon: const Icon(
+                                Icons.check_circle_outline_rounded,
+                                size: 16,
+                              ),
+                              label: const Text(
+                                'فهمت',
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                              ),
                             ),
-                            icon: const Icon(
-                              Icons.check_circle_outline_rounded,
-                              size: 18,
-                            ),
-                            label: const Text(
-                              'فهمت',
-                              style: TextStyle(fontWeight: FontWeight.w800),
-                            ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -599,3 +777,51 @@ class _PollWidget extends StatelessWidget {
     );
   }
 }
+
+class _NotificationInfoRow extends StatelessWidget {
+  const _NotificationInfoRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.valueColor,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: AppColors.slate500),
+          const SizedBox(width: 6),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.slate600,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                color: valueColor ?? AppColors.slate900,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

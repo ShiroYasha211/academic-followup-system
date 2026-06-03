@@ -2,21 +2,25 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:moeen_student_app/src/features/student/presentation/student_dashboard_screen.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/downloads/download_service.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/notifications/push_notification_service.dart';
 import '../../../core/offline/connectivity_service.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
@@ -42,6 +46,30 @@ part 'student_exams_screen.dart';
 part 'student_resources_screen.dart';
 part 'student_library_screen.dart';
 part 'student_flashcards_screen.dart';
+part 'student_flashcards_home.dart';
+part 'student_flashcards_packs.dart';
+part 'student_flashcards_analytics.dart';
+part 'student_flashcards_difficulty.dart';
+part 'student_flashcards_history.dart';
+part 'student_flashcards_upcoming.dart';
+part 'student_flashcards_today.dart';
+part 'student_flashcards_quick_review.dart';
+part 'student_flashcards_hero_widgets.dart';
+part 'student_flashcards_pack_widgets.dart';
+part 'student_flashcards_today_widgets.dart';
+part 'student_flashcards_dashboard_widgets.dart';
+part 'student_flashcards_ui_widgets.dart';
+part 'student_flashcards_details_screen.dart';
+part 'student_flashcards_details_widgets.dart';
+part 'student_flashcards_review.dart';
+part 'student_flashcards_store.dart';
+part 'student_flashcards_forms.dart';
+part 'student_flashcards_item_widgets.dart';
+part 'student_flashcards_review_summary_widgets.dart';
+part 'student_flashcards_shot_review_card.dart';
+part 'student_flashcards_smart_review_prompt.dart';
+part 'student_flashcards_smart_review_settings.dart';
+part 'student_flashcards_helpers.dart';
 part 'student_assignments_screen.dart';
 part 'student_qr_scan_screen.dart';
 part 'student_reminders_screen.dart';
@@ -190,30 +218,168 @@ final _libraryProvider = FutureProvider.autoDispose
 
 final _flashcardsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
   ref,
-) {
-  return ref.watch(studentContentRepositoryProvider).flashcards();
+) async {
+  final store = ref.watch(flashcardLocalStoreProvider);
+  try {
+    final data = await ref.watch(studentContentRepositoryProvider).flashcards();
+    await store.cacheHome(data);
+    return data;
+  } on ApiException catch (error) {
+    if (!error.isOffline) rethrow;
+    final cached = await store.loadHome();
+    if (cached != null) return cached;
+    rethrow;
+  }
 });
 
 final _flashcardDetailsProvider = FutureProvider.autoDispose
-    .family<Map<String, dynamic>, int>((ref, id) {
-      return ref.watch(studentContentRepositoryProvider).flashcardDetails(id);
+    .family<Map<String, dynamic>, int>((ref, id) async {
+      final store = ref.watch(flashcardLocalStoreProvider);
+      try {
+        final data = await ref
+            .watch(studentContentRepositoryProvider)
+            .flashcardDetails(id);
+        await store.cachePackDetails(id, data);
+        return data;
+      } on ApiException catch (error) {
+        if (!error.isOffline) rethrow;
+        final cached = await store.loadPackDetails(id);
+        if (cached != null) return cached;
+        rethrow;
+      }
     });
 
 final _flashcardReviewProvider = FutureProvider.autoDispose
-    .family<Map<String, dynamic>, int>((ref, id) {
-      return ref.watch(studentContentRepositoryProvider).flashcardReview(id);
+    .family<Map<String, dynamic>, int>((ref, id) async {
+      final store = ref.watch(flashcardLocalStoreProvider);
+      try {
+        final data = await ref
+            .watch(studentContentRepositoryProvider)
+            .flashcardReview(id);
+        await store.cachePackReview(id, data);
+        return data;
+      } on ApiException catch (error) {
+        if (!error.isOffline) rethrow;
+        final cached = await store.loadPackReview(id);
+        if (cached != null) return cached;
+        rethrow;
+      }
     });
 
 final _flashcardDailyQueueProvider =
-    FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
-      return ref.watch(studentContentRepositoryProvider).flashcardDailyQueue();
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+      final store = ref.watch(flashcardLocalStoreProvider);
+      try {
+        final data = await ref
+            .watch(studentContentRepositoryProvider)
+            .flashcardDailyQueue();
+        await store.cacheDailyQueue(data);
+        return data;
+      } on ApiException catch (error) {
+        if (!error.isOffline) rethrow;
+        final cached = await store.loadDailyQueue();
+        if (cached != null) return cached;
+        rethrow;
+      }
     });
 
-final _flashcardStoreProvider = FutureProvider.autoDispose
-    .family<Map<String, dynamic>, String>((ref, search) {
+final _flashcardSettingsProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+      final store = ref.watch(flashcardLocalStoreProvider);
+      try {
+        final data = await ref
+            .watch(studentContentRepositoryProvider)
+            .flashcardSettings();
+        await store.cacheSettings(data);
+        if (await ref.read(connectivityServiceProvider).isOnline()) {
+          await store.applyServerSmartReviewSettings(data);
+        }
+        return data;
+      } on ApiException catch (error) {
+        if (!error.isOffline) rethrow;
+        final cached = await store.loadSettings();
+        if (cached != null) return cached;
+        final home = await store.loadHome();
+        if (home != null && home['settings'] is Map) {
+          return {'settings': Map<String, dynamic>.from(home['settings'])};
+        }
+        rethrow;
+      }
+    });
+
+final _flashcardUpcomingProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+      final store = ref.watch(flashcardLocalStoreProvider);
+      try {
+        final data = await ref
+            .watch(studentContentRepositoryProvider)
+            .flashcardUpcoming();
+        await store.cacheUpcoming(data);
+        return data;
+      } on ApiException catch (error) {
+        if (!error.isOffline) rethrow;
+        final cached = await store.loadUpcoming();
+        if (cached != null) return cached;
+        rethrow;
+      }
+    });
+
+final _flashcardHistoryProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+      final store = ref.watch(flashcardLocalStoreProvider);
+      try {
+        final data = await ref
+            .watch(studentContentRepositoryProvider)
+            .flashcardHistory();
+        await store.cacheHistory(data);
+        return data;
+      } on ApiException catch (error) {
+        if (!error.isOffline) rethrow;
+        final cached = await store.loadHistory();
+        if (cached != null) return cached;
+        rethrow;
+      }
+    });
+
+final _flashcardDifficultyProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+      final store = ref.watch(flashcardLocalStoreProvider);
+      try {
+        final data = await ref
+            .watch(studentContentRepositoryProvider)
+            .flashcardDifficulty();
+        await store.cacheDifficulty(data);
+        return data;
+      } on ApiException catch (error) {
+        if (!error.isOffline) rethrow;
+        final cached = await store.loadDifficulty();
+        if (cached != null) return cached;
+        rethrow;
+      }
+    });
+
+final _flashcardAnalyticsProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+      final store = ref.watch(flashcardLocalStoreProvider);
+      try {
+        final data = await ref
+            .watch(studentContentRepositoryProvider)
+            .flashcardAnalytics();
+        await store.cacheAnalytics(data);
+        return data;
+      } on ApiException catch (error) {
+        if (!error.isOffline) rethrow;
+        final cached = await store.loadAnalytics();
+        if (cached != null) return cached;
+        rethrow;
+      }
+    });
+
+final _flashcardStoreProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
       return ref
           .watch(studentContentRepositoryProvider)
-          .flashcardStore(search: search, displayMode: 'one_line');
+          .flashcardStore(displayMode: 'one_line');
     });
 
 final _assignmentsProvider = FutureProvider.autoDispose

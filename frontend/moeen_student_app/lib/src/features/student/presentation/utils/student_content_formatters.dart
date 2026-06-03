@@ -681,6 +681,14 @@ String _notificationTypeLabel(String type) {
     'grade_delegation' => 'تفويض درجات',
     'attendance' => 'حضور',
     'poll' => 'استطلاع',
+    'flashcard_assignment' => 'بطاقات One Line Shot',
+    'tree_farm' => 'مزرعة الأشجار',
+    'excuse' => 'أعذار الغياب',
+    'absence_warning' => 'إنذار غياب',
+    'lecture_report' => 'تسجيل حضور',
+    'message' => 'محادثة',
+    'resource' => 'ملف دراسي',
+    'study_reminder' => 'تذكير بالمذاكرة',
     _ => 'تنبيه',
   };
 }
@@ -693,6 +701,14 @@ IconData _notificationIcon(String type) {
     'attendance' => Icons.how_to_reg_rounded,
     'poll' => Icons.poll_rounded,
     'announcement' => Icons.campaign_rounded,
+    'flashcard_assignment' => Icons.bolt_rounded,
+    'tree_farm' => Icons.park_rounded,
+    'excuse' => Icons.verified_user_rounded,
+    'absence_warning' => Icons.warning_amber_rounded,
+    'lecture_report' => Icons.co_present_rounded,
+    'message' => Icons.chat_bubble_outline_rounded,
+    'resource' => Icons.folder_copy_rounded,
+    'study_reminder' => Icons.alarm_on_rounded,
     _ => Icons.notifications_rounded,
   };
 }
@@ -705,6 +721,14 @@ Color _notificationColor(String type) {
     'attendance' => AppColors.success,
     'poll' => AppColors.info,
     'announcement' => AppColors.royalBlue,
+    'flashcard_assignment' => const Color(0xFF4F46E5),
+    'tree_farm' => const Color(0xFF10B981),
+    'excuse' => AppColors.info,
+    'absence_warning' => AppColors.danger,
+    'lecture_report' => AppColors.success,
+    'message' => AppColors.royalBlue,
+    'resource' => const Color(0xFF7C3AED),
+    'study_reminder' => AppColors.warning,
     _ => AppColors.goldDeep,
   };
 }

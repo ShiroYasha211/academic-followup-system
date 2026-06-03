@@ -625,7 +625,7 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
                           ],
                           const SizedBox(height: 22),
                           DropdownButtonFormField<SubjectOption>(
-                            value: _selectedSubject,
+                            initialValue: _selectedSubject,
                             decoration: inputDecoration('المادة'),
                             items: _subjects
                                 .map(

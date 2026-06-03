@@ -89,6 +89,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const StudentNewsScreen(),
       ),
       GoRoute(
+        path: '/student/news/bookmarks',
+        builder: (context, state) => const StudentNewsBookmarksScreen(),
+      ),
+      GoRoute(
         path: '/student/news/details',
         builder: (context, state) =>
             StudentNewsDetailsScreen(item: asMap(state.extra)),
@@ -116,7 +120,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: StudentTreeFarmScreen.route,
-        builder: (context, state) => const StudentPlaceholderScreen(feature: 'tree-farm'),
+        builder: (context, state) => const StudentTreeFarmScreen(),
       ),
       GoRoute(
         path: StudentNotificationsScreen.route,
@@ -227,19 +231,51 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: StudentFlashcardsScreen.route,
-        builder: (context, state) => const StudentPlaceholderScreen(feature: 'flashcards'),
+        builder: (context, state) => const StudentFlashcardsScreen(),
       ),
       GoRoute(
         path: StudentFlashcardStoreScreen.route,
-        builder: (context, state) => const StudentPlaceholderScreen(feature: 'flashcards'),
+        builder: (context, state) => const StudentFlashcardStoreScreen(),
+      ),
+      GoRoute(
+        path: StudentFlashcardsScreen.todayRoute,
+        builder: (context, state) => const StudentFlashcardsTodayScreen(),
+      ),
+      GoRoute(
+        path: StudentFlashcardsScreen.packsRoute,
+        builder: (context, state) => const StudentFlashcardPacksScreen(),
+      ),
+      GoRoute(
+        path: StudentFlashcardsScreen.upcomingRoute,
+        builder: (context, state) => const StudentFlashcardsUpcomingScreen(),
+      ),
+      GoRoute(
+        path: StudentFlashcardsScreen.historyRoute,
+        builder: (context, state) => const StudentFlashcardsHistoryScreen(),
+      ),
+      GoRoute(
+        path: StudentFlashcardsScreen.difficultyRoute,
+        builder: (context, state) => const StudentFlashcardsDifficultyScreen(),
+      ),
+      GoRoute(
+        path: StudentFlashcardsScreen.analyticsRoute,
+        builder: (context, state) => const StudentFlashcardsAnalyticsScreen(),
+      ),
+      GoRoute(
+        path: StudentFlashcardsScreen.quickReviewRoute,
+        builder: (context, state) => const StudentFlashcardQuickReviewScreen(),
       ),
       GoRoute(
         path: '/student/flashcards/:id/review',
-        builder: (context, state) => const StudentPlaceholderScreen(feature: 'flashcards'),
+        builder: (context, state) => StudentFlashcardReviewScreen(
+          packId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        ),
       ),
       GoRoute(
         path: '/student/flashcards/:id',
-        builder: (context, state) => const StudentPlaceholderScreen(feature: 'flashcards'),
+        builder: (context, state) => StudentFlashcardDetailsScreen(
+          packId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        ),
       ),
       GoRoute(
         path: StudentExamsScreen.route,

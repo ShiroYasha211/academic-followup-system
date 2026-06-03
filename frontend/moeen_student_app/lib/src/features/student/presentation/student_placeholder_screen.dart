@@ -15,7 +15,7 @@ class StudentPlaceholderScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = _labels[feature] ?? 'مسار قادم';
-    final isWorkingOn = feature == 'flashcards' || feature == 'tree-farm';
+    final isWorkingOn = feature == 'flashcards';
 
     return StudentShell(
       currentIndex: 3,

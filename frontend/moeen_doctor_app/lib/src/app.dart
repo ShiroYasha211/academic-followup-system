@@ -178,7 +178,7 @@ class _MoeenStaffAppState extends ConsumerState<MoeenStaffApp>
   Widget build(BuildContext context) {
     final refreshState = ref.watch(staffRefreshCoordinatorProvider);
     return MaterialApp.router(
-      title: 'Moeen Staff',
+      title: 'Moeen Doctor',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       routerConfig: ref.watch(appRouterProvider),

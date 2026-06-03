@@ -86,7 +86,7 @@ final studentStarsBalanceProvider = FutureProvider.autoDispose<int>((
       0;
   if (raw is num) return raw.toInt();
   return int.tryParse(raw.toString()) ?? 0;
-});
+    });
 
 class StudentShell extends ConsumerStatefulWidget {
   const StudentShell({
@@ -98,6 +98,8 @@ class StudentShell extends ConsumerStatefulWidget {
     this.safeAreaBottom = true,
     this.parentRoute,
     this.onBackPressed,
+    this.resizeToAvoidBottomInset,
+    this.disableDrawer = false,
   });
 
   final int currentIndex;
@@ -107,6 +109,8 @@ class StudentShell extends ConsumerStatefulWidget {
   final bool safeAreaBottom;
   final String? parentRoute;
   final Future<bool> Function()? onBackPressed;
+  final bool? resizeToAvoidBottomInset;
+  final bool disableDrawer;
 
   @override
   ConsumerState<StudentShell> createState() => _StudentShellState();
@@ -116,15 +120,19 @@ class _StudentShellState extends ConsumerState<StudentShell>
     with WidgetsBindingObserver {
   Timer? _refreshTimer;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _flashcardPromptOpen = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _refreshTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => _refreshBadges(),
-    );
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _refreshBadges();
+      _maybeShowFlashcardPrompt();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowFlashcardPrompt();
+    });
   }
 
   @override
@@ -136,8 +144,14 @@ class _StudentShellState extends ConsumerState<StudentShell>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      unawaited(scheduleStudentFlashcardSmartReviewNotification(ref));
+    }
     if (state == AppLifecycleState.resumed) {
       _refreshBadges();
+      _maybeShowFlashcardPrompt();
     }
   }
 
@@ -146,6 +160,27 @@ class _StudentShellState extends ConsumerState<StudentShell>
     ref.invalidate(studentUnreadScreenCountsProvider);
     ref.invalidate(studentUnreadMessagesCountProvider);
     ref.invalidate(studentStarsBalanceProvider);
+  }
+
+  Future<void> _maybeShowFlashcardPrompt() async {
+    if (!mounted || _flashcardPromptOpen) return;
+    final path = GoRouterState.of(context).uri.path;
+    if (path == StudentFlashcardsScreen.quickReviewRoute ||
+        path.endsWith('/review') ||
+        path.startsWith('/student/quizzes')) {
+      return;
+    }
+    _flashcardPromptOpen = true;
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 650));
+      if (!mounted) return;
+      await showStudentFlashcardSmartReviewPrompt(
+        context: context,
+        ref: ref,
+      );
+    } finally {
+      _flashcardPromptOpen = false;
+    }
   }
 
   Future<void> _handleSystemBack() async {
@@ -216,6 +251,7 @@ class _StudentShellState extends ConsumerState<StudentShell>
         key: _scaffoldKey,
         extendBodyBehindAppBar: true,
         backgroundColor: AppColors.cream,
+        resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset,
         appBar: _PremiumAppBar(
           title: widget.title,
           session: session,
@@ -223,10 +259,12 @@ class _StudentShellState extends ConsumerState<StudentShell>
           starsBalance: starsBalance,
           hasBackTarget: hasBackTarget,
           onLeadingPressed: () => unawaited(_handleAppBarLeading()),
+          disableActions: widget.disableDrawer,
         ),
         body: SafeArea(bottom: widget.safeAreaBottom, child: widget.child),
         floatingActionButton: widget.floatingActionButton,
-        drawer: _StudentDrawer(currentIndex: widget.currentIndex),
+        drawer: widget.disableDrawer ? null : _StudentDrawer(currentIndex: widget.currentIndex),
+        drawerEnableOpenDragGesture: !widget.disableDrawer,
       ),
     );
   }
@@ -240,6 +278,7 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.starsBalance,
     required this.hasBackTarget,
     required this.onLeadingPressed,
+    this.disableActions = false,
   });
   final String title;
   final AuthSession? session;
@@ -247,6 +286,7 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int starsBalance;
   final bool hasBackTarget;
   final VoidCallback onLeadingPressed;
+  final bool disableActions;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 8);
@@ -305,131 +345,133 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
             ],
           ),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
-              child: InkWell(
-                onTap: () => context.go(StudentStarsScreen.route),
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  height: 42,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.gold.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: AppColors.gold.withValues(alpha: 0.18),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.stars_rounded,
-                        color: AppColors.goldDeep,
-                        size: 19,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        starsBalance > 999 ? '999+' : starsBalance.toString(),
-                        style: const TextStyle(
-                          color: AppColors.royalBlueDark,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: AppColors.gold.withValues(alpha: 0.12),
+          actions: disableActions
+              ? const []
+              : [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                    child: InkWell(
+                      onTap: () => context.go(StudentStarsScreen.route),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: AppColors.gold.withValues(alpha: 0.18),
-                      ),
-                    ),
-                    child: IconButton(
-                      onPressed: () =>
-                          context.go(StudentNotificationsScreen.route),
-                      icon: const Icon(
-                        Icons.notifications_active_rounded,
-                        color: AppColors.goldDeep,
-                        size: 21,
-                      ),
-                      tooltip: 'التنبيهات',
-                    ),
-                  ),
-                  if (unreadNotifications > 0)
-                    Positioned(
-                      top: -2,
-                      right: -2,
                       child: Container(
-                        constraints: const BoxConstraints(
-                          minWidth: 19,
-                          minHeight: 19,
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 5),
+                        height: 42,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
                         decoration: BoxDecoration(
-                          color: AppColors.danger,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          unreadNotifications > 99
-                              ? '99+'
-                              : unreadNotifications.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            height: 1,
+                          color: AppColors.gold.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: AppColors.gold.withValues(alpha: 0.18),
                           ),
                         ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.stars_rounded,
+                              color: AppColors.goldDeep,
+                              size: 19,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              starsBalance > 999 ? '999+' : starsBalance.toString(),
+                              style: const TextStyle(
+                                color: AppColors.royalBlueDark,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                ],
-              ),
-            ),
-            if (session?.isPracticalDelegate == true)
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.gold, AppColors.goldDeep],
                   ),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.gold.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: AppColors.gold.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: AppColors.gold.withValues(alpha: 0.18),
+                            ),
+                          ),
+                          child: IconButton(
+                            onPressed: () =>
+                                context.go(StudentNotificationsScreen.route),
+                            icon: const Icon(
+                              Icons.notifications_active_rounded,
+                              color: AppColors.goldDeep,
+                              size: 21,
+                            ),
+                            tooltip: 'التنبيهات',
+                          ),
+                        ),
+                        if (unreadNotifications > 0)
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: Container(
+                              constraints: const BoxConstraints(
+                                minWidth: 19,
+                                minHeight: 19,
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 5),
+                              decoration: BoxDecoration(
+                                color: AppColors.danger,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                unreadNotifications > 99
+                                    ? '99+'
+                                    : unreadNotifications.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child: const Text(
-                  'مندوب',
-                  style: TextStyle(
-                    color: AppColors.royalBlueDark,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 10,
                   ),
-                ),
-              ),
-            const SizedBox(width: 8),
-          ],
+                  if (session?.isPracticalDelegate == true)
+                    Container(
+                      margin: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppColors.gold, AppColors.goldDeep],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.gold.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        'مندوب',
+                        style: TextStyle(
+                          color: AppColors.royalBlueDark,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                ],
         ),
       ),
     );

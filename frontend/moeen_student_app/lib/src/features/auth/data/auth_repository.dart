@@ -1,21 +1,24 @@
+import '../../../core/device/device_identity_service.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import 'academic_option.dart';
 import 'auth_session.dart';
 
 class AuthRepository {
-  AuthRepository(this._api);
+  AuthRepository(this._api, this._deviceIdentity);
 
   final ApiClient _api;
+  final DeviceIdentityService _deviceIdentity;
 
   Future<AuthSession> login({
     required String login,
     required String password,
   }) async {
     try {
+      final device = await _deviceIdentity.loginPayload();
       final response = await _api.post(
         '/student/login',
-        data: {'login': login, 'password': password},
+        data: {'login': login, 'password': password, 'device': device},
       );
       return _sessionFromStudentResponse(response);
     } on ApiException catch (error) {

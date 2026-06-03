@@ -200,7 +200,9 @@ class _AdministrativeSubjectSelectorViewState
           return _ScaffoldBody(
             loading: snapshot.connectionState == ConnectionState.waiting,
             error: snapshot.error,
-            onRetry: () => setState(() => _future = _fetch()),
+            onRetry: () => setState(() {
+              _future = _fetch();
+            }),
             child: _buildContent(_map(snapshot.data?['data'])),
           );
         },
@@ -229,7 +231,13 @@ class _AdministrativeSubjectSelectorViewState
     }).toList();
 
     return RefreshIndicator(
-      onRefresh: () async => setState(() => _future = _fetch()),
+      onRefresh: () {
+        final future = _fetch();
+        setState(() {
+          _future = future;
+        });
+        return future;
+      },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
@@ -337,7 +345,9 @@ class _AdministrativeLevelSelectorViewState
           return _ScaffoldBody(
             loading: snapshot.connectionState == ConnectionState.waiting,
             error: snapshot.error,
-            onRetry: () => setState(() => _future = _fetch()),
+            onRetry: () => setState(() {
+              _future = _fetch();
+            }),
             child: _buildContent(_map(snapshot.data?['data'])),
           );
         },
@@ -356,7 +366,13 @@ class _AdministrativeLevelSelectorViewState
     final color = _isThreshold ? AppColors.danger : AppColors.teal;
 
     return RefreshIndicator(
-      onRefresh: () async => setState(() => _future = _fetch()),
+      onRefresh: () {
+        final future = _fetch();
+        setState(() {
+          _future = future;
+        });
+        return future;
+      },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
@@ -514,7 +530,9 @@ class _AdministrativeSubjectReportViewState
           return _ScaffoldBody(
             loading: snapshot.connectionState == ConnectionState.waiting,
             error: snapshot.error,
-            onRetry: () => setState(() => _future = _fetch()),
+            onRetry: () => setState(() {
+              _future = _fetch();
+            }),
             child: _buildReport(_map(snapshot.data?['data'])),
           );
         },
@@ -537,7 +555,13 @@ class _AdministrativeSubjectReportViewState
     }).toList();
 
     return RefreshIndicator(
-      onRefresh: () async => setState(() => _future = _fetch()),
+      onRefresh: () {
+        final future = _fetch();
+        setState(() {
+          _future = future;
+        });
+        return future;
+      },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
@@ -712,7 +736,9 @@ class _AdministrativeThresholdReportViewState
           return _ScaffoldBody(
             loading: snapshot.connectionState == ConnectionState.waiting,
             error: snapshot.error,
-            onRetry: () => setState(() => _future = _fetch()),
+            onRetry: () => setState(() {
+              _future = _fetch();
+            }),
             child: _buildReport(_map(snapshot.data?['data'])),
           );
         },
@@ -738,7 +764,13 @@ class _AdministrativeThresholdReportViewState
     final warningCount = _int(summary['warning_count']);
 
     return RefreshIndicator(
-      onRefresh: () async => setState(() => _future = _fetch()),
+      onRefresh: () {
+        final future = _fetch();
+        setState(() {
+          _future = future;
+        });
+        return future;
+      },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
@@ -943,7 +975,9 @@ class _AdministrativeLevelSummaryReportViewState
           return _ScaffoldBody(
             loading: snapshot.connectionState == ConnectionState.waiting,
             error: snapshot.error,
-            onRetry: () => setState(() => _future = _fetch()),
+            onRetry: () => setState(() {
+              _future = _fetch();
+            }),
             child: _buildReport(_map(snapshot.data?['data'])),
           );
         },
@@ -966,7 +1000,13 @@ class _AdministrativeLevelSummaryReportViewState
             : AppColors.danger;
 
     return RefreshIndicator(
-      onRefresh: () async => setState(() => _future = _fetch()),
+      onRefresh: () {
+        final future = _fetch();
+        setState(() {
+          _future = future;
+        });
+        return future;
+      },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
@@ -1132,7 +1172,9 @@ class _AdministrativeDoctorPerformanceReportViewState
           return _ScaffoldBody(
             loading: snapshot.connectionState == ConnectionState.waiting,
             error: snapshot.error,
-            onRetry: () => setState(() => _future = _fetch()),
+            onRetry: () => setState(() {
+              _future = _fetch();
+            }),
             child: _buildReport(_map(snapshot.data?['data'])),
           );
         },
@@ -1145,7 +1187,13 @@ class _AdministrativeDoctorPerformanceReportViewState
     final doctors = _list(data['doctors']);
 
     return RefreshIndicator(
-      onRefresh: () async => setState(() => _future = _fetch()),
+      onRefresh: () {
+        final future = _fetch();
+        setState(() {
+          _future = future;
+        });
+        return future;
+      },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
@@ -1264,7 +1312,9 @@ class _AdministrativeComparisonReportViewState
           return _ScaffoldBody(
             loading: snapshot.connectionState == ConnectionState.waiting,
             error: snapshot.error,
-            onRetry: () => setState(() => _future = _fetch()),
+            onRetry: () => setState(() {
+              _future = _fetch();
+            }),
             child: _buildReport(_map(snapshot.data?['data'])),
           );
         },
@@ -1276,7 +1326,13 @@ class _AdministrativeComparisonReportViewState
     final summary = _map(data['summary']);
     final items = _list(data['items']);
     return RefreshIndicator(
-      onRefresh: () async => setState(() => _future = _fetch()),
+      onRefresh: () {
+        final future = _fetch();
+        setState(() {
+          _future = future;
+        });
+        return future;
+      },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [

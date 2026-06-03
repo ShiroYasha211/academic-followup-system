@@ -558,6 +558,15 @@ class StudentContentRepository {
     return (response['message'] ?? 'تم تسجيل التصويت بنجاح.').toString();
   }
 
+  Future<String> retractVoteNotification({
+    required int notificationId,
+  }) async {
+    final response = await _api.delete(
+      '/student/notifications/$notificationId/vote',
+    );
+    return (response['message'] ?? 'تم سحب التصويت بنجاح.').toString();
+  }
+
   Future<Map<String, dynamic>> authorizedGrades() async {
     return _cachedMap(
       cache: _cache,

@@ -1860,7 +1860,7 @@ class _IconInfo extends StatelessWidget {
   }
 }
 
-class _NewsCard extends StatelessWidget {
+class _NewsCard extends ConsumerWidget {
   const _NewsCard(
     this.item, {
     this.isLast = false,
@@ -1874,339 +1874,297 @@ class _NewsCard extends StatelessWidget {
   final Future<void> Function(Map<String, dynamic> item)? onOpen;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final source = text(item, 'source');
     final color = _sourceColor(source);
     final attachment = absoluteUrl(text(item, 'attachment_url'));
     final hasImage = attachment.isNotEmpty && isImageUrl(attachment);
+    final title = text(item, 'title', fallback: 'إعلان');
+    final excerpt = text(item, 'excerpt', fallback: text(item, 'body'));
+    final isUnread = text(item, 'id').startsWith('center-') && text(item, 'read_at').isEmpty;
+    final isBookmarked = ref.watch(newsBookmarksProvider).any((b) => text(b, 'id') == text(item, 'id'));
 
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Timeline indicator
-          SizedBox(
-            width: 32,
-            child: Column(
-              children: [
-                Container(
-                  width: isPinned ? 16 : 12,
-                  height: isPinned ? 16 : 12,
-                  decoration: BoxDecoration(
-                    color: isPinned ? AppColors.royalBlue : color,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (isPinned ? AppColors.royalBlue : color)
-                            .withValues(alpha: 0.3),
-                        blurRadius: isPinned ? 10 : 6,
-                        spreadRadius: isPinned ? 2 : 1,
+    final IconData publisherIcon = switch (source) {
+      'doctor' => Icons.school_rounded,
+      'delegate' => Icons.groups_rounded,
+      _ => Icons.account_balance_rounded,
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isPinned 
+              ? AppColors.royalBlue.withValues(alpha: 0.25)
+              : Colors.grey.shade100,
+          width: isPinned ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isPinned 
+                ? AppColors.royalBlue.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () async {
+            await onOpen?.call(item);
+            if (context.mounted) {
+              context.push('/student/news/details', extra: item);
+            }
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (hasImage)
+                SizedBox(
+                  height: 180,
+                  width: double.infinity,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.network(
+                        attachment,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: AppColors.slate50,
+                            child: const Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.slate200,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (_, __, ___) => const _NewsImageFallback(height: 180),
+                      ),
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.4),
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.6),
+                              ],
+                              stops: const [0.0, 0.5, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (isPinned)
+                        Positioned(
+                          top: 12,
+                          left: 12,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.royalBlue,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.push_pin_rounded, color: Colors.white, size: 12),
+                                SizedBox(width: 4),
+                                Text(
+                                  'مثبت',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: _MiniBadge(
+                          label: _sourceLabel(source),
+                          color: color,
+                          blur: true,
+                        ),
                       ),
                     ],
                   ),
-                  child: isPinned
-                      ? const Icon(
-                          Icons.push_pin_rounded,
-                          size: 8,
-                          color: Colors.white,
-                        )
-                      : null,
                 ),
-                if (!isLast)
-                  Expanded(
-                    child: Container(
-                      width: 2,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            color.withValues(alpha: 0.5),
-                            color.withValues(alpha: 0.05),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 24),
-              decoration: BoxDecoration(
-                color: isPinned
-                    ? AppColors.royalBlue.withValues(alpha: 0.03)
-                    : Colors.white,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  bottomLeft: Radius.circular(24),
-                  bottomRight: Radius.circular(24),
-                  topRight: Radius.circular(4),
-                ),
-                border: Border.all(
-                  color: isPinned
-                      ? AppColors.royalBlue.withValues(alpha: 0.25)
-                      : color.withValues(alpha: 0.08),
-                  width: isPinned ? 1.5 : 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: isPinned
-                        ? AppColors.royalBlue.withValues(alpha: 0.08)
-                        : AppColors.midnight.withValues(alpha: 0.04),
-                    blurRadius: isPinned ? 20 : 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: () async {
-                  await onOpen?.call(item);
-                  if (context.mounted) {
-                    context.push('/student/news/details', extra: item);
-                  }
-                },
+              Padding(
+                padding: const EdgeInsets.all(18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Pin banner for pinned items
-                    if (isPinned)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              AppColors.royalBlue.withValues(alpha: 0.08),
-                              AppColors.royalBlue.withValues(alpha: 0.03),
+                    Row(
+                      children: [
+                        if (!hasImage) ...[
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(publisherIcon, color: color, size: 18),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _sourceLabel(source),
+                                style: TextStyle(
+                                  color: color,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                text(item, 'author_name', fallback: 'النظام'),
+                                style: const TextStyle(
+                                  color: AppColors.slate500,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ],
                           ),
+                        ] else ...[
+                          Icon(Icons.person_outline_rounded, color: AppColors.slate400, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            text(item, 'author_name', fallback: 'النظام'),
+                            style: const TextStyle(
+                              color: AppColors.slate500,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        IconButton(
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          icon: Icon(
+                            isBookmarked
+                                ? Icons.bookmark_rounded
+                                : Icons.bookmark_border_rounded,
+                            size: 18,
+                            color: isBookmarked
+                                ? AppColors.royalBlue
+                                : AppColors.slate400,
+                          ),
+                          onPressed: () {
+                            ref.read(newsBookmarksProvider.notifier).toggleBookmark(item);
+                          },
+                        ),
+                        if (isUnread)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            margin: const EdgeInsets.symmetric(horizontal: 6),
+                            decoration: const BoxDecoration(
+                              color: AppColors.info,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.info,
+                                  blurRadius: 6,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                          ),
+                        Icon(
+                          Icons.access_time_rounded,
+                          size: 12,
+                          color: AppColors.slate400,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          timeAgo(text(item, 'created_at')),
+                          style: const TextStyle(
+                            color: AppColors.slate500,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        height: 1.35,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      excerpt,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.slate600,
+                        height: 1.5,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (attachment.isNotEmpty && !hasImage) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: color.withValues(alpha: 0.1)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(
-                              Icons.push_pin_rounded,
-                              size: 14,
-                              color: AppColors.royalBlue,
-                            ),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'إعلان مثبت',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.royalBlue,
+                            Icon(Icons.attach_file_rounded, color: color, size: 16),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'يوجد ملف مرفق جاهز للتحميل',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.slate700,
+                                ),
                               ),
                             ),
+                            Icon(Icons.arrow_back_ios_new_rounded, size: 10, color: color),
                           ],
                         ),
                       ),
-                    if (hasImage)
-                      SizedBox(
-                        height: 160,
-                        width: double.infinity,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Image.network(
-                              attachment,
-                              fit: BoxFit.cover,
-                              loadingBuilder:
-                                  (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return Container(
-                                      color: AppColors.slate50,
-                                      child: const Center(
-                                        child: SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: AppColors.slate200,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                              errorBuilder: (_, __, ___) =>
-                                  const _NewsImageFallback(height: 160),
-                            ),
-                            Positioned(
-                              top: 12,
-                              right: 12,
-                              child: _MiniBadge(
-                                label: _sourceLabel(source),
-                                color: color,
-                                blur: true,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (!hasImage)
-                            Row(
-                              children: [
-                                _MiniBadge(
-                                  label: _sourceLabel(source),
-                                  color: color,
-                                ),
-                                const Spacer(),
-                                Icon(
-                                  Icons.access_time_rounded,
-                                  size: 14,
-                                  color: AppColors.slate400,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  timeAgo(text(item, 'created_at')),
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: AppColors.slate500,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          if (!hasImage) const SizedBox(height: 12),
-                          Text(
-                            text(item, 'title', fallback: 'إعلان'),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              height: 1.3,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            text(item, 'excerpt', fallback: text(item, 'body')),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: AppColors.slate600,
-                              height: 1.5,
-                              fontSize: 13,
-                            ),
-                          ),
-                          if (hasImage) ...[
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.access_time_rounded,
-                                  size: 14,
-                                  color: AppColors.slate400,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  timeAgo(text(item, 'created_at')),
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(color: AppColors.slate500),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  'عرض التفاصيل',
-                                  style: TextStyle(
-                                    color: color,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.arrow_back_ios_new_rounded,
-                                  size: 10,
-                                  color: color,
-                                ),
-                              ],
-                            ),
-                          ] else if (attachment.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            InkWell(
-                              onTap: () => _downloadUrlToFile(
-                                context,
-                                attachment,
-                                text(item, 'title', fallback: 'مرفق الإعلان'),
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: color.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: color.withValues(alpha: 0.2),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: color.withValues(alpha: 0.15),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        Icons.attach_file_rounded,
-                                        size: 16,
-                                        color: color,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          const Text(
-                                            'مرفق مع الإعلان',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                          Text(
-                                            'اضغط للتحميل والعرض',
-                                            style: TextStyle(
-                                              color: AppColors.slate500,
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Icon(
-                                      Icons.file_download_rounded,
-                                      size: 20,
-                                      color: color,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                    ],
                   ],
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -2218,86 +2176,83 @@ class _NewsSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 32,
-              child: Column(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Container(
+        height: 160,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.grey.shade100),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
                   Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: AppColors.slate200,
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: AppColors.slate100,
                       shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: Container(width: 2, color: AppColors.slate100),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Container(
-                height: 140,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppColors.slate100),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
+                  const SizedBox(width: 10),
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 60,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              color: AppColors.slate100,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          const Spacer(),
-                          Container(
-                            width: 80,
-                            height: 16,
-                            color: AppColors.ghostWhite,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
                       Container(
-                        width: double.infinity,
-                        height: 20,
+                        width: 60,
+                        height: 12,
                         decoration: BoxDecoration(
                           color: AppColors.slate100,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 4),
                       Container(
-                        width: 200,
-                        height: 16,
+                        width: 40,
+                        height: 10,
                         decoration: BoxDecoration(
                           color: AppColors.ghostWhite,
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(3),
                         ),
                       ),
                     ],
                   ),
+                  const Spacer(),
+                  Container(
+                    width: 70,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: AppColors.slate100,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: AppColors.slate100,
+                  borderRadius: BorderRadius.circular(4),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Container(
+                width: 220,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: AppColors.ghostWhite,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -4300,70 +4255,6 @@ class _QuestionCardState extends State<_QuestionCard> {
   }
 }
 
-class _SoftTile extends StatelessWidget {
-  const _SoftTile({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    this.trailing,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: AppColors.slate100,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: color),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                    if (subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (trailing != null) trailing!,
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _MiniBadge extends StatelessWidget {
   const _MiniBadge({

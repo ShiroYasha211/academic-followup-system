@@ -38,58 +38,49 @@ class TreeFarmLocalStore {
 class TreeFarmLocalState {
   const TreeFarmLocalState({
     this.activeSession,
-    this.pendingSessions = const [],
     this.pendingThoughts = const [],
     this.pendingPlants = const [],
+    this.localHistoryMetadata = const [],
   });
 
   final Map<String, dynamic>? activeSession;
-  final List<Map<String, dynamic>> pendingSessions;
   final List<Map<String, dynamic>> pendingThoughts;
   final List<Map<String, dynamic>> pendingPlants;
+  final List<Map<String, dynamic>> localHistoryMetadata;
 
   factory TreeFarmLocalState.fromJson(Map<String, dynamic> json) {
     return TreeFarmLocalState(
       activeSession: _mapOrNull(json['active_session']),
-      pendingSessions: _mapList(json['pending_sessions']),
       pendingThoughts: _mapList(json['pending_thoughts']),
       pendingPlants: _mapList(json['pending_plants']),
+      localHistoryMetadata: _mapList(json['local_history_metadata']),
     );
   }
 
   TreeFarmLocalState copyWith({
     Map<String, dynamic>? activeSession,
     bool clearActiveSession = false,
-    List<Map<String, dynamic>>? pendingSessions,
     List<Map<String, dynamic>>? pendingThoughts,
     List<Map<String, dynamic>>? pendingPlants,
+    List<Map<String, dynamic>>? localHistoryMetadata,
   }) {
     return TreeFarmLocalState(
       activeSession: clearActiveSession
           ? null
           : activeSession ?? this.activeSession,
-      pendingSessions: pendingSessions ?? this.pendingSessions,
       pendingThoughts: pendingThoughts ?? this.pendingThoughts,
       pendingPlants: pendingPlants ?? this.pendingPlants,
+      localHistoryMetadata: localHistoryMetadata ?? this.localHistoryMetadata,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'active_session': activeSession,
-      'pending_sessions': pendingSessions,
       'pending_thoughts': pendingThoughts,
       'pending_plants': pendingPlants,
+      'local_history_metadata': localHistoryMetadata,
     };
-  }
-
-  bool get hasExpiredPendingSession {
-    final cutoff = DateTime.now().toUtc().subtract(const Duration(hours: 24));
-    return pendingSessions.any((session) {
-      final raw = session['started_at']?.toString();
-      final startedAt = raw == null ? null : DateTime.tryParse(raw)?.toUtc();
-      return startedAt != null && startedAt.isBefore(cutoff);
-    });
   }
 }
 

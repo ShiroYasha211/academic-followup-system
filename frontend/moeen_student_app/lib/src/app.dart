@@ -10,6 +10,7 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/logic/auth_controller.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/student/logic/student_controllers.dart';
+import 'features/student/presentation/student_content_screens.dart';
 import 'features/student/presentation/widgets/student_shell.dart';
 import 'shared/widgets/download_banner_overlay.dart';
 import 'shared/widgets/offline_banner.dart';
@@ -70,6 +71,14 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp> {
         PushNotificationService.storePendingNavigationPath(path);
         router.go(LoginScreen.route);
         return;
+      }
+      if (path == StudentFlashcardsScreen.quickReviewRoute) {
+        final shown = await showStudentFlashcardSmartReviewPrompt(
+          context: context,
+          ref: ref,
+          force: true,
+        );
+        if (shown) return;
       }
       router.go(path);
     } catch (_) {
