@@ -15,6 +15,10 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   );
 });
 
+final publicSupportSettingsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  return ref.watch(authRepositoryProvider).fetchPublicSupportSettings();
+});
+
 final authControllerProvider =
     AsyncNotifierProvider<AuthController, AuthSession?>(AuthController.new);
 

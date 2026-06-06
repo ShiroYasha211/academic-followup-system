@@ -14,6 +14,9 @@ import 'features/student/presentation/student_content_screens.dart';
 import 'features/student/presentation/widgets/student_shell.dart';
 import 'shared/widgets/download_banner_overlay.dart';
 import 'shared/widgets/offline_banner.dart';
+import 'core/network/global_error_provider.dart';
+import 'core/theme/app_colors.dart';
+import 'shared/widgets/moeen_dialogs.dart';
 
 class MoeenStudentApp extends ConsumerStatefulWidget {
   const MoeenStudentApp({super.key});
@@ -26,6 +29,7 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp> {
   StreamSubscription<String>? _notificationNavigationSubscription;
   StreamSubscription<Map<String, dynamic>>? _notificationRefreshSubscription;
   ProviderSubscription<AsyncValue<bool>>? _onlineStatusSubscription;
+  bool _dialogShowing = false;
 
   @override
   void initState() {
@@ -95,8 +99,64 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp> {
     super.dispose();
   }
 
+  void _showCompulsoryErrorDialog(GlobalDeviceError error) {
+    if (_dialogShowing) return;
+    _dialogShowing = true;
+
+    final context = rootNavigatorKey.currentContext;
+    if (context == null) {
+      _dialogShowing = false;
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PopScope(
+        canPop: false,
+        child: MoeenDialog(
+          title: 'صلاحية الجهاز',
+          message: error.message,
+          icon: Icons.warning_amber_rounded,
+          color: AppColors.danger,
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () async {
+                  _dialogShowing = false;
+                  Navigator.pop(context);
+                  await ref.read(authControllerProvider.notifier).logout();
+                  ref.read(globalDeviceErrorProvider.notifier).state = null;
+                  ref.read(appRouterProvider).go(LoginScreen.route);
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.danger,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'العودة إلى صفحة تسجيل الدخول',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen<GlobalDeviceError?>(globalDeviceErrorProvider, (previous, next) {
+      if (next != null) {
+        _showCompulsoryErrorDialog(next);
+      }
+    });
+
     final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(

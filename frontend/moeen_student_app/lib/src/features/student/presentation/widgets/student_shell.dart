@@ -86,7 +86,7 @@ final studentStarsBalanceProvider = FutureProvider.autoDispose<int>((
       0;
   if (raw is num) return raw.toInt();
   return int.tryParse(raw.toString()) ?? 0;
-    });
+});
 
 class StudentShell extends ConsumerStatefulWidget {
   const StudentShell({
@@ -147,7 +147,10 @@ class _StudentShellState extends ConsumerState<StudentShell>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden) {
-      unawaited(scheduleStudentFlashcardSmartReviewNotification(ref));
+      final session = ref.read(authControllerProvider).valueOrNull;
+      if (session?.isSecondaryDevice != true) {
+        unawaited(scheduleStudentFlashcardSmartReviewNotification(ref));
+      }
     }
     if (state == AppLifecycleState.resumed) {
       _refreshBadges();
@@ -164,6 +167,8 @@ class _StudentShellState extends ConsumerState<StudentShell>
 
   Future<void> _maybeShowFlashcardPrompt() async {
     if (!mounted || _flashcardPromptOpen) return;
+    final session = ref.read(authControllerProvider).valueOrNull;
+    if (session?.isSecondaryDevice == true) return;
     final path = GoRouterState.of(context).uri.path;
     if (path == StudentFlashcardsScreen.quickReviewRoute ||
         path.endsWith('/review') ||
@@ -174,10 +179,7 @@ class _StudentShellState extends ConsumerState<StudentShell>
     try {
       await Future<void>.delayed(const Duration(milliseconds: 650));
       if (!mounted) return;
-      await showStudentFlashcardSmartReviewPrompt(
-        context: context,
-        ref: ref,
-      );
+      await showStudentFlashcardSmartReviewPrompt(context: context, ref: ref);
     } finally {
       _flashcardPromptOpen = false;
     }
@@ -263,7 +265,9 @@ class _StudentShellState extends ConsumerState<StudentShell>
         ),
         body: SafeArea(bottom: widget.safeAreaBottom, child: widget.child),
         floatingActionButton: widget.floatingActionButton,
-        drawer: widget.disableDrawer ? null : _StudentDrawer(currentIndex: widget.currentIndex),
+        drawer: widget.disableDrawer
+            ? null
+            : _StudentDrawer(currentIndex: widget.currentIndex),
         drawerEnableOpenDragGesture: !widget.disableDrawer,
       ),
     );
@@ -349,7 +353,10 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
               ? const []
               : [
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 2,
+                    ),
                     child: InkWell(
                       onTap: () => context.go(StudentStarsScreen.route),
                       borderRadius: BorderRadius.circular(14),
@@ -373,7 +380,9 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
                             ),
                             const SizedBox(width: 5),
                             Text(
-                              starsBalance > 999 ? '999+' : starsBalance.toString(),
+                              starsBalance > 999
+                                  ? '999+'
+                                  : starsBalance.toString(),
                               style: const TextStyle(
                                 color: AppColors.royalBlueDark,
                                 fontWeight: FontWeight.w900,
@@ -386,7 +395,10 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 4,
+                    ),
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
@@ -420,11 +432,16 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
                                 minWidth: 19,
                                 minHeight: 19,
                               ),
-                              padding: const EdgeInsets.symmetric(horizontal: 5),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.danger,
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.white, width: 2),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
                               ),
                               alignment: Alignment.center,
                               child: Text(
@@ -445,7 +462,10 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
                   if (session?.isPracticalDelegate == true)
                     Container(
-                      margin: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                      margin: const EdgeInsets.symmetric(
+                        vertical: 14,
+                        horizontal: 8,
+                      ),
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
@@ -508,6 +528,7 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
         const <String, int>{};
     final unreadMessages =
         ref.watch(studentUnreadMessagesCountProvider).valueOrNull ?? 0;
+    final isSecondaryDevice = session?.isSecondaryDevice == true;
 
     final groups = [
       _DrawerGroup('القائمة الرئيسية', [
@@ -524,6 +545,7 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           20,
           StudentQrScanScreen.route,
           false,
+          true,
         ),
       ]),
       _DrawerGroup('حساب الطالب', [
@@ -590,6 +612,7 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           Icons.bolt_rounded,
           15,
           StudentFlashcardsScreen.route,
+          true,
           true,
         ),
         _DrawerItem(
@@ -665,6 +688,7 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           Icons.quiz_rounded,
           7,
           StudentQuizzesScreen.route,
+          true,
           true,
         ),
         _DrawerItem(
@@ -798,6 +822,8 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
                           item: item,
                           isSubscribed: isSubscribed,
                           selected: item.index == widget.currentIndex,
+                          blockedBySecondaryDevice:
+                              isSecondaryDevice && item.requiresPrimaryDevice,
                           badgeCount:
                               item.route == StudentNotificationsScreen.route
                               ? unreadNotifications
@@ -872,6 +898,19 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
   }
 
   Future<void> _go(_DrawerItem item) async {
+    final session = ref.read(authControllerProvider).valueOrNull;
+    if (item.requiresPrimaryDevice && session?.isSecondaryDevice == true) {
+      await showMoeenInfoDialog(
+        context: context,
+        title: 'متاح من الجهاز الأساسي فقط',
+        message:
+            'هذه الميزة لا تعمل من الجهاز الفرعي. استخدم الجهاز الأساسي للحضور، الكويزات، وOne Line Shot.',
+        icon: Icons.phone_android_rounded,
+        color: AppColors.orange,
+      );
+      return;
+    }
+
     if (!item.requiresSubscription) {
       Navigator.pop(context);
       _navigate(item);
@@ -1113,6 +1152,7 @@ class _DrawerTile extends StatelessWidget {
     required this.item,
     required this.isSubscribed,
     required this.selected,
+    required this.blockedBySecondaryDevice,
     required this.badgeCount,
     required this.onTap,
   });
@@ -1120,6 +1160,7 @@ class _DrawerTile extends StatelessWidget {
   final _DrawerItem item;
   final bool isSubscribed;
   final bool selected;
+  final bool blockedBySecondaryDevice;
   final int badgeCount;
   final VoidCallback onTap;
 
@@ -1167,13 +1208,19 @@ class _DrawerTile extends StatelessWidget {
                   ),
                 ),
               )
-            : (item.requiresSubscription && !isSubscribed
+            : (blockedBySecondaryDevice
                   ? const Icon(
-                      Icons.lock_rounded,
+                      Icons.phone_locked_rounded,
                       size: 16,
                       color: AppColors.slate300,
                     )
-                  : null),
+                  : (item.requiresSubscription && !isSubscribed
+                        ? const Icon(
+                            Icons.lock_rounded,
+                            size: 16,
+                            color: AppColors.slate300,
+                          )
+                        : null)),
       ),
     );
   }
@@ -1191,13 +1238,15 @@ class _DrawerItem {
     this.icon,
     this.index,
     this.route,
-    this.requiresSubscription,
-  );
+    this.requiresSubscription, [
+    this.requiresPrimaryDevice = false,
+  ]);
   final String label;
   final IconData icon;
   final int index;
   final String route;
   final bool requiresSubscription;
+  final bool requiresPrimaryDevice;
 }
 
 Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {

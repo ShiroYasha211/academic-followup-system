@@ -10,6 +10,8 @@ class AuthSession {
     required this.hasClinical,
     this.permissions = const [],
     this.email,
+    this.deviceType,
+    this.isPrimaryDevice,
   });
 
   final String token;
@@ -20,8 +22,12 @@ class AuthSession {
   final bool isPracticalDelegate;
   final bool hasClinical;
   final List<String> permissions;
+  final String? deviceType;
+  final bool? isPrimaryDevice;
 
   bool get isDelegate => workspace == AuthWorkspace.delegate;
+  bool get isSecondaryDevice =>
+      deviceType == 'secondary' || isPrimaryDevice == false;
 
   bool hasPermission(String resource, String action) =>
       permissions.contains('$resource.$action');
@@ -44,6 +50,8 @@ class AuthSession {
     bool? isPracticalDelegate,
     bool? hasClinical,
     List<String>? permissions,
+    String? deviceType,
+    bool? isPrimaryDevice,
   }) {
     return AuthSession(
       token: token ?? this.token,
@@ -54,6 +62,8 @@ class AuthSession {
       isPracticalDelegate: isPracticalDelegate ?? this.isPracticalDelegate,
       hasClinical: hasClinical ?? this.hasClinical,
       permissions: permissions ?? this.permissions,
+      deviceType: deviceType ?? this.deviceType,
+      isPrimaryDevice: isPrimaryDevice ?? this.isPrimaryDevice,
     );
   }
 }

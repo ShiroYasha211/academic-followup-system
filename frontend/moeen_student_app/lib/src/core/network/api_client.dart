@@ -6,8 +6,11 @@ import '../config/app_config.dart';
 import 'api_exception.dart';
 
 class ApiClient {
-  ApiClient({String? token})
-    : _dio = Dio(
+  ApiClient({
+    String? token,
+    void Function(int statusCode, String message, String? errorCode)? onAuthError,
+  })  : _onAuthError = onAuthError,
+        _dio = Dio(
         BaseOptions(
           baseUrl: AppConfig.apiBaseUrl,
           connectTimeout: const Duration(seconds: 20),
@@ -20,6 +23,7 @@ class ApiClient {
       );
 
   final Dio _dio;
+  final void Function(int statusCode, String message, String? errorCode)? _onAuthError;
   String get baseUrl => _dio.options.baseUrl;
 
   Future<Map<String, dynamic>> get(
@@ -80,6 +84,7 @@ class ApiClient {
             final decoded = String.fromCharCodes(data);
             final json = jsonDecode(decoded);
             if (json is Map<String, dynamic>) {
+              _checkAuthError(statusCode, json);
               throw ApiException(
                 (json['message'] ?? 'تعذر تحميل الملف.').toString(),
                 statusCode: statusCode,
@@ -97,9 +102,11 @@ class ApiClient {
     } on DioException catch (error) {
       final data = error.response?.data;
       if (data is Map<String, dynamic>) {
+        final statusCode = error.response?.statusCode ?? 0;
+        _checkAuthError(statusCode, data);
         throw ApiException(
           (data['message'] ?? 'تعذر تحميل الملف.').toString(),
-          statusCode: error.response?.statusCode,
+          statusCode: statusCode,
           errors: data['errors'],
         );
       }
@@ -147,9 +154,11 @@ class ApiClient {
     } on DioException catch (error) {
       final data = error.response?.data;
       if (data is Map<String, dynamic>) {
+        final statusCode = error.response?.statusCode ?? 0;
+        _checkAuthError(statusCode, data);
         throw ApiException(
           (data['message'] ?? 'تعذر تنفيذ الطلب.').toString(),
-          statusCode: error.response?.statusCode,
+          statusCode: statusCode,
           errors: data['errors'],
         );
       }
@@ -163,6 +172,16 @@ class ApiClient {
         statusCode: error.response?.statusCode,
         isOffline: isOffline,
       );
+    }
+  }
+
+  void _checkAuthError(int statusCode, Object? responseData) {
+    if (responseData is Map<String, dynamic>) {
+      if (statusCode == 401) {
+        final errorCode = (responseData['error_code'] ?? responseData['code'])?.toString();
+        final message = (responseData['message'] ?? 'تم إلغاء تنشيط هذا الجهاز أو انتهت صلاحية استخدامه.').toString();
+        _onAuthError?.call(statusCode, message, errorCode);
+      }
     }
   }
 

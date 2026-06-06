@@ -657,3 +657,700 @@ const _volunteerContactMethods = <String, String>{
   'email': 'بريد إلكتروني',
   'other': 'أخرى',
 };
+
+extension _DoctorClinicalRareCaseActions on _DoctorClinicalSectionScreenState {
+  Future<void> _openRareCaseForm({_Json? item}) async {
+    final formKey = GlobalKey<FormState>();
+    final diagnosis = TextEditingController(text: _docText(item?['diagnosis']));
+    final hospital = TextEditingController(text: _docText(item?['hospital']));
+    final department = TextEditingController(
+      text: _docText(item?['department']),
+    );
+    final room = TextEditingController(text: _docText(item?['room_number']));
+    final patientName = TextEditingController(
+      text: _docText(item?['patient_name']),
+    );
+    final signs = TextEditingController(
+      text: _docText(item?['clinical_signs']),
+    );
+    final internalNotes = TextEditingController(
+      text: _docText(item?['internal_notes']),
+    );
+    var status = _docText(item?['status'], 'published');
+    if (!{'draft', 'published', 'closed', 'archived'}.contains(status)) {
+      status = 'published';
+    }
+    PlatformFile? attachment;
+
+    final ok = await showMoeenBottomSheet<bool>(
+      context: context,
+      title: item == null ? 'إعلان حالة نادرة' : 'تعديل إعلان الحالة',
+      icon: Icons.campaign_rounded,
+      color: AppColors.warning,
+      fullScreen: true,
+      child: StatefulBuilder(
+        builder: (context, setLocal) {
+          return Form(
+            key: formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.slate200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.medical_information_rounded,
+                            color: AppColors.royalBlue,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'البيانات الطبية',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.slate800,
+                              fontFamily: 'Cairo',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(
+                        height: 24,
+                        thickness: 1,
+                        color: AppColors.slate100,
+                      ),
+                      TextFormField(
+                        controller: diagnosis,
+                        decoration: InputDecoration(
+                          labelText: 'التشخيص الطبي',
+                          prefixIcon: const Icon(
+                            Icons.medical_services_rounded,
+                            color: AppColors.royalBlue,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.slate50,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.slate200,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.slate200,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.royalBlue,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? 'التشخيص مطلوب.'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: signs,
+                        minLines: 3,
+                        maxLines: 5,
+                        decoration: InputDecoration(
+                          labelText: 'العلامات السريرية وأعراض الحالة',
+                          prefixIcon: const Icon(
+                            Icons.description_rounded,
+                            color: AppColors.royalBlue,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.slate50,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.slate200,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.slate200,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.royalBlue,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.slate200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.local_hospital_rounded,
+                            color: AppColors.teal,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'الموقع والمريض',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.slate800,
+                              fontFamily: 'Cairo',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(
+                        height: 24,
+                        thickness: 1,
+                        color: AppColors.slate100,
+                      ),
+                      TextFormField(
+                        controller: hospital,
+                        decoration: InputDecoration(
+                          labelText: 'المستشفى / المركز',
+                          prefixIcon: const Icon(
+                            Icons.local_hospital_rounded,
+                            color: AppColors.teal,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.slate50,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.slate200,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.slate200,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.teal,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? 'المستشفى مطلوب.'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: department,
+                        decoration: InputDecoration(
+                          labelText: 'القسم الطبي',
+                          prefixIcon: const Icon(
+                            Icons.account_tree_rounded,
+                            color: AppColors.teal,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.slate50,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.slate200,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.slate200,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.teal,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? 'القسم مطلوب.'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: room,
+                              decoration: InputDecoration(
+                                labelText: 'رقم الغرفة',
+                                prefixIcon: const Icon(
+                                  Icons.meeting_room_rounded,
+                                  color: AppColors.slate500,
+                                ),
+                                filled: true,
+                                fillColor: AppColors.slate50,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 14,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.slate200,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.slate200,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.slate500,
+                                    width: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextFormField(
+                              controller: patientName,
+                              decoration: InputDecoration(
+                                labelText: 'اسم المريض (اختياري)',
+                                prefixIcon: const Icon(
+                                  Icons.person_rounded,
+                                  color: AppColors.slate500,
+                                ),
+                                filled: true,
+                                fillColor: AppColors.slate50,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 14,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.slate200,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.slate200,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.slate500,
+                                    width: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.slate200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.image_rounded,
+                            color: AppColors.warning,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'المرفقات والصور',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.slate800,
+                              fontFamily: 'Cairo',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(
+                        height: 24,
+                        thickness: 1,
+                        color: AppColors.slate100,
+                      ),
+                      if (item != null &&
+                          _docText(item['attachment_url']).isNotEmpty) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.warning.withValues(alpha: 0.18),
+                            ),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline_rounded,
+                                color: AppColors.warning,
+                                size: 18,
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'اترك الصورة بدون تغيير إذا كنت تريد الاحتفاظ بالمرفق الحالي.',
+                                  style: TextStyle(
+                                    color: AppColors.slate700,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    fontFamily: 'Cairo',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      InkWell(
+                        onTap: () async {
+                          final result = await FilePicker.platform.pickFiles(
+                            type: FileType.image,
+                          );
+                          if (result?.files.single != null) {
+                            setLocal(() => attachment = result!.files.single);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: attachment == null
+                            ? Container(
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  color: AppColors.slate50,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppColors.slate300,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.add_photo_alternate_rounded,
+                                      color: AppColors.slate400,
+                                      size: 32,
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'إضافة صورة مرفقة (اختياري)',
+                                      style: TextStyle(
+                                        color: AppColors.slate600,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        fontFamily: 'Cairo',
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'اضغط لتحديد ملف الصورة من المعرض',
+                                      style: TextStyle(
+                                        color: AppColors.slate400,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                        fontFamily: 'Cairo',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : Container(
+                                height: 160,
+                                decoration: BoxDecoration(
+                                  color: AppColors.slate50,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppColors.royalBlue.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Image.file(
+                                        File(attachment!.path!),
+                                        fit: BoxFit.cover,
+                                      ),
+                                      Positioned(
+                                        top: 8,
+                                        left: 8,
+                                        child: FloatingActionButton.small(
+                                          heroTag:
+                                              'remove_attachment_rare_case',
+                                          onPressed: () {
+                                            setLocal(() => attachment = null);
+                                          },
+                                          backgroundColor: Colors.white,
+                                          foregroundColor: AppColors.danger,
+                                          child: const Icon(
+                                            Icons.delete_rounded,
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        bottom: 0,
+                                        left: 0,
+                                        right: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
+                                          ),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.6,
+                                          ),
+                                          child: Text(
+                                            attachment!.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              fontFamily: 'Cairo',
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.slate200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.tune_rounded,
+                            color: AppColors.warning,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'إعدادات النشر والمتابعة',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.slate800,
+                              fontFamily: 'Cairo',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(
+                        height: 24,
+                        thickness: 1,
+                        color: AppColors.slate100,
+                      ),
+                      DropdownButtonFormField<String>(
+                        initialValue: status,
+                        decoration: const InputDecoration(labelText: 'الحالة'),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'draft',
+                            child: Text('مسودة'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'published',
+                            child: Text('منشورة'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'closed',
+                            child: Text('مغلقة'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'archived',
+                            child: Text('مؤرشفة'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) status = value;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: internalNotes,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          labelText: 'ملاحظات داخلية لا تظهر للطلاب',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: () {
+                    if (formKey.currentState?.validate() != true) return;
+                    Navigator.pop(context, true);
+                  },
+                  icon: Icon(
+                    item == null ? Icons.send_rounded : Icons.save_rounded,
+                  ),
+                  label: Text(
+                    item == null ? 'نشر الحالة الآن' : 'حفظ التعديلات',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Cairo',
+                      fontSize: 14,
+                    ),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.royalBlue,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    final payload = ok == true
+        ? <String, dynamic>{
+            'patient_name': patientName.text.trim(),
+            'hospital': hospital.text.trim(),
+            'department': department.text.trim(),
+            'room_number': room.text.trim(),
+            'diagnosis': diagnosis.text.trim(),
+            'clinical_signs': signs.text.trim(),
+            'status': status,
+            'internal_notes': internalNotes.text.trim(),
+          }
+        : null;
+
+    Future.delayed(const Duration(milliseconds: 500), () {
+      patientName.dispose();
+      hospital.dispose();
+      department.dispose();
+      room.dispose();
+      diagnosis.dispose();
+      signs.dispose();
+      internalNotes.dispose();
+    });
+
+    if (ok != true || payload == null) return;
+    try {
+      if (attachment?.path != null) {
+        payload['attachment'] = await MultipartFile.fromFile(
+          attachment!.path!,
+          filename: attachment!.name,
+        );
+      }
+      if (item == null) {
+        await ref.read(staffRepositoryProvider).upload(_endpoint, payload);
+      } else {
+        await ref
+            .read(staffRepositoryProvider)
+            .uploadPut('$_endpoint/${item['id']}', payload);
+      }
+      if (!mounted) return;
+      _reload();
+      _docSnack(
+        context,
+        item == null ? 'تم نشر الحالة النادرة.' : 'تم تعديل الحالة النادرة.',
+        color: AppColors.success,
+      );
+    } catch (error) {
+      if (mounted) await _docErrorDialog(context, error);
+    }
+  }
+}

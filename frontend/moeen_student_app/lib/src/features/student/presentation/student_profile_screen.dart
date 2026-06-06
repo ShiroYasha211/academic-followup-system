@@ -150,6 +150,8 @@ class StudentProfileScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 32),
+                      _DevicesSection(profile: profile),
+                      const SizedBox(height: 32),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
@@ -913,3 +915,524 @@ String _accountStatusLabel(String status) {
     _ => status.isEmpty ? '-' : status,
   };
 }
+
+class _DevicesSection extends ConsumerWidget {
+  const _DevicesSection({required this.profile});
+  final Map<String, dynamic> profile;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final devices = asList(profile['devices']).map(asMap).toList();
+    final requests = asList(profile['device_requests']).map(asMap).toList();
+    final hasPending = requests.any((r) => text(r, 'status') == 'pending');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeader(
+          title: 'الأجهزة والطلبات',
+          icon: Icons.devices_rounded,
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: AppColors.slate100),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'الأجهزة المرتبطة حالياً بالحساب',
+                style: TextStyle(
+                  color: AppColors.midnight,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (devices.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text(
+                    'لا توجد أجهزة مرتبطة.',
+                    style: TextStyle(color: AppColors.slate400, fontSize: 13),
+                  ),
+                )
+              else
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  itemCount: devices.length,
+                  separatorBuilder: (_, __) => const Divider(height: 24),
+                  itemBuilder: (context, index) {
+                    final dev = devices[index];
+                    final isPrimary = boolValue(dev, 'is_primary');
+                    final isTemp = boolValue(dev, 'is_temporary');
+                    final expiresAt = text(dev, 'expires_at');
+                    final platform = text(dev, 'platform').toLowerCase();
+                    final isActive = boolValue(dev, 'is_active');
+
+                    IconData platformIcon = Icons.phone_android_rounded;
+                    Color iconColor = AppColors.royalBlue;
+                    if (platform.contains('android')) {
+                      platformIcon = Icons.android_rounded;
+                      iconColor = Colors.green;
+                    } else if (platform.contains('ios') || platform.contains('apple') || platform.contains('iphone')) {
+                      platformIcon = Icons.apple_rounded;
+                      iconColor = Colors.grey.shade800;
+                    } else if (platform.contains('windows')) {
+                      platformIcon = Icons.laptop_windows_rounded;
+                      iconColor = Colors.blue;
+                    }
+
+                    return Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: iconColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(platformIcon, color: iconColor, size: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                text(dev, 'device_name', fallback: 'جهاز غير معروف'),
+                                style: const TextStyle(
+                                  color: AppColors.midnight,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  if (!isActive)
+                                    Container(
+                                      margin: const EdgeInsets.only(left: 6),
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.danger.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text(
+                                        'غير نشط',
+                                        style: TextStyle(
+                                          color: AppColors.danger,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: (isPrimary ? AppColors.royalBlue : AppColors.success).withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      isPrimary ? 'رئيسي' : 'فرعي',
+                                      style: TextStyle(
+                                        color: isPrimary ? AppColors.royalBlue : AppColors.success,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isTemp) ...[
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'مؤقت (ينتهي: ${_formatExpiryDate(expiresAt)})',
+                                        style: const TextStyle(
+                                          color: AppColors.rose,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              if (requests.isNotEmpty) ...[
+                const Divider(height: 40),
+                const Text(
+                  'طلبات الأجهزة الإضافية السابقة',
+                  style: TextStyle(
+                    color: AppColors.midnight,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  itemCount: requests.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final req = requests[index];
+                    final status = text(req, 'status');
+                    final adminNote = text(req, 'admin_note');
+                    final date = text(req, 'created_at');
+
+                    Color statusColor = AppColors.goldDeep;
+                    String statusText = 'قيد المراجعة';
+                    if (status == 'approved') {
+                      statusColor = AppColors.success;
+                      statusText = 'تم القبول';
+                    } else if (status == 'rejected') {
+                      statusColor = AppColors.danger;
+                      statusText = 'تم الرفض';
+                    }
+
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.slate50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.slate100),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  text(req, 'requested_device_name'),
+                                  style: const TextStyle(
+                                    color: AppColors.midnight,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  statusText,
+                                  style: TextStyle(
+                                    color: statusColor,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'السبب: ${text(req, 'reason')}',
+                            style: const TextStyle(
+                              color: AppColors.slate600,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (adminNote.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: AppColors.slate100),
+                              ),
+                              child: Text(
+                                'ملاحظة الإدارة: $adminNote',
+                                style: const TextStyle(
+                                  color: AppColors.midnight,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _formatExpiryDate(date),
+                              style: const TextStyle(
+                                color: AppColors.slate400,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+              const SizedBox(height: 24),
+              if (hasPending)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.goldDeep.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.goldDeep.withValues(alpha: 0.2)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.hourglass_empty_rounded, color: AppColors.goldDeep),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'لديك طلب معلق حالياً لاستخدام جهاز فرعي، يرجى انتظار رد الإدارة.',
+                          style: TextStyle(
+                            color: AppColors.goldDeep,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showRequestDeviceSheet(context, ref),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      side: const BorderSide(color: AppColors.royalBlue, width: 2),
+                    ),
+                    icon: const Icon(Icons.add_to_home_screen_rounded, color: AppColors.royalBlue),
+                    label: const Text(
+                      'طلب تفعيل جهاز فرعي إضافي',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.royalBlue,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatExpiryDate(String dateStr) {
+    if (dateStr.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(dateStr);
+      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  void _showRequestDeviceSheet(BuildContext context, WidgetRef ref) {
+    showMoeenBottomSheet(
+      context: context,
+      title: 'طلب تفعيل جهاز فرعي',
+      icon: Icons.add_to_home_screen_rounded,
+      color: AppColors.royalBlue,
+      child: _RequestDeviceForm(
+        onSubmit: (deviceName, platform, reason) async {
+          await ref.read(studentContentRepositoryProvider).submitDeviceRequest(
+            requestedDeviceName: deviceName,
+            platform: platform,
+            reason: reason,
+          );
+          ref.invalidate(_studentProfileProvider);
+        },
+      ),
+    );
+  }
+}
+
+class _RequestDeviceForm extends StatefulWidget {
+  const _RequestDeviceForm({required this.onSubmit});
+  final Future<void> Function(String deviceName, String platform, String reason) onSubmit;
+
+  @override
+  State<_RequestDeviceForm> createState() => _RequestDeviceFormState();
+}
+
+class _RequestDeviceFormState extends State<_RequestDeviceForm> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _reasonController = TextEditingController();
+  String _platform = 'Android';
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      _platform = 'Web';
+    } else {
+      try {
+        if (Platform.isAndroid) _platform = 'Android';
+        if (Platform.isIOS) _platform = 'iOS';
+        if (Platform.isWindows) _platform = 'Windows';
+        if (Platform.isMacOS) _platform = 'macOS';
+      } catch (_) {}
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Form(
+      key: _formKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _nameController,
+            textInputAction: TextInputAction.next,
+            validator: (value) => value == null || value.trim().isEmpty
+                ? 'يرجى إدخال اسم/نوع الجهاز الجديد.'
+                : null,
+            decoration: InputDecoration(
+              labelText: 'اسم الجهاز (مثال: iPhone 14 Pro, Samsung S23)',
+              prefixIcon: const Icon(Icons.phone_android_rounded),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            value: _platform,
+            items: const [
+              DropdownMenuItem(value: 'Android', child: Text('Android')),
+              DropdownMenuItem(value: 'iOS', child: Text('iOS')),
+              DropdownMenuItem(value: 'Windows', child: Text('Windows')),
+              DropdownMenuItem(value: 'macOS', child: Text('macOS')),
+            ],
+            onChanged: (val) {
+              if (val != null) setState(() => _platform = val);
+            },
+            decoration: InputDecoration(
+              labelText: 'نظام تشغيل الجهاز',
+              prefixIcon: const Icon(Icons.settings_rounded),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _reasonController,
+            maxLines: 3,
+            validator: (value) => value == null || value.trim().isEmpty
+                ? 'يرجى كتابة سبب طلب تفعيل الجهاز الإضافي.'
+                : null,
+            decoration: InputDecoration(
+              labelText: 'سبب تقديم الطلب والمبرر للاستخدام',
+              prefixIcon: const Icon(Icons.comment_rounded),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: _submitting ? null : _handleSubmit,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: _submitting
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'تقديم الطلب للإدارة',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleSubmit() async {
+    if (_formKey.currentState?.validate() != true) return;
+    setState(() => _submitting = true);
+    try {
+      await widget.onSubmit(
+        _nameController.text.trim(),
+        _platform,
+        _reasonController.text.trim(),
+      );
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم تقديم طلب الجهاز بنجاح وجاري المراجعة'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: AppColors.danger),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+}
+

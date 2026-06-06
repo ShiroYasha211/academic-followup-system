@@ -15,6 +15,8 @@ class SessionStorage {
   static const _practicalKey = 'is_practical_delegate';
   static const _clinicalKey = 'has_clinical';
   static const _permissionsKey = 'permissions';
+  static const _deviceTypeKey = 'device_type';
+  static const _isPrimaryDeviceKey = 'is_primary_device';
 
   Future<void> save(AuthSession session) async {
     await Future.wait([
@@ -28,7 +30,17 @@ class SessionStorage {
         value: session.isPracticalDelegate ? '1' : '0',
       ),
       _storage.write(key: _clinicalKey, value: session.hasClinical ? '1' : '0'),
-      _storage.write(key: _permissionsKey, value: session.permissions.join(',')),
+      _storage.write(
+        key: _permissionsKey,
+        value: session.permissions.join(','),
+      ),
+      _storage.write(key: _deviceTypeKey, value: session.deviceType),
+      _storage.write(
+        key: _isPrimaryDeviceKey,
+        value: session.isPrimaryDevice == null
+            ? null
+            : (session.isPrimaryDevice! ? '1' : '0'),
+      ),
     ]);
   }
 
@@ -41,6 +53,8 @@ class SessionStorage {
     final isPractical = await _storage.read(key: _practicalKey);
     final hasClinical = await _storage.read(key: _clinicalKey);
     final permissionsStr = await _storage.read(key: _permissionsKey);
+    final deviceType = await _storage.read(key: _deviceTypeKey);
+    final isPrimaryDevice = await _storage.read(key: _isPrimaryDeviceKey);
 
     if ([
       token,
@@ -62,9 +76,25 @@ class SessionStorage {
       email: email,
       isPracticalDelegate: isPractical == '1',
       hasClinical: hasClinical == '1',
-      permissions: permissionsStr?.split(',').where((s) => s.isNotEmpty).toList() ?? [],
+      permissions:
+          permissionsStr?.split(',').where((s) => s.isNotEmpty).toList() ?? [],
+      deviceType: deviceType,
+      isPrimaryDevice: isPrimaryDevice == null ? null : isPrimaryDevice == '1',
     );
   }
 
-  Future<void> clear() => _storage.deleteAll();
+  Future<void> clear() async {
+    await Future.wait([
+      _storage.delete(key: _tokenKey),
+      _storage.delete(key: _workspaceKey),
+      _storage.delete(key: _roleKey),
+      _storage.delete(key: _nameKey),
+      _storage.delete(key: _emailKey),
+      _storage.delete(key: _practicalKey),
+      _storage.delete(key: _clinicalKey),
+      _storage.delete(key: _permissionsKey),
+      _storage.delete(key: _deviceTypeKey),
+      _storage.delete(key: _isPrimaryDeviceKey),
+    ]);
+  }
 }

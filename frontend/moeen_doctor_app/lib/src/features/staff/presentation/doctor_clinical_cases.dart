@@ -800,3 +800,481 @@ String _taskTypeLabel(String type) {
       return type.isEmpty ? 'مهمة سريرية' : type;
   }
 }
+
+extension _DoctorClinicalCaseActions on _DoctorClinicalSectionScreenState {
+  Future<void> _openCaseForm({_Json? item}) async {
+    final options = await Future.wait([
+      ref
+          .read(staffRepositoryProvider)
+          .get('/doctor/clinical/training-centers'),
+      ref.read(staffRepositoryProvider).get('/doctor/clinical/departments'),
+      ref.read(staffRepositoryProvider).get('/doctor/clinical/body-systems'),
+    ]);
+    if (!mounted) return;
+    final centers = _clinicalPagedItems(options[0]);
+    final departments = _clinicalPagedItems(options[1]);
+    final systems = _clinicalPagedItems(options[2]);
+    final formKey = GlobalKey<FormState>();
+    final patient = TextEditingController(
+      text: _docText(item?['patient_name']),
+    );
+    final age = TextEditingController(text: _docText(item?['age']));
+    final diagnosis = TextEditingController(
+      text: _docText(item?['diagnosis_or_description']),
+    );
+    int? centerId = _docInt(item?['training_center_id'], 0) == 0
+        ? null
+        : _docInt(item?['training_center_id']);
+    int? departmentId = _docInt(item?['clinical_department_id'], 0) == 0
+        ? null
+        : _docInt(item?['clinical_department_id']);
+    int? systemId = _docInt(item?['body_system_id'], 0) == 0
+        ? null
+        : _docInt(item?['body_system_id']);
+    String gender = _docText(item?['gender'], 'male');
+    String status = _docText(item?['status'], 'active');
+    final ok = await showMoeenBottomSheet<bool>(
+      context: context,
+      title: item == null ? 'إضافة حالة سريرية' : 'تعديل حالة سريرية',
+      icon: Icons.medical_information_rounded,
+      color: AppColors.success,
+      fullScreen: true,
+      child: StatefulBuilder(
+        builder: (context, setLocal) => Form(
+          key: formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.slate200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.badge_rounded,
+                          color: AppColors.royalBlue,
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'بيانات المريض الأساسية',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.slate800,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(
+                      height: 24,
+                      thickness: 1,
+                      color: AppColors.slate100,
+                    ),
+                    TextFormField(
+                      controller: patient,
+                      decoration: InputDecoration(
+                        labelText: 'اسم المريض كامل',
+                        prefixIcon: const Icon(
+                          Icons.person_rounded,
+                          color: AppColors.royalBlue,
+                        ),
+                        filled: true,
+                        fillColor: AppColors.slate50,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.slate200,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.slate200,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.royalBlue,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'اسم المريض مطلوب.'
+                          : null,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: age,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: 'العمر',
+                              prefixIcon: const Icon(
+                                Icons.cake_rounded,
+                                color: AppColors.royalBlue,
+                              ),
+                              filled: true,
+                              fillColor: AppColors.slate50,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 14,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.slate200,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.slate200,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.royalBlue,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                            validator: (value) =>
+                                int.tryParse(value?.trim() ?? '') == null
+                                ? 'العمر مطلوب كرقم.'
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: gender,
+                            decoration: InputDecoration(
+                              labelText: 'الجنس',
+                              prefixIcon: const Icon(
+                                Icons.wc_rounded,
+                                color: AppColors.slate500,
+                              ),
+                              filled: true,
+                              fillColor: AppColors.slate50,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 14,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.slate200,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.slate200,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.slate500,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'male',
+                                child: Text('ذكر'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'female',
+                                child: Text('أنثى'),
+                              ),
+                            ],
+                            onChanged: (v) =>
+                                setLocal(() => gender = v ?? gender),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.slate200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.local_hospital_rounded,
+                          color: AppColors.info,
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'الموقع والفرز الطبي',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.slate800,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(
+                      height: 24,
+                      thickness: 1,
+                      color: AppColors.slate100,
+                    ),
+                    _clinicalDropdown(
+                      'المستشفى / المركز السريري',
+                      centers,
+                      centerId,
+                      (v) => setLocal(() => centerId = v),
+                      prefixIcon: Icons.local_hospital_rounded,
+                      activeColor: AppColors.info,
+                      validator: (value) =>
+                          value == null ? 'اختر المركز.' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    _clinicalDropdown(
+                      'القسم الطبي المختص',
+                      departments,
+                      departmentId,
+                      (v) => setLocal(() => departmentId = v),
+                      prefixIcon: Icons.account_tree_rounded,
+                      activeColor: AppColors.info,
+                      validator: (value) =>
+                          value == null ? 'اختر القسم.' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    _clinicalDropdown(
+                      'جهاز أو نظام الجسم',
+                      systems,
+                      systemId,
+                      (v) => setLocal(() => systemId = v),
+                      prefixIcon: Icons.biotech_rounded,
+                      activeColor: AppColors.info,
+                      validator: (value) =>
+                          value == null ? 'اختر نظام الجسم.' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: status,
+                      decoration: InputDecoration(
+                        labelText: 'حالة الاستعداد',
+                        prefixIcon: const Icon(
+                          Icons.shield_rounded,
+                          color: AppColors.info,
+                        ),
+                        filled: true,
+                        fillColor: AppColors.slate50,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.slate200,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.slate200,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.info,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'active', child: Text('نشط')),
+                        DropdownMenuItem(
+                          value: 'discharged',
+                          child: Text('خروج'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'transferred',
+                          child: Text('تحويل'),
+                        ),
+                      ],
+                      onChanged: (v) => setLocal(() => status = v ?? status),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.slate200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.medical_services_rounded,
+                          color: AppColors.success,
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'التفاصيل والتشخيص السريري',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.slate800,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(
+                      height: 24,
+                      thickness: 1,
+                      color: AppColors.slate100,
+                    ),
+                    TextFormField(
+                      controller: diagnosis,
+                      minLines: 3,
+                      maxLines: 6,
+                      decoration: InputDecoration(
+                        labelText: 'التشخيص أو الوصف التفصيلي',
+                        prefixIcon: const Icon(
+                          Icons.description_rounded,
+                          color: AppColors.success,
+                        ),
+                        filled: true,
+                        fillColor: AppColors.slate50,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.slate200,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.slate200,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.success,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'التشخيص أو الوصف مطلوب.'
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: () {
+                  if (formKey.currentState?.validate() != true) return;
+                  Navigator.pop(context, true);
+                },
+                icon: const Icon(Icons.save_rounded),
+                label: const Text(
+                  'حفظ الحالة السريرية',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Cairo',
+                    fontSize: 14,
+                  ),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final payload = ok == true
+        ? {
+            'patient_name': patient.text.trim(),
+            'age': int.tryParse(age.text.trim()),
+            'gender': gender,
+            'training_center_id': centerId,
+            'clinical_department_id': departmentId,
+            'body_system_id': systemId,
+            'diagnosis_or_description': diagnosis.text.trim(),
+            'status': status,
+          }
+        : null;
+
+    Future.delayed(const Duration(milliseconds: 500), () {
+      patient.dispose();
+      age.dispose();
+      diagnosis.dispose();
+    });
+
+    if (ok != true || payload == null) return;
+    try {
+      if (item == null) {
+        await ref.read(staffRepositoryProvider).post(_endpoint, payload);
+      } else {
+        await ref
+            .read(staffRepositoryProvider)
+            .put('$_endpoint/${item['id']}', payload);
+      }
+      if (!mounted) return;
+      _reload();
+    } catch (error) {
+      if (mounted) await _docErrorDialog(context, error);
+    }
+  }
+}

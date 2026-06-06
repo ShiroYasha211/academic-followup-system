@@ -1860,6 +1860,420 @@ class _IconInfo extends StatelessWidget {
   }
 }
 
+class _TapScaleContainer extends StatefulWidget {
+  const _TapScaleContainer({
+    required this.child,
+    required this.onTap,
+    this.margin,
+    this.decoration,
+    this.clipBehavior = Clip.none,
+  });
+
+  final Widget child;
+  final VoidCallback onTap;
+  final EdgeInsetsGeometry? margin;
+  final Decoration? decoration;
+  final Clip clipBehavior;
+
+  @override
+  State<_TapScaleContainer> createState() => _TapScaleContainerState();
+}
+
+class _TapScaleContainerState extends State<_TapScaleContainer> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+      lowerBound: 0.97,
+      upperBound: 1.0,
+    )..value = 1.0;
+    _scaleAnimation = _controller;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _controller.reverse(),
+      onTapUp: (_) => _controller.forward(),
+      onTapCancel: () => _controller.forward(),
+      onTap: widget.onTap,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Container(
+          margin: widget.margin,
+          decoration: widget.decoration,
+          clipBehavior: widget.clipBehavior,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactPollWidget extends ConsumerStatefulWidget {
+  const _CompactPollWidget({
+    required this.item,
+    required this.sourceColor,
+  });
+
+  final Map<String, dynamic> item;
+  final Color sourceColor;
+
+  @override
+  ConsumerState<_CompactPollWidget> createState() => _CompactPollWidgetState();
+}
+
+class _CompactPollWidgetState extends ConsumerState<_CompactPollWidget> {
+  Map<String, dynamic>? _localPollData;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.item['poll_data'] != null) {
+      _localPollData = Map<String, dynamic>.from(widget.item['poll_data']);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _CompactPollWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.item['poll_data'] != null) {
+      _localPollData = Map<String, dynamic>.from(widget.item['poll_data']);
+    }
+  }
+
+  Future<void> _castVote(int optionId) async {
+    final rawId = text(widget.item, 'id');
+    if (!rawId.startsWith('center-')) return;
+    final notificationId = int.tryParse(rawId.substring('center-'.length));
+    if (notificationId == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await ref.read(studentContentRepositoryProvider).voteNotification(
+        notificationId: notificationId,
+        optionId: optionId,
+      );
+
+      // Optimistically update local state
+      setState(() {
+        if (_localPollData != null) {
+          final options = List<Map<String, dynamic>>.from(
+            asList(_localPollData!['options']).map(asMap),
+          );
+
+          for (var i = 0; i < options.length; i++) {
+            final opt = Map<String, dynamic>.from(options[i]);
+            if (number(opt, 'id').toInt() == optionId) {
+              opt['votes_count'] = (number(opt, 'votes_count').toInt() + 1);
+            }
+            options[i] = opt;
+          }
+
+          _localPollData!['options'] = options;
+          _localPollData!['has_voted'] = true;
+          _localPollData!['voted_option_id'] = optionId;
+        }
+        _isLoading = false;
+      });
+
+      // Synchronize backends/lists
+      ref.invalidate(_newsProvider('all'));
+      ref.invalidate(_newsProvider('administration'));
+      ref.invalidate(_newsProvider('doctor'));
+      ref.invalidate(_newsProvider('delegate'));
+      ref.invalidate(studentUnreadNotificationsCountProvider);
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        MoeenDialogs.showError(context, message: 'فشل التصويت: ${e.toString()}');
+      }
+    }
+  }
+
+  Future<void> _retractVote() async {
+    final rawId = text(widget.item, 'id');
+    if (!rawId.startsWith('center-')) return;
+    final notificationId = int.tryParse(rawId.substring('center-'.length));
+    if (notificationId == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await ref.read(studentContentRepositoryProvider).retractVoteNotification(
+        notificationId: notificationId,
+      );
+
+      // Optimistically update local state
+      setState(() {
+        if (_localPollData != null) {
+          final options = List<Map<String, dynamic>>.from(
+            asList(_localPollData!['options']).map(asMap),
+          );
+          final votedOptionId = number(_localPollData!, 'voted_option_id').toInt();
+
+          for (var i = 0; i < options.length; i++) {
+            final opt = Map<String, dynamic>.from(options[i]);
+            if (number(opt, 'id').toInt() == votedOptionId) {
+              opt['votes_count'] = (number(opt, 'votes_count').toInt() - 1).clamp(0, 99999);
+            }
+            options[i] = opt;
+          }
+
+          _localPollData!['options'] = options;
+          _localPollData!['has_voted'] = false;
+          _localPollData!['voted_option_id'] = 0;
+        }
+        _isLoading = false;
+      });
+
+      // Synchronize backends/lists
+      ref.invalidate(_newsProvider('all'));
+      ref.invalidate(_newsProvider('administration'));
+      ref.invalidate(_newsProvider('doctor'));
+      ref.invalidate(_newsProvider('delegate'));
+      ref.invalidate(studentUnreadNotificationsCountProvider);
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        MoeenDialogs.showError(context, message: 'فشل سحب التصويت: ${e.toString()}');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_localPollData == null) return const SizedBox.shrink();
+
+    final options = List<Map<String, dynamic>>.from(
+      asList(_localPollData!['options']).map(asMap),
+    );
+    final hasVoted = boolValue(_localPollData!, 'has_voted');
+    final votedId = number(_localPollData!, 'voted_option_id').toInt();
+
+    final totalVotes = options.fold<int>(
+      0,
+      (sum, item) => sum + number(item, 'votes_count').toInt(),
+    );
+
+    final color = widget.sourceColor;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withValues(alpha: 0.15),
+          width: 1,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.analytics_outlined, size: 14, color: color),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'استطلاع سريع',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.midnight,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '$totalVotes صوت',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ...options.map((option) {
+                final id = number(option, 'id').toInt();
+                final selected = id == votedId;
+                final votes = number(option, 'votes_count').toInt();
+                final percent = totalVotes == 0 ? 0.0 : (votes / totalVotes);
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Container(
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: selected 
+                            ? color 
+                            : AppColors.slate200.withValues(alpha: 0.8),
+                        width: selected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Stack(
+                        children: [
+                          if (hasVoted)
+                            Positioned.fill(
+                              child: Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: FractionallySizedBox(
+                                  widthFactor: percent,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: color.withValues(
+                                        alpha: selected ? 0.14 : 0.06,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: _isLoading || hasVoted 
+                                  ? null 
+                                  : () => _castVote(id),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: Row(
+                                  children: [
+                                    if (hasVoted) ...[
+                                      if (selected)
+                                        Icon(Icons.check_circle_rounded, color: color, size: 16)
+                                      else
+                                        const SizedBox(width: 16),
+                                    ] else ...[
+                                      Container(
+                                        width: 14,
+                                        height: 14,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: color.withValues(alpha: 0.5),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        text(option, 'text'),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontFamily: 'Cairo',
+                                          fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                                          fontSize: 11,
+                                          color: selected ? AppColors.midnight : AppColors.slate700,
+                                        ),
+                                      ),
+                                    ),
+                                    if (hasVoted)
+                                      Text(
+                                        '${(percent * 100).toInt()}%',
+                                        style: TextStyle(
+                                          fontFamily: 'Cairo',
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 11,
+                                          color: selected ? color : AppColors.slate600,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              if (hasVoted) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.center,
+                  child: TextButton.icon(
+                    onPressed: _isLoading ? null : _retractVote,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      textStyle: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w800,
+                        fontSize: 10,
+                      ),
+                    ),
+                    icon: const Icon(Icons.undo_rounded, size: 12),
+                    label: const Text('سحب أو تغيير التصويت'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (_isLoading)
+            Positioned.fill(
+              child: Container(
+                color: Colors.white24,
+                child: Center(
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _NewsCard extends ConsumerWidget {
   const _NewsCard(
     this.item, {
@@ -1883,6 +2297,7 @@ class _NewsCard extends ConsumerWidget {
     final excerpt = text(item, 'excerpt', fallback: text(item, 'body'));
     final isUnread = text(item, 'id').startsWith('center-') && text(item, 'read_at').isEmpty;
     final isBookmarked = ref.watch(newsBookmarksProvider).any((b) => text(b, 'id') == text(item, 'id'));
+    final pollData = item['poll_data'] != null ? Map<String, dynamic>.from(item['poll_data']) : null;
 
     final IconData publisherIcon = switch (source) {
       'doctor' => Icons.school_rounded,
@@ -1890,21 +2305,21 @@ class _NewsCard extends ConsumerWidget {
       _ => Icons.account_balance_rounded,
     };
 
-    return Container(
+    return _TapScaleContainer(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isPinned 
-              ? AppColors.royalBlue.withValues(alpha: 0.25)
-              : Colors.grey.shade100,
+              ? AppColors.teal.withValues(alpha: 0.3)
+              : AppColors.slate200.withValues(alpha: 0.6),
           width: isPinned ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
             color: isPinned 
-                ? AppColors.royalBlue.withValues(alpha: 0.08)
+                ? AppColors.teal.withValues(alpha: 0.08)
                 : Colors.black.withValues(alpha: 0.03),
             blurRadius: 16,
             offset: const Offset(0, 8),
@@ -1912,45 +2327,193 @@ class _NewsCard extends ConsumerWidget {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () async {
-            await onOpen?.call(item);
-            if (context.mounted) {
-              context.push('/student/news/details', extra: item);
-            }
-          },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (hasImage)
-                SizedBox(
-                  height: 180,
-                  width: double.infinity,
+      onTap: () async {
+        await onOpen?.call(item);
+        if (context.mounted) {
+          context.push('/student/news/details', extra: item);
+        }
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Publisher Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Row(
+              children: [
+                // Avatar / Icon
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: color.withValues(alpha: 0.2),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      publisherIcon,
+                      color: color,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Publisher Info Text
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            _sourceLabel(source),
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              color: color,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (isPinned) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.teal.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(Icons.push_pin_rounded, color: AppColors.teal, size: 10),
+                                  SizedBox(width: 2),
+                                  Text(
+                                    'مثبت',
+                                    style: TextStyle(
+                                      fontFamily: 'Cairo',
+                                      color: AppColors.teal,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Text(
+                            text(item, 'author_name', fallback: 'النظام'),
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              color: AppColors.slate500,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 3,
+                            height: 3,
+                            decoration: const BoxDecoration(
+                              color: AppColors.slate300,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            timeAgo(text(item, 'created_at')),
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              color: AppColors.slate500,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Actions (Bookmark & Unread)
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    ref.read(newsBookmarksProvider.notifier).toggleBookmark(item);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isBookmarked 
+                          ? AppColors.teal.withValues(alpha: 0.08)
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isBookmarked 
+                          ? Icons.bookmark_rounded 
+                          : Icons.bookmark_border_rounded,
+                      size: 18,
+                      color: isBookmarked ? AppColors.teal : AppColors.slate400,
+                    ),
+                  ),
+                ),
+                if (isUnread) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: AppColors.danger,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // 2. Image (if exists)
+          if (hasImage)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.network(
-                        attachment,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: AppColors.slate50,
-                            child: const Center(
-                              child: SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.slate200,
+                      Hero(
+                        tag: 'news-image-${text(item, 'id')}',
+                        child: Image.network(
+                          attachment,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              color: AppColors.slate50,
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.slate200,
+                                  ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
-                        errorBuilder: (_, __, ___) => const _NewsImageFallback(height: 180),
+                            );
+                          },
+                          errorBuilder: (_, __, ___) => const _NewsImageFallback(height: 180),
+                        ),
                       ),
                       Positioned.fill(
                         child: DecoratedBox(
@@ -1959,212 +2522,99 @@ class _NewsCard extends ConsumerWidget {
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.black.withValues(alpha: 0.4),
+                                Colors.black.withValues(alpha: 0.25),
                                 Colors.transparent,
-                                Colors.black.withValues(alpha: 0.6),
+                                Colors.black.withValues(alpha: 0.4),
                               ],
                               stops: const [0.0, 0.5, 1.0],
                             ),
                           ),
                         ),
                       ),
-                      if (isPinned)
-                        Positioned(
-                          top: 12,
-                          left: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: AppColors.royalBlue,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(Icons.push_pin_rounded, color: Colors.white, size: 12),
-                                SizedBox(width: 4),
-                                Text(
-                                  'مثبت',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: _MiniBadge(
-                          label: _sourceLabel(source),
-                          color: color,
-                          blur: true,
-                        ),
-                      ),
                     ],
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              ),
+            ),
+
+          // 3. Title & Content
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.midnight,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  excerpt,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.slate600,
+                    height: 1.45,
+                  ),
+                ),
+
+                // 4. Attachment banner (if exists and no image)
+                if (attachment.isNotEmpty && !hasImage) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: color.withValues(alpha: 0.15),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
                       children: [
-                        if (!hasImage) ...[
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(publisherIcon, color: color, size: 18),
-                          ),
-                          const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _sourceLabel(source),
-                                style: TextStyle(
-                                  color: color,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              Text(
-                                text(item, 'author_name', fallback: 'النظام'),
-                                style: const TextStyle(
-                                  color: AppColors.slate500,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ] else ...[
-                          Icon(Icons.person_outline_rounded, color: AppColors.slate400, size: 14),
-                          const SizedBox(width: 4),
-                          Text(
-                            text(item, 'author_name', fallback: 'النظام'),
-                            style: const TextStyle(
-                              color: AppColors.slate500,
+                        Icon(Icons.attach_file_rounded, color: color, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'يوجد ملف مرفق جاهز للتحميل',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
+                              color: color,
                             ),
                           ),
-                        ],
-                        const Spacer(),
-                        IconButton(
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          icon: Icon(
-                            isBookmarked
-                                ? Icons.bookmark_rounded
-                                : Icons.bookmark_border_rounded,
-                            size: 18,
-                            color: isBookmarked
-                                ? AppColors.royalBlue
-                                : AppColors.slate400,
-                          ),
-                          onPressed: () {
-                            ref.read(newsBookmarksProvider.notifier).toggleBookmark(item);
-                          },
                         ),
-                        if (isUnread)
-                          Container(
-                            width: 8,
-                            height: 8,
-                            margin: const EdgeInsets.symmetric(horizontal: 6),
-                            decoration: const BoxDecoration(
-                              color: AppColors.info,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.info,
-                                  blurRadius: 6,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                          ),
                         Icon(
-                          Icons.access_time_rounded,
-                          size: 12,
-                          color: AppColors.slate400,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          timeAgo(text(item, 'created_at')),
-                          style: const TextStyle(
-                            color: AppColors.slate500,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          Icons.arrow_back_ios_new_rounded, 
+                          size: 12, 
+                          color: color.withValues(alpha: 0.7),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        height: 1.35,
-                        color: AppColors.midnight,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      excerpt,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.slate600,
-                        height: 1.5,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    if (attachment.isNotEmpty && !hasImage) ...[
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: color.withValues(alpha: 0.1)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.attach_file_rounded, color: color, size: 16),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text(
-                                'يوجد ملف مرفق جاهز للتحميل',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.slate700,
-                                ),
-                              ),
-                            ),
-                            Icon(Icons.arrow_back_ios_new_rounded, size: 10, color: color),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+                  ),
+                ],
+
+                // 5. Compact Poll Widget (if exists)
+                if (pollData != null)
+                  _CompactPollWidget(
+                    item: item,
+                    sourceColor: color,
+                  ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

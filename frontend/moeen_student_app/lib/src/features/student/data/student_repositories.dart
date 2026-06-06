@@ -44,6 +44,10 @@ final studentContentRepositoryProvider = Provider<StudentContentRepository>((
   );
 });
 
+final studentSupportSettingsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  return ref.watch(studentContentRepositoryProvider).fetchSupportSettings();
+});
+
 class StudentDashboardRepository {
   const StudentDashboardRepository(this._api, this._cache);
 
@@ -798,6 +802,80 @@ class StudentContentRepository {
     return (response['message'] ?? 'تم تسجيل المراجعة.').toString();
   }
 
+  Future<Map<String, dynamic>> flashcardSettings() async {
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.flashcards.settings',
+      load: () async => _data(await _api.get('/student/flashcards/settings')),
+    );
+  }
+
+  Future<Map<String, dynamic>> flashcardUpcoming() async {
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.flashcards.upcoming',
+      load: () async => _data(await _api.get('/student/flashcards/upcoming')),
+    );
+  }
+
+  Future<Map<String, dynamic>> flashcardHistory() async {
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.flashcards.history',
+      load: () async => _data(await _api.get('/student/flashcards/history')),
+    );
+  }
+
+  Future<Map<String, dynamic>> flashcardDifficulty() async {
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.flashcards.difficulty',
+      load: () async => _data(await _api.get('/student/flashcards/difficulty')),
+    );
+  }
+
+  Future<Map<String, dynamic>> flashcardAnalytics() async {
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.flashcards.analytics',
+      load: () async => _data(await _api.get('/student/flashcards/analytics')),
+    );
+  }
+
+  Future<String> updateFlashcardPack(int id, Map<String, dynamic> data) async {
+    final response = await _api.put('/student/flashcards/$id', data: data);
+    return (response['message'] ?? 'تم تحديث الحزمة بنجاح.').toString();
+  }
+
+  Future<Map<String, dynamic>> updateFlashcardSettings(Map<String, dynamic> data) async {
+    final response = await _api.post('/student/flashcards/settings', data: data);
+    return _data(response);
+  }
+
+  Future<Map<String, dynamic>> logTreeFarmSession({
+    required String farmScope,
+    required int focusedSeconds,
+    required String startedAt,
+    required String endedAt,
+    required String clientUuid,
+    int? subjectId,
+    String? subjectName,
+  }) async {
+    final response = await _api.post(
+      '/student/tree-farm/sessions',
+      data: {
+        'farm_scope': farmScope,
+        'focused_seconds': focusedSeconds,
+        'started_at': startedAt,
+        'ended_at': endedAt,
+        'client_uuid': clientUuid,
+        if (subjectId != null) 'subject_id': subjectId,
+        if (subjectName != null) 'subject_name': subjectName,
+      },
+    );
+    return _flexData(response);
+  }
+
   Future<Map<String, dynamic>> assignments({String sortBy = 'due_date'}) async {
     return _cachedMap(
       cache: _cache,
@@ -1111,6 +1189,31 @@ class StudentContentRepository {
       },
     );
     return (response['message'] ?? 'تم تغيير كلمة المرور بنجاح.').toString();
+  }
+
+  Future<String> submitDeviceRequest({
+    required String requestedDeviceName,
+    String? platform,
+    required String reason,
+  }) async {
+    final response = await _api.post(
+      '/student/devices/request',
+      data: {
+        'requested_device_name': requestedDeviceName,
+        if (platform != null) 'platform': platform,
+        'reason': reason,
+      },
+    );
+    return (response['message'] ?? 'تم تقديم طلب استخدام جهاز فرعي بنجاح.').toString();
+  }
+
+  Future<Map<String, dynamic>> fetchSupportSettings() async {
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.support_settings',
+      load: () async => _data(await _api.get('/student/support-settings')),
+      maxAge: const Duration(hours: 1),
+    );
   }
 }
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../data/student_repositories.dart';
 import 'widgets/student_shell.dart';
 
 class StudentSupportScreen extends ConsumerWidget {
@@ -12,60 +13,125 @@ class StudentSupportScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final settingsAsync = ref.watch(studentSupportSettingsProvider);
+
     return StudentShell(
       currentIndex: 0,
       title: 'مركز المساعدة',
-      child: RefreshIndicator(
-        onRefresh: () async => Future.delayed(const Duration(seconds: 1)),
-        color: AppColors.royalBlue,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 48),
-          children: [
-            const _SupportHero(),
-            const SizedBox(height: 28),
-            const _SectionTitle(title: 'قنوات التواصل المباشر'),
-            const SizedBox(height: 12),
-            const _ContactCard(
-              icon: Icons.phone_in_talk_rounded,
-              color: AppColors.royalBlue,
-              title: 'الهاتف المباشر',
-              value: '+967 777 000 111',
-              subtitle: 'السبت - الخميس | 8:00 ص - 2:00 م',
+      child: settingsAsync.when(
+        data: (data) {
+          final phone = data['support_phone']?.toString() ?? '+967 777 000 111';
+          final whatsapp = data['support_whatsapp']?.toString() ?? '+967 777 000 222';
+          final email = data['support_email']?.toString() ?? 'support@moeen.tech';
+          final website = data['support_website']?.toString() ?? 'moeen.tech';
+          final instagram = data['support_instagram']?.toString() ?? '@moeen.app';
+          final workHours = data['support_work_hours']?.toString() ?? 'السبت - الخميس | 8:00 ص - 2:00 م';
+          final notice = data['support_notice']?.toString() ??
+              'عند وجود مشكلة في الحضور أو رفع الملفات، يرجى إرسال اسمك، رقم القيد، وصف دقيق للمشكلة، مع لقطة شاشة توضيحية لضمان سرعة المعالجة.';
+
+          return RefreshIndicator(
+            onRefresh: () async => ref.refresh(studentSupportSettingsProvider.future),
+            color: AppColors.royalBlue,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 48),
+              children: [
+                const _SupportHero(),
+                const SizedBox(height: 28),
+                const _SectionTitle(title: 'قنوات التواصل المباشر'),
+                const SizedBox(height: 12),
+                _ContactCard(
+                  icon: Icons.phone_in_talk_rounded,
+                  color: AppColors.royalBlue,
+                  title: 'الهاتف المباشر',
+                  value: phone,
+                  subtitle: workHours,
+                ),
+                _ContactCard(
+                  icon: Icons.chat_rounded,
+                  color: AppColors.success,
+                  title: 'واتساب الدعم',
+                  value: whatsapp,
+                  subtitle: 'للاستفسارات العاجلة والتقنية',
+                ),
+                _ContactCard(
+                  icon: Icons.alternate_email_rounded,
+                  color: AppColors.orange,
+                  title: 'البريد الإلكتروني',
+                  value: email,
+                  subtitle: 'للمراسلات والطلبات الرسمية',
+                ),
+                const SizedBox(height: 28),
+                const _SectionTitle(title: 'منصات التواصل الاجتماعي'),
+                const SizedBox(height: 12),
+                _ContactCard(
+                  icon: Icons.public_rounded,
+                  color: AppColors.info,
+                  title: 'الموقع الإلكتروني',
+                  value: website,
+                  subtitle: 'البوابة الإخبارية والتحديثات',
+                ),
+                _ContactCard(
+                  icon: Icons.camera_alt_rounded,
+                  color: AppColors.rose,
+                  title: 'إنستغرام',
+                  value: instagram,
+                  subtitle: 'دليل الاستخدام والشروحات',
+                ),
+                const SizedBox(height: 32),
+                _SupportNotice(notice: notice),
+              ],
             ),
-            const _ContactCard(
-              icon: Icons.chat_rounded,
-              color: AppColors.success,
-              title: 'واتساب الدعم',
-              value: '+967 777 000 222',
-              subtitle: 'للاستفسارات العاجلة والتقنية',
+          );
+        },
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.royalBlue),
+        ),
+        error: (error, stackTrace) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: AppColors.rose,
+                  size: 64,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'فشل تحميل بيانات الدعم والمساعدة',
+                  style: TextStyle(
+                    color: AppColors.midnight,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  error.toString(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.slate400,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () => ref.invalidate(studentSupportSettingsProvider),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('إعادة المحاولة'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.royalBlue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const _ContactCard(
-              icon: Icons.alternate_email_rounded,
-              color: AppColors.orange,
-              title: 'البريد الإلكتروني',
-              value: 'support@moeen.tech',
-              subtitle: 'للمراسلات والطلبات الرسمية',
-            ),
-            const SizedBox(height: 28),
-            const _SectionTitle(title: 'منصات التواصل الاجتماعي'),
-            const SizedBox(height: 12),
-            const _ContactCard(
-              icon: Icons.public_rounded,
-              color: AppColors.info,
-              title: 'الموقع الإلكتروني',
-              value: 'moeen.tech',
-              subtitle: 'البوابة الإخبارية والتحديثات',
-            ),
-            const _ContactCard(
-              icon: Icons.camera_alt_rounded,
-              color: AppColors.rose,
-              title: 'إنستغرام',
-              value: '@moeen.app',
-              subtitle: 'دليل الاستخدام والشروحات',
-            ),
-            const SizedBox(height: 32),
-            const _SupportNotice(),
-          ],
+          ),
         ),
       ),
     );
@@ -339,7 +405,8 @@ class _ContactCard extends StatelessWidget {
 }
 
 class _SupportNotice extends StatelessWidget {
-  const _SupportNotice();
+  const _SupportNotice({required this.notice});
+  final String notice;
 
   @override
   Widget build(BuildContext context) {
@@ -381,9 +448,9 @@ class _SupportNotice extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          const Text(
-            'عند وجود مشكلة في الحضور أو رفع الملفات، يرجى إرسال اسمك، رقم القيد، وصف دقيق للمشكلة، مع لقطة شاشة توضيحية لضمان سرعة المعالجة.',
-            style: TextStyle(
+          Text(
+            notice,
+            style: const TextStyle(
               color: Color(0xFF92400E),
               fontSize: 13,
               fontWeight: FontWeight.w700,

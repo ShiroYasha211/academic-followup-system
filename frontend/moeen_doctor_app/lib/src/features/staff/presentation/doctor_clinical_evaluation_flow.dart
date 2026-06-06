@@ -34,6 +34,7 @@ class _ClinicalEvaluationFormState
   DateTime? _startedAt;
   int? _finishedElapsedSeconds;
   DateTime _now = DateTime.now();
+  bool _lockedByTimeLimit = false;
   bool _loadingStudents = false;
   bool _saving = false;
   List<_Json> _students = const [];
@@ -154,18 +155,29 @@ class _ClinicalEvaluationFormState
   void _ensureTicker() {
     _ticker ??= Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _startedAt == null) return;
-      setState(() => _now = DateTime.now());
+      final limit = _activeLimitSeconds;
+      final now = DateTime.now();
+      final elapsed = now.difference(_startedAt!).inSeconds.clamp(0, 1 << 31);
+      if (limit != null && elapsed >= limit) {
+        _finishEvaluationByTimeLimit();
+        return;
+      }
+      setState(() => _now = now);
     });
   }
 
-  void _freezeTimerForReview() {
-    _finishedElapsedSeconds ??= _elapsedSeconds;
+  void _freezeTimerForReview({bool lockedByTimeLimit = false}) {
+    final limit = _activeLimitSeconds;
+    _finishedElapsedSeconds ??= lockedByTimeLimit && limit != null
+        ? limit
+        : _elapsedSeconds;
+    _lockedByTimeLimit = _lockedByTimeLimit || lockedByTimeLimit;
     _ticker?.cancel();
     _ticker = null;
-    _finishedElapsedSeconds = null;
   }
 
   void _resumeTimerFromReview() {
+    if (_lockedByTimeLimit) return;
     final frozen = _finishedElapsedSeconds;
     if (frozen != null) {
       _startedAt = DateTime.now().subtract(Duration(seconds: frozen));
@@ -173,6 +185,18 @@ class _ClinicalEvaluationFormState
       _now = DateTime.now();
     }
     _ensureTicker();
+  }
+
+  void _finishEvaluationByTimeLimit() {
+    if (_lockedByTimeLimit) return;
+    _ticker?.cancel();
+    _ticker = null;
+    if (!mounted) return;
+    setState(() {
+      _now = DateTime.now();
+      _freezeTimerForReview(lockedByTimeLimit: true);
+      _step = 4;
+    });
   }
 
   void _clearItemNotes() {
@@ -225,6 +249,7 @@ class _ClinicalEvaluationFormState
       _startedAt = null;
       _now = DateTime.now();
       _finishedElapsedSeconds = null;
+      _lockedByTimeLimit = false;
       _ticker?.cancel();
       _ticker = null;
     });
@@ -248,22 +273,63 @@ class _ClinicalEvaluationFormState
 
   IconData _getAdaptiveIcon(String text) {
     final t = text.toLowerCase();
-    if (t.contains('غسل') || t.contains('تعقيم') || t.contains('يد') || t.contains('wash') || t.contains('sanitize') || t.contains('hand')) {
+    if (t.contains('غسل') ||
+        t.contains('تعقيم') ||
+        t.contains('يد') ||
+        t.contains('wash') ||
+        t.contains('sanitize') ||
+        t.contains('hand')) {
       return Icons.clean_hands_rounded;
     }
-    if (t.contains('سماع') || t.contains('فحص') || t.contains('صدر') || t.contains('قلب') || t.contains('سماعة') || t.contains('stethoscope') || t.contains('examine') || t.contains('heart') || t.contains('chest')) {
+    if (t.contains('سماع') ||
+        t.contains('فحص') ||
+        t.contains('صدر') ||
+        t.contains('قلب') ||
+        t.contains('سماعة') ||
+        t.contains('stethoscope') ||
+        t.contains('examine') ||
+        t.contains('heart') ||
+        t.contains('chest')) {
       return Icons.hearing_rounded;
     }
-    if (t.contains('تحدث') || t.contains('شرح') || t.contains('سؤال') || t.contains('تواصل') || t.contains('مريض') || t.contains('explain') || t.contains('ask') || t.contains('communicate')) {
+    if (t.contains('تحدث') ||
+        t.contains('شرح') ||
+        t.contains('سؤال') ||
+        t.contains('تواصل') ||
+        t.contains('مريض') ||
+        t.contains('explain') ||
+        t.contains('ask') ||
+        t.contains('communicate')) {
       return Icons.forum_rounded;
     }
-    if (t.contains('كتابة') || t.contains('تسجيل') || t.contains('ملاحظة') || t.contains('ملف') || t.contains('تقرير') || t.contains('write') || t.contains('record') || t.contains('note') || t.contains('file')) {
+    if (t.contains('كتابة') ||
+        t.contains('تسجيل') ||
+        t.contains('ملاحظة') ||
+        t.contains('ملف') ||
+        t.contains('تقرير') ||
+        t.contains('write') ||
+        t.contains('record') ||
+        t.contains('note') ||
+        t.contains('file')) {
       return Icons.rate_review_rounded;
     }
-    if (t.contains('إبرة') || t.contains('حقن') || t.contains('سحب') || t.contains('دم') || t.contains('عينة') || t.contains('needle') || t.contains('injection') || t.contains('blood')) {
+    if (t.contains('إبرة') ||
+        t.contains('حقن') ||
+        t.contains('سحب') ||
+        t.contains('دم') ||
+        t.contains('عينة') ||
+        t.contains('needle') ||
+        t.contains('injection') ||
+        t.contains('blood')) {
       return Icons.vaccines_rounded;
     }
-    if (t.contains('نبض') || t.contains('ضغط') || t.contains('حرارة') || t.contains('تنفس') || t.contains('pulse') || t.contains('blood pressure') || t.contains('temperature')) {
+    if (t.contains('نبض') ||
+        t.contains('ضغط') ||
+        t.contains('حرارة') ||
+        t.contains('تنفس') ||
+        t.contains('pulse') ||
+        t.contains('blood pressure') ||
+        t.contains('temperature')) {
       return Icons.monitor_heart_rounded;
     }
     return Icons.subdirectory_arrow_left_rounded;
@@ -362,7 +428,10 @@ class _ClinicalEvaluationFormState
           decoration: InputDecoration(
             labelText: 'بحث سريع عن الطالب بالاسم أو القيد',
             labelStyle: const TextStyle(fontFamily: 'Cairo', fontSize: 12),
-            prefixIcon: const Icon(Icons.search_rounded, color: AppColors.slate400),
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              color: AppColors.slate400,
+            ),
             filled: true,
             fillColor: AppColors.slate50,
             border: OutlineInputBorder(
@@ -409,10 +478,12 @@ class _ClinicalEvaluationFormState
         ),
         const SizedBox(height: 16),
         if (_loadingStudents)
-          const Center(child: Padding(
-            padding: EdgeInsets.all(24),
-            child: CircularProgressIndicator(),
-          ))
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(),
+            ),
+          )
         else if (_students.isEmpty)
           const _DocEmpty('لا توجد نتائج مطابقة للبحث الحالي.')
         else
@@ -486,6 +557,8 @@ class _ClinicalEvaluationFormState
             setState(() {
               _startedAt ??= DateTime.now();
               _now = DateTime.now();
+              _finishedElapsedSeconds = null;
+              _lockedByTimeLimit = false;
               _step = 3;
             });
             _ensureTicker();
@@ -532,7 +605,11 @@ class _ClinicalEvaluationFormState
                     },
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: Icon(Icons.zoom_out, size: 14, color: AppColors.slate600),
+                      child: Icon(
+                        Icons.zoom_out,
+                        size: 14,
+                        color: AppColors.slate600,
+                      ),
                     ),
                   ),
                   Text(
@@ -552,7 +629,11 @@ class _ClinicalEvaluationFormState
                     },
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: Icon(Icons.zoom_in, size: 14, color: AppColors.slate600),
+                      child: Icon(
+                        Icons.zoom_in,
+                        size: 14,
+                        color: AppColors.slate600,
+                      ),
                     ),
                   ),
                 ],
@@ -584,7 +665,10 @@ class _ClinicalEvaluationFormState
           decoration: InputDecoration(
             labelText: 'توصيات وملاحظات الطبيب العامة للطالب',
             labelStyle: const TextStyle(fontFamily: 'Cairo', fontSize: 12),
-            prefixIcon: const Icon(Icons.comment_rounded, color: AppColors.slate400),
+            prefixIcon: const Icon(
+              Icons.comment_rounded,
+              color: AppColors.slate400,
+            ),
             alignLabelWithHint: true,
             filled: true,
             fillColor: AppColors.slate50,
@@ -762,21 +846,34 @@ class _ClinicalEvaluationFormState
         if (_remainingSeconds != null) ...[
           const SizedBox(height: 10),
           _reviewMetricTile(
-            label: _remainingSeconds! >= 0 ? 'الوقت المتبقي للتقييم' : 'مدة تجاوز المؤقت',
+            label: _remainingSeconds! >= 0
+                ? 'الوقت المتبقي للتقييم'
+                : 'مدة تجاوز المؤقت',
             value: _formatDuration(_remainingSeconds!.abs()),
             icon: Icons.hourglass_bottom_rounded,
-            color: _remainingSeconds! >= 0 ? AppColors.success : AppColors.danger,
+            color: _remainingSeconds! >= 0
+                ? AppColors.success
+                : AppColors.danger,
           ),
         ],
         if (_evaluatedCount < _scoreableItems.length) ...[
           const SizedBox(height: 12),
-          _warningBox('تنبيه: يوجد بنود لم يتم تقييمها بعد، سيتم احتسابها تلقائياً "لم يتم".'),
+          _warningBox(
+            'تنبيه: يوجد بنود لم يتم تقييمها بعد، سيتم احتسابها تلقائياً "لم يتم".',
+          ),
+        ],
+        if (_lockedByTimeLimit) ...[
+          const SizedBox(height: 12),
+          _warningBox(
+            'انتهى وقت التقييم، وتم قفل الإجابات الحالية. احفظ النتيجة النهائية أو اخرج من التقييم.',
+          ),
         ],
         const SizedBox(height: 16),
         _navigationButtons(
           canNext: !_saving,
           nextLabel: 'حفظ التقييم النهائي',
           nextIcon: Icons.save_rounded,
+          showBack: !_lockedByTimeLimit,
           onBack: () {
             _resumeTimerFromReview();
             setState(() => _step = 3);
@@ -922,8 +1019,16 @@ class _ClinicalEvaluationFormState
                         runSpacing: 4,
                         children: [
                           _tagPill(code, AppColors.slate500, AppColors.slate50),
-                          _tagPill(major, AppColors.royalBlue, AppColors.royalBlue.withValues(alpha: 0.06)),
-                          _tagPill(level, Colors.purple, Colors.purple.withValues(alpha: 0.06)),
+                          _tagPill(
+                            major,
+                            AppColors.royalBlue,
+                            AppColors.royalBlue.withValues(alpha: 0.06),
+                          ),
+                          _tagPill(
+                            level,
+                            Colors.purple,
+                            Colors.purple.withValues(alpha: 0.06),
+                          ),
                         ],
                       ),
                     ],
@@ -999,9 +1104,7 @@ class _ClinicalEvaluationFormState
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: active
-                  ? skillColor.withValues(alpha: 0.05)
-                  : Colors.white,
+              color: active ? skillColor.withValues(alpha: 0.05) : Colors.white,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: active ? skillColor : AppColors.slate100,
@@ -1030,10 +1133,10 @@ class _ClinicalEvaluationFormState
                     rawSkill == 'communication'
                         ? Icons.forum_rounded
                         : rawSkill == 'procedure'
-                            ? Icons.vaccines_rounded
-                            : rawSkill == 'history_taking'
-                                ? Icons.rate_review_rounded
-                                : Icons.hearing_rounded,
+                        ? Icons.vaccines_rounded
+                        : rawSkill == 'history_taking'
+                        ? Icons.rate_review_rounded
+                        : Icons.hearing_rounded,
                     color: skillColor,
                   ),
                 ),
@@ -1056,10 +1159,20 @@ class _ClinicalEvaluationFormState
                         spacing: 6,
                         runSpacing: 4,
                         children: [
-                          _tagPill(_skillLabel(rawSkill), skillColor, skillColor.withValues(alpha: 0.06)),
-                          _tagPill('$marks درجة', AppColors.gold, AppColors.gold.withValues(alpha: 0.06)),
                           _tagPill(
-                            officialMinutes > 0 ? '$officialMinutes دقيقة' : 'وقت مفتوح',
+                            _skillLabel(rawSkill),
+                            skillColor,
+                            skillColor.withValues(alpha: 0.06),
+                          ),
+                          _tagPill(
+                            '$marks درجة',
+                            AppColors.gold,
+                            AppColors.gold.withValues(alpha: 0.06),
+                          ),
+                          _tagPill(
+                            officialMinutes > 0
+                                ? '$officialMinutes دقيقة'
+                                : 'وقت مفتوح',
                             AppColors.royalBlue,
                             AppColors.royalBlue.withValues(alpha: 0.06),
                           ),
@@ -1179,15 +1292,33 @@ class _ClinicalEvaluationFormState
           Row(
             children: [
               Expanded(
-                child: _scorePill(id, 'done', 'تم بالكامل', AppColors.success, current),
+                child: _scorePill(
+                  id,
+                  'done',
+                  'تم بالكامل',
+                  AppColors.success,
+                  current,
+                ),
               ),
               const SizedBox(width: 6),
               Expanded(
-                child: _scorePill(id, 'partial', 'تم جزئياً', AppColors.gold, current),
+                child: _scorePill(
+                  id,
+                  'partial',
+                  'تم جزئياً',
+                  AppColors.gold,
+                  current,
+                ),
               ),
               const SizedBox(width: 6),
               Expanded(
-                child: _scorePill(id, 'not_done', 'لم يتم', AppColors.danger, current),
+                child: _scorePill(
+                  id,
+                  'not_done',
+                  'لم يتم',
+                  AppColors.danger,
+                  current,
+                ),
               ),
             ],
           ),
@@ -1220,7 +1351,10 @@ class _ClinicalEvaluationFormState
                   ),
                 ),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -1233,19 +1367,16 @@ class _ClinicalEvaluationFormState
               controller: note,
               minLines: 1,
               maxLines: 3,
-              style: const TextStyle(
-                fontFamily: 'Cairo',
-                fontSize: 12,
-              ),
+              style: const TextStyle(fontFamily: 'Cairo', fontSize: 12),
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: 'ملاحظة على هذا البند الفرعي',
-                labelStyle: const TextStyle(
-                  fontFamily: 'Cairo',
-                  fontSize: 11,
-                ),
+                labelStyle: const TextStyle(fontFamily: 'Cairo', fontSize: 11),
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 fillColor: AppColors.slate50,
                 filled: true,
                 border: OutlineInputBorder(
@@ -1300,11 +1431,7 @@ class _ClinicalEvaluationFormState
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 13,
-              color: active ? Colors.white : color,
-            ),
+            Icon(icon, size: 13, color: active ? Colors.white : color),
             const SizedBox(width: 4),
             Text(
               label,
@@ -1385,7 +1512,9 @@ class _ClinicalEvaluationFormState
                     value: _formatDuration(remaining.abs()),
                     icon: Icons.timer_rounded,
                     color: remaining >= 0
-                        ? (remaining < 30 ? AppColors.danger : AppColors.royalBlue)
+                        ? (remaining < 30
+                              ? AppColors.danger
+                              : AppColors.royalBlue)
                         : AppColors.danger,
                   ),
                 ),
@@ -1449,7 +1578,9 @@ class _ClinicalEvaluationFormState
                   value,
                   style: TextStyle(
                     fontFamily: 'Cairo',
-                    color: color == AppColors.danger ? AppColors.danger : AppColors.midnight,
+                    color: color == AppColors.danger
+                        ? AppColors.danger
+                        : AppColors.midnight,
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1512,7 +1643,11 @@ class _ClinicalEvaluationFormState
               color: Colors.white,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.school_rounded, color: AppColors.royalBlue, size: 20),
+            child: const Icon(
+              Icons.school_rounded,
+              color: AppColors.royalBlue,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1578,7 +1713,10 @@ class _ClinicalEvaluationFormState
             isDense: true,
             contentPadding: EdgeInsets.zero,
           ),
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.slate500),
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: AppColors.slate500,
+          ),
           style: const TextStyle(
             fontFamily: 'Cairo',
             color: AppColors.midnight,
@@ -1675,7 +1813,10 @@ class _ClinicalEvaluationFormState
               decoration: InputDecoration(
                 labelText: 'الوقت المخصص بالدقائق',
                 labelStyle: const TextStyle(fontFamily: 'Cairo', fontSize: 12),
-                prefixIcon: const Icon(Icons.timer_10_rounded, color: AppColors.slate400),
+                prefixIcon: const Icon(
+                  Icons.timer_10_rounded,
+                  color: AppColors.slate400,
+                ),
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -1759,17 +1900,20 @@ class _ClinicalEvaluationFormState
     required VoidCallback onNext,
     String nextLabel = 'التالي',
     IconData nextIcon = Icons.arrow_back_rounded,
+    bool showBack = true,
   }) {
     return Row(
       children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_forward_rounded),
-            label: const Text('رجوع'),
+        if (showBack) ...[
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_forward_rounded),
+              label: const Text('رجوع'),
+            ),
           ),
-        ),
-        const SizedBox(width: 10),
+          const SizedBox(width: 10),
+        ],
         Expanded(
           child: FilledButton.icon(
             onPressed: canNext ? onNext : null,
@@ -1893,10 +2037,7 @@ class _ClinicalEvaluationFormState
   Future<void> _submit() async {
     setState(() => _saving = true);
     try {
-      final startedAt = _startedAt;
-      final elapsed = startedAt == null
-          ? 0
-          : DateTime.now().difference(startedAt).inSeconds;
+      final elapsed = _elapsedSeconds;
       await widget.onSubmit({
         'checklist_id': _checklistId,
         'student_id': _studentId,

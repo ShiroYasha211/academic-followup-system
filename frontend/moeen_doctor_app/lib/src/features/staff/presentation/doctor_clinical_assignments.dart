@@ -2120,3 +2120,841 @@ class _CaseSearchPickerState extends State<_CaseSearchPicker> {
     );
   }
 }
+
+extension _DoctorClinicalAssignmentActions
+    on _DoctorClinicalSectionScreenState {
+  Future<void> _openAssignmentForm() async {
+    _Json? findItem(List<_Json> items, int? id) {
+      if (id == null) return null;
+      for (final item in items) {
+        if (_docInt(item['id']) == id) return item;
+      }
+      return null;
+    }
+
+    List<_Json> uniqueRelationOptions(List<_Json> items, String key) {
+      final seen = <int>{};
+      final result = <_Json>[];
+      for (final item in items) {
+        final relation = _docMap(item[key]);
+        final id = _docInt(relation['id']);
+        final name = _docText(relation['name']);
+        if (id > 0 && name.isNotEmpty && seen.add(id)) {
+          result.add({'id': id, 'name': name});
+        }
+      }
+      result.sort((a, b) => _docText(a['name']).compareTo(_docText(b['name'])));
+      return result;
+    }
+
+    final results = await Future.wait([
+      ref
+          .read(staffRepositoryProvider)
+          .get(
+            '/doctor/clinical/cases',
+            query: const {'per_page': 200, 'include_assignment_summary': 1},
+          ),
+      ref
+          .read(staffRepositoryProvider)
+          .get('/doctor/clinical/evaluations/start-data'),
+    ]);
+    if (!mounted) return;
+    final cases = _clinicalPagedItems(results[0]);
+    final startData = _docMap(_docData(results[1]));
+    final students = _docList(startData['students']);
+    final formKey = GlobalKey<FormState>();
+    int? studentId;
+    int? caseId;
+    String task = 'history_taking';
+    DateTime? dueAt;
+    PlatformFile? attachment;
+    final instructions = TextEditingController();
+
+    final centers = uniqueRelationOptions(cases, 'training_center');
+    final departments = uniqueRelationOptions(cases, 'clinical_department');
+    final systems = uniqueRelationOptions(cases, 'body_system');
+
+    final ok = await showMoeenBottomSheet<bool>(
+      context: context,
+      title: 'تكليف حالة لطالب',
+      icon: Icons.assignment_ind_rounded,
+      color: AppColors.royalBlue,
+      fullScreen: true,
+      child: StatefulBuilder(
+        builder: (context, setLocal) {
+          final selectedCase = findItem(cases, caseId);
+
+          return Form(
+            key: formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Bento Container 1: Parties Data
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.slate200),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.royalBlue.withValues(
+                                alpha: 0.08,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.people_alt_rounded,
+                              color: AppColors.royalBlue,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'أطراف التكليف',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13.5,
+                              color: AppColors.slate900,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(
+                        height: 24,
+                        thickness: 1,
+                        color: AppColors.slate100,
+                      ),
+                      // Student Selector Tile
+                      FormField<int>(
+                        initialValue: studentId,
+                        validator: (value) =>
+                            value == null ? 'اختر الطالب المكلف.' : null,
+                        builder: (fieldState) {
+                          final selectedStudent = findItem(students, studentId);
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              InkWell(
+                                onTap: () async {
+                                  final selected =
+                                      await showMoeenBottomSheet<_Json>(
+                                        context: context,
+                                        title: 'اختر الطالب المكلف',
+                                        icon: Icons.school_rounded,
+                                        color: AppColors.royalBlue,
+                                        fullScreen: true,
+                                        child: _StudentSearchPicker(
+                                          students: students,
+                                        ),
+                                      );
+                                  if (selected != null) {
+                                    setLocal(() {
+                                      studentId = _docInt(selected['id']);
+                                      fieldState.didChange(studentId);
+                                    });
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.slate50,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: fieldState.hasError
+                                          ? AppColors.danger
+                                          : (studentId == null
+                                                ? AppColors.slate200
+                                                : AppColors.royalBlue),
+                                      width: studentId == null ? 1 : 1.5,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.school_rounded,
+                                        color: AppColors.royalBlue,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              studentId == null
+                                                  ? 'الطالب المكلف'
+                                                  : 'الطالب المحدد',
+                                              style: const TextStyle(
+                                                fontFamily: 'Cairo',
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 11,
+                                                color: AppColors.slate500,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              studentId == null
+                                                  ? 'اضغط للبحث واختيار طالب...'
+                                                  : _docText(
+                                                      selectedStudent?['name'],
+                                                      'طالب',
+                                                    ),
+                                              style: TextStyle(
+                                                fontFamily: 'Cairo',
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 13,
+                                                color: studentId == null
+                                                    ? AppColors.slate400
+                                                    : AppColors.slate900,
+                                              ),
+                                            ),
+                                            if (selectedStudent != null) ...[
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'رقم القيد: ${_docText(selectedStudent['student_number'], '-')}',
+                                                style: const TextStyle(
+                                                  fontFamily: 'Cairo',
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 11,
+                                                  color: AppColors.slate500,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons.arrow_forward_ios_rounded,
+                                        size: 14,
+                                        color: AppColors.slate400,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              if (fieldState.hasError) ...[
+                                const SizedBox(height: 6),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  child: Text(
+                                    fieldState.errorText ?? '',
+                                    style: const TextStyle(
+                                      fontFamily: 'Cairo',
+                                      fontSize: 11,
+                                      color: AppColors.danger,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      // Case Selector Tile
+                      FormField<int>(
+                        initialValue: caseId,
+                        validator: (value) =>
+                            value == null ? 'اختر الحالة السريرية.' : null,
+                        builder: (fieldState) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              InkWell(
+                                onTap: () async {
+                                  final selected =
+                                      await showMoeenBottomSheet<_Json>(
+                                        context: context,
+                                        title: 'اختر الحالة السريرية',
+                                        icon: Icons.medical_information_rounded,
+                                        color: AppColors.teal,
+                                        fullScreen: true,
+                                        child: _CaseSearchPicker(
+                                          cases: cases,
+                                          centers: centers,
+                                          departments: departments,
+                                          systems: systems,
+                                        ),
+                                      );
+                                  if (selected != null) {
+                                    setLocal(() {
+                                      caseId = _docInt(selected['id']);
+                                      fieldState.didChange(caseId);
+                                    });
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.slate50,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: fieldState.hasError
+                                          ? AppColors.danger
+                                          : (caseId == null
+                                                ? AppColors.slate200
+                                                : AppColors.teal),
+                                      width: caseId == null ? 1 : 1.5,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.medical_information_rounded,
+                                        color: AppColors.teal,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              caseId == null
+                                                  ? 'الحالة السريرية'
+                                                  : 'الحالة المحددة',
+                                              style: const TextStyle(
+                                                fontFamily: 'Cairo',
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 11,
+                                                color: AppColors.slate500,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              caseId == null
+                                                  ? 'اضغط للبحث واختيار حالة سريرية...'
+                                                  : _docText(
+                                                      selectedCase?['patient_name'],
+                                                      _docText(
+                                                        selectedCase?['name'],
+                                                        'حالة سريرية',
+                                                      ),
+                                                    ),
+                                              style: TextStyle(
+                                                fontFamily: 'Cairo',
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 13,
+                                                color: caseId == null
+                                                    ? AppColors.slate400
+                                                    : AppColors.slate900,
+                                              ),
+                                            ),
+                                            if (selectedCase != null) ...[
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'التشخيص: ${_docText(selectedCase['diagnosis_or_description'], '-')}',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontFamily: 'Cairo',
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 11,
+                                                  color: AppColors.slate500,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons.arrow_forward_ios_rounded,
+                                        size: 14,
+                                        color: AppColors.slate400,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              if (fieldState.hasError) ...[
+                                const SizedBox(height: 6),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  child: Text(
+                                    fieldState.errorText ?? '',
+                                    style: const TextStyle(
+                                      fontFamily: 'Cairo',
+                                      fontSize: 11,
+                                      color: AppColors.danger,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          );
+                        },
+                      ),
+                      if (selectedCase != null) ...[
+                        const SizedBox(height: 12),
+                        _AssignmentCasePreview(caseItem: selectedCase),
+                      ],
+                    ],
+                  ),
+                ),
+
+                // Bento Container 2: Task details
+                Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.slate200),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.task_alt_rounded,
+                              color: AppColors.warning,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'تفاصيل وتوجيهات المهمة',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13.5,
+                              color: AppColors.slate900,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(
+                        height: 24,
+                        thickness: 1,
+                        color: AppColors.slate100,
+                      ),
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        initialValue: task,
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.midnight,
+                          fontSize: 13,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'نوع المهمة المطلوبة',
+                          labelStyle: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w700,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.assignment_rounded,
+                            color: AppColors.royalBlue,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.slate50,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(
+                              color: AppColors.slate200,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(
+                              color: AppColors.slate200,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(
+                              color: AppColors.royalBlue,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'history_taking',
+                            child: Text(
+                              'أخذ قصة مرضية',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'clinical_examination',
+                            child: Text(
+                              'الفحص السريري',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'follow_up',
+                            child: Text(
+                              'متابعة',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setLocal(() => task = v ?? task),
+                      ),
+                      const SizedBox(height: 12),
+                      InkWell(
+                        onTap: () async {
+                          final now = DateTime.now();
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: dueAt ?? now,
+                            firstDate: DateTime(now.year - 1),
+                            lastDate: DateTime(now.year + 3),
+                          );
+                          if (date == null || !context.mounted) return;
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: dueAt == null
+                                ? TimeOfDay.now()
+                                : TimeOfDay.fromDateTime(dueAt!),
+                          );
+                          if (time == null) return;
+                          setLocal(() {
+                            dueAt = DateTime(
+                              date.year,
+                              date.month,
+                              date.day,
+                              time.hour,
+                              time.minute,
+                            );
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'موعد الاستحقاق',
+                            prefixIcon: const Icon(
+                              Icons.event_available_rounded,
+                            ),
+                            suffixIcon: dueAt == null
+                                ? null
+                                : IconButton(
+                                    tooltip: 'مَسح الموعد',
+                                    onPressed: () =>
+                                        setLocal(() => dueAt = null),
+                                    icon: const Icon(Icons.close_rounded),
+                                  ),
+                          ),
+                          child: Text(
+                            dueAt == null
+                                ? 'اختياري - بدون موعد محدد'
+                                : _docDateTimeForInput(
+                                    _docDateTimeForApi(dueAt!),
+                                  ),
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.midnight,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: instructions,
+                        minLines: 3,
+                        maxLines: 5,
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.midnight,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'تعليمات وإرشادات للطالب',
+                          labelStyle: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w700,
+                          ),
+                          alignLabelWithHint: true,
+                          prefixIcon: const Padding(
+                            padding: EdgeInsets.only(bottom: 50),
+                            child: Icon(
+                              Icons.description_rounded,
+                              color: AppColors.slate500,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: AppColors.slate50,
+                          contentPadding: const EdgeInsets.all(16),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(
+                              color: AppColors.slate200,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(
+                              color: AppColors.slate200,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(
+                              color: AppColors.royalBlue,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      InkWell(
+                        onTap: () async {
+                          final result = await FilePicker.platform.pickFiles(
+                            allowMultiple: false,
+                            withData: false,
+                          );
+                          if (result == null || result.files.isEmpty) return;
+                          setLocal(() => attachment = result.files.single);
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: attachment == null
+                                ? AppColors.slate50
+                                : AppColors.royalBlue.withValues(alpha: 0.07),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: attachment == null
+                                  ? AppColors.slate200
+                                  : AppColors.royalBlue.withValues(alpha: 0.22),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                attachment == null
+                                    ? Icons.attach_file_rounded
+                                    : Icons.file_present_rounded,
+                                color: attachment == null
+                                    ? AppColors.slate500
+                                    : AppColors.royalBlue,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      attachment?.name ??
+                                          'إرفاق ملف أو صورة للتكليف',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontFamily: 'Cairo',
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 12.5,
+                                        color: AppColors.slate900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      attachment == null
+                                          ? 'اختياري، يستخدم لتوجيه الطالب بصورة أو ملف للحالة.'
+                                          : 'سيتم إرسال هذا المرفق مع التكليف.',
+                                      style: const TextStyle(
+                                        fontFamily: 'Cairo',
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11,
+                                        color: AppColors.slate500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (attachment != null)
+                                IconButton(
+                                  tooltip: 'إزالة المرفق',
+                                  onPressed: () =>
+                                      setLocal(() => attachment = null),
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.slate600,
+                          side: const BorderSide(color: AppColors.slate300),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          'إلغاء',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          if (formKey.currentState?.validate() != true) return;
+                          final summary = _docMap(
+                            selectedCase?['assignment_summary'],
+                          );
+                          final similarSummary = _docMap(
+                            selectedCase?['similar_cases_summary'],
+                          );
+                          final studentsCount = _docInt(
+                            summary['students_count'],
+                          );
+                          final similarCount = _docInt(
+                            similarSummary['cases_count'],
+                          );
+                          if (studentsCount > 0 || similarCount > 0) {
+                            final approved = await showMoeenConfirmDialog(
+                              context: context,
+                              title: 'تأكيد تكليف الحالة',
+                              message:
+                                  'هذه الحالة عليها $studentsCount طالب مكلف، ويوجد $similarCount حالة مشابهة داخل الكلية. هل تريد إرسال التكليف رغم ذلك؟',
+                              confirmLabel: 'نعم، إرسال التكليف',
+                              cancelLabel: 'مراجعة الحالة',
+                              icon: Icons.warning_amber_rounded,
+                              color: AppColors.warning,
+                            );
+                            if (!approved || !context.mounted) return;
+                          }
+                          Navigator.pop(context, true);
+                        },
+                        icon: const Icon(Icons.send_rounded, size: 18),
+                        label: const Text(
+                          'إرسال التكليف',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.royalBlue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 2,
+                          shadowColor: AppColors.royalBlue.withValues(
+                            alpha: 0.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    final payload = {
+      'student_id': studentId,
+      'clinical_case_id': caseId,
+      'task_type': task,
+      'instructions': instructions.text.trim(),
+      if (dueAt != null) 'due_at': _docDateTimeForApi(dueAt!),
+    };
+    Future.delayed(const Duration(milliseconds: 500), () {
+      instructions.dispose();
+    });
+    if (ok != true) return;
+    try {
+      if (attachment?.path != null) {
+        await ref.read(staffRepositoryProvider).upload(_endpoint, {
+          ...payload,
+          'attachment': await MultipartFile.fromFile(
+            attachment!.path!,
+            filename: attachment!.name,
+          ),
+        });
+      } else {
+        await ref.read(staffRepositoryProvider).post(_endpoint, payload);
+      }
+      if (!mounted) return;
+      _reload();
+    } catch (error) {
+      if (mounted) await _docErrorDialog(context, error);
+    }
+  }
+}

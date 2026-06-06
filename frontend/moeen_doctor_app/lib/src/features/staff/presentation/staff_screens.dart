@@ -40,6 +40,14 @@ part 'doctor_inquiries.dart';
 part 'doctor_messages.dart';
 part 'doctor_news_notifications.dart';
 part 'doctor_clinical.dart';
+part 'doctor_clinical_home.dart';
+part 'doctor_clinical_portfolios.dart';
+part 'doctor_clinical_records.dart';
+part 'doctor_clinical_checklists.dart';
+part 'doctor_clinical_result_widgets.dart';
+part 'doctor_clinical_sections.dart';
+part 'doctor_clinical_setup_actions.dart';
+part 'doctor_clinical_review_actions.dart';
 part 'doctor_clinical_assignments.dart';
 part 'doctor_clinical_body_systems.dart';
 part 'doctor_clinical_cases.dart';
@@ -266,6 +274,12 @@ final staffRoutes = <GoRoute>[
     builder: (context, state) => const DoctorClinicalScreen(),
   ),
   GoRoute(
+    path: DoctorClinicalPortfolioDetailsScreen.route,
+    builder: (context, state) => DoctorClinicalPortfolioDetailsScreen(
+      studentId: int.parse(state.pathParameters['studentId']!),
+    ),
+  ),
+  GoRoute(
     path: DoctorClinicalSectionScreen.route,
     builder: (context, state) =>
         DoctorClinicalSectionScreen(section: state.pathParameters['section']!),
@@ -336,7 +350,8 @@ final staffRoutes = <GoRoute>[
   GoRoute(
     path: AdministrativeSubjectReportScreen.route,
     builder: (context, state) => AdministrativeSubjectReportScreen(
-      subjectId: int.tryParse(state.uri.queryParameters['subject_id'] ?? '') ?? 0,
+      subjectId:
+          int.tryParse(state.uri.queryParameters['subject_id'] ?? '') ?? 0,
       dateStart: state.uri.queryParameters['date_start'],
       dateEnd: state.uri.queryParameters['date_end'],
     ),

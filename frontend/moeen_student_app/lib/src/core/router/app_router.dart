@@ -1,7 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/logic/auth_controller.dart';
+import '../../features/auth/presentation/device_mismatch_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
@@ -18,9 +20,21 @@ import '../../features/student/presentation/student_placeholder_screen.dart';
 import '../../features/student/presentation/student_subscription_screen.dart';
 import '../../features/student/presentation/student_support_screen.dart';
 
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: SplashScreen.route,
+    redirect: (context, state) {
+      final session = ref.read(authControllerProvider).valueOrNull;
+      final path = state.uri.path;
+      if (session?.isSecondaryDevice == true &&
+          _requiresPrimaryStudentDevice(path)) {
+        return StudentDashboardScreen.route;
+      }
+      return null;
+    },
     routes: [
       GoRoute(
         path: SplashScreen.route,
@@ -29,6 +43,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: LoginScreen.route,
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: DeviceMismatchScreen.route,
+        builder: (context, state) {
+          final extra = state.extra;
+          final whatsapp = extra is Map
+              ? extra['whatsapp_number']?.toString()
+              : null;
+          return DeviceMismatchScreen(whatsappNumber: whatsapp);
+        },
       ),
       GoRoute(
         path: RegisterScreen.route,
@@ -438,3 +462,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+bool _requiresPrimaryStudentDevice(String path) {
+  return path == StudentQrScanScreen.route ||
+      path == StudentQuizzesScreen.route ||
+      path.startsWith('/student/quizzes/') ||
+      path == StudentFlashcardsScreen.route ||
+      path.startsWith('/student/flashcards');
+}

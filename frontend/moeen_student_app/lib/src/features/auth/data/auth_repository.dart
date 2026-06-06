@@ -1,6 +1,7 @@
 import '../../../core/device/device_identity_service.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/device_not_authorized_exception.dart';
 import 'academic_option.dart';
 import 'auth_session.dart';
 
@@ -22,6 +23,9 @@ class AuthRepository {
       );
       return _sessionFromStudentResponse(response);
     } on ApiException catch (error) {
+      // Check for device-not-authorized before falling back to delegate login
+      _maybeRethrowDeviceError(error);
+
       final canTryDelegate =
           login.contains('@') &&
           (error.statusCode == 401 || error.statusCode == 403);
@@ -94,9 +98,18 @@ class AuthRepository {
         .toList();
   }
 
+  Future<Map<String, dynamic>> fetchPublicSupportSettings() async {
+    final response = await _api.get('/public/support-settings');
+    final data = response['data'];
+    if (data is Map<String, dynamic>) return data;
+    throw const ApiException('استجابة غير مكتملة من الخادم.');
+  }
+
   AuthSession _sessionFromStudentResponse(Map<String, dynamic> response) {
     final data = response['data'] as Map<String, dynamic>;
     final user = data['user'] as Map<String, dynamic>;
+    final device = data['device'];
+    final deviceMap = device is Map ? device : const <String, dynamic>{};
     final major = user['major'];
     final role = _roleValue(user['role']);
     final isPracticalDelegate = user['is_practical_delegate'] == true;
@@ -110,9 +123,12 @@ class AuthRepository {
       email: user['email']?.toString(),
       isPracticalDelegate: isPracticalDelegate,
       hasClinical: major is Map && major['has_clinical'] == true,
-      permissions: (user['permissions'] as List?)
-              ?.map((e) => e.toString())
-              .toList() ??
+      deviceType: deviceMap['device_type']?.toString(),
+      isPrimaryDevice: deviceMap['is_primary'] is bool
+          ? deviceMap['is_primary'] as bool
+          : null,
+      permissions:
+          (user['permissions'] as List?)?.map((e) => e.toString()).toList() ??
           [],
     );
   }
@@ -128,9 +144,8 @@ class AuthRepository {
       email: user['email']?.toString(),
       isPracticalDelegate: user['is_practical_delegate'] == true,
       hasClinical: user['is_clinical_delegate'] == true,
-      permissions: (user['permissions'] as List?)
-              ?.map((e) => e.toString())
-              .toList() ??
+      permissions:
+          (user['permissions'] as List?)?.map((e) => e.toString()).toList() ??
           [],
     );
   }
@@ -140,5 +155,22 @@ class AuthRepository {
       return value['value'].toString();
     }
     return (value ?? 'student').toString();
+  }
+
+  /// If the ApiException carries a device_not_authorized error code,
+  /// throw a typed [DeviceNotAuthorizedException] so the UI can handle it.
+  void _maybeRethrowDeviceError(ApiException error) {
+    final errors = error.errors;
+    if (errors is! Map) return;
+
+    final code = errors['error_code']?.toString();
+    if (code == 'device_not_authorized') {
+      final whatsapp = errors['whatsapp_number']?.toString();
+      throw DeviceNotAuthorizedException(
+        whatsappNumber: (whatsapp != null && whatsapp.isNotEmpty)
+            ? whatsapp
+            : null,
+      );
+    }
   }
 }
