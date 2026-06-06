@@ -55,6 +55,7 @@ part 'doctor_clinical_checklist_form.dart';
 part 'doctor_clinical_common_widgets.dart';
 part 'doctor_clinical_departments.dart';
 part 'doctor_clinical_evaluation_flow.dart';
+part 'doctor_clinical_evaluation_portfolios.dart';
 part 'doctor_clinical_evaluation_results.dart';
 part 'doctor_clinical_forms.dart';
 part 'doctor_clinical_home_widgets.dart';
@@ -225,6 +226,12 @@ final staffRoutes = <GoRoute>[
     ),
   ),
   GoRoute(
+    path: DoctorQuizResultsScreen.route,
+    builder: (context, state) => DoctorQuizResultsScreen(
+      quizId: int.parse(state.pathParameters['quizId']!),
+    ),
+  ),
+  GoRoute(
     path: DoctorQuizDetailsScreen.route,
     builder: (context, state) => DoctorQuizDetailsScreen(
       quizId: int.parse(state.pathParameters['quizId']!),
@@ -276,6 +283,16 @@ final staffRoutes = <GoRoute>[
   GoRoute(
     path: DoctorClinicalPortfolioDetailsScreen.route,
     builder: (context, state) => DoctorClinicalPortfolioDetailsScreen(
+      studentId: int.parse(state.pathParameters['studentId']!),
+    ),
+  ),
+  GoRoute(
+    path: DoctorEvaluationPortfoliosScreen.route,
+    builder: (context, state) => const DoctorEvaluationPortfoliosScreen(),
+  ),
+  GoRoute(
+    path: DoctorEvaluationPortfolioDetailsScreen.route,
+    builder: (context, state) => DoctorEvaluationPortfolioDetailsScreen(
       studentId: int.parse(state.pathParameters['studentId']!),
     ),
   ),

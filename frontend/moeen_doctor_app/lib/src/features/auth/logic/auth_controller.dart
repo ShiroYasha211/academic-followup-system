@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/notifications/push_notification_service.dart';
 import '../../../core/providers.dart';
 import '../../auth/data/auth_repository.dart';
@@ -15,6 +16,9 @@ final authControllerProvider =
     );
 
 class AuthController extends AsyncNotifier<StaffAuthSession?> {
+  bool _handlingUnauthorized = false;
+  String? _sessionExpiredMessage;
+
   @override
   Future<StaffAuthSession?> build() async {
     final session = await ref.watch(sessionStorageProvider).read();
@@ -24,6 +28,15 @@ class AuthController extends AsyncNotifier<StaffAuthSession?> {
       await ref.read(sessionStorageProvider).save(refreshed);
       await StaffPushNotificationService.registerDevice(refreshed);
       return refreshed;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401) {
+        await ref.read(sessionStorageProvider).clear();
+        _sessionExpiredMessage =
+            'انتهت جلسة تسجيل الدخول أو تم تسجيل الحساب من جهاز آخر. يرجى تسجيل الدخول مجددًا.';
+        return null;
+      }
+      await StaffPushNotificationService.registerDevice(session);
+      return session;
     } catch (_) {
       await StaffPushNotificationService.registerDevice(session);
       return session;
@@ -31,6 +44,7 @@ class AuthController extends AsyncNotifier<StaffAuthSession?> {
   }
 
   Future<void> login({required String email, required String password}) async {
+    _sessionExpiredMessage = null;
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final session = await ref
@@ -61,6 +75,7 @@ class AuthController extends AsyncNotifier<StaffAuthSession?> {
   }
 
   Future<void> logout() async {
+    _sessionExpiredMessage = null;
     final session = state.valueOrNull;
     if (session != null) {
       await StaffPushNotificationService.unregisterDevice(session);
@@ -72,5 +87,24 @@ class AuthController extends AsyncNotifier<StaffAuthSession?> {
     }
     await ref.read(sessionStorageProvider).clear();
     state = const AsyncData(null);
+  }
+
+  Future<void> handleUnauthorized() async {
+    if (_handlingUnauthorized || state.valueOrNull == null) return;
+    _handlingUnauthorized = true;
+    try {
+      _sessionExpiredMessage =
+          'انتهت جلسة تسجيل الدخول أو تم تسجيل الحساب من جهاز آخر. يرجى تسجيل الدخول مجددًا.';
+      await ref.read(sessionStorageProvider).clear();
+      state = const AsyncData(null);
+    } finally {
+      _handlingUnauthorized = false;
+    }
+  }
+
+  String? takeSessionExpiredMessage() {
+    final message = _sessionExpiredMessage;
+    _sessionExpiredMessage = null;
+    return message;
   }
 }

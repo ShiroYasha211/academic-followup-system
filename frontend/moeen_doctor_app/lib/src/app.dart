@@ -11,14 +11,18 @@ import 'core/notifications/push_notification_service.dart';
 import 'core/refresh/staff_refresh_coordinator.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
+import 'shared/widgets/moeen_dialogs.dart';
 import 'features/auth/logic/auth_controller.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/register_screen.dart';
 import 'features/auth/presentation/splash_screen.dart';
 import 'features/staff/presentation/staff_screens.dart';
 
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: SplashScreen.route,
     redirect: (context, state) {
       final auth = ref.read(authControllerProvider).valueOrNull;
@@ -176,6 +180,29 @@ class _MoeenStaffAppState extends ConsumerState<MoeenStaffApp>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(authControllerProvider, (previous, next) {
+      if (previous?.valueOrNull == null || next.valueOrNull != null) return;
+
+      final message = ref
+          .read(authControllerProvider.notifier)
+          .takeSessionExpiredMessage();
+      if (message == null) return;
+
+      ref.read(appRouterProvider).go(LoginScreen.route);
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final dialogContext = rootNavigatorKey.currentContext;
+        if (dialogContext == null) return;
+        await showMoeenInfoDialog(
+          context: dialogContext,
+          title: 'انتهت جلسة تسجيل الدخول',
+          message: message,
+          buttonLabel: 'تسجيل الدخول',
+          icon: Icons.lock_clock_rounded,
+          color: AppColors.warning,
+        );
+      });
+    });
+
     final refreshState = ref.watch(staffRefreshCoordinatorProvider);
     return MaterialApp.router(
       title: 'Moeen Doctor',
@@ -254,9 +281,7 @@ class _StaffGlobalConnectivityBanner extends StatelessWidget {
                           message,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
+                          style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800,

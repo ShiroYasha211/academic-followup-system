@@ -7,6 +7,7 @@ import '../../../shared/widgets/auth_shell.dart';
 import '../../../shared/widgets/auth_status_message.dart';
 import '../../../shared/widgets/moeen_card.dart';
 import '../../../shared/widgets/moeen_logo.dart';
+import '../../../shared/widgets/moeen_dialogs.dart';
 import '../../../shared/widgets/primary_action_button.dart';
 import '../../staff/presentation/staff_screens.dart';
 import '../logic/auth_controller.dart';
@@ -27,6 +28,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscure = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(authControllerProvider.future);
+      if (!mounted) return;
+      final message = ref
+          .read(authControllerProvider.notifier)
+          .takeSessionExpiredMessage();
+      if (message == null) return;
+      await showMoeenInfoDialog(
+        context: context,
+        title: 'انتهت جلسة تسجيل الدخول',
+        message: message,
+        buttonLabel: 'تسجيل الدخول',
+        icon: Icons.lock_clock_rounded,
+        color: AppColors.warning,
+      );
+    });
+  }
 
   @override
   void dispose() {

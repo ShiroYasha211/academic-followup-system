@@ -22,5 +22,10 @@ final publicApiClientProvider = Provider<ApiClient>((ref) => ApiClient());
 
 final authenticatedApiClientProvider = Provider<ApiClient>((ref) {
   final token = ref.watch(authControllerProvider).valueOrNull?.token;
-  return ApiClient(token: token);
+  return ApiClient(
+    token: token,
+    onUnauthorized: token == null
+        ? null
+        : () => ref.read(authControllerProvider.notifier).handleUnauthorized(),
+  );
 });

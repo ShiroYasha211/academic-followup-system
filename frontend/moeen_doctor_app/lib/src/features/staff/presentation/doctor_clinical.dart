@@ -25,6 +25,9 @@ class _DoctorClinicalSectionScreenState
     extends ConsumerState<DoctorClinicalSectionScreen> {
   final _search = TextEditingController();
   String? _status;
+  String? _portfolioMajor;
+  String? _portfolioLevel;
+  String? _portfolioSort = 'name_asc';
   late Future<Map<String, dynamic>> _future = _fetch();
   bool _processingQr = false;
   bool _showHiddenChecklists = false;
@@ -48,6 +51,7 @@ class _DoctorClinicalSectionScreenState
             'body-systems',
             'checklists',
             'results',
+            'portfolios',
           }.contains(widget.section)) {
         return;
       }
@@ -192,6 +196,7 @@ class _DoctorClinicalSectionScreenState
                   'records',
                   'checklists',
                   'results',
+                  'portfolios',
                 }.contains(widget.section) &&
                 _search.text.trim().isNotEmpty)
               'search': _search.text.trim(),
@@ -325,7 +330,7 @@ class _DoctorClinicalSectionScreenState
                 if (widget.section == 'records') _buildRecordsStats(items),
                 if (widget.section == 'checklists')
                   _buildChecklistsStats(items),
-                if (_showsFilters) _buildFilters(),
+                if (_showsFilters) _buildFilters(data),
                 if (_showsFilters) const SizedBox(height: 14),
                 ..._buildBody(data),
               ],

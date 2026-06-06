@@ -213,69 +213,126 @@ extension _DoctorClinicalSectionContent on _DoctorClinicalSectionScreenState {
     return const SizedBox.shrink();
   }
 
-  Widget _buildFilters() {
+  Widget _buildFilters([_Json? data]) {
     return _DocFilterPanel(
       title: 'بحث وتصفية',
       icon: Icons.tune_rounded,
       children: [
-        TextField(
-          controller: _search,
-          onChanged: (text) {
-            if (widget.section == 'records' ||
-                widget.section == 'checklists' ||
-                widget.section == 'results') {
-              _update(() {});
-            }
-          },
-          onSubmitted:
-              {
-                'rare-cases',
-                'volunteers',
-                'cases',
-                'assignments',
-                'centers',
-                'departments',
-                'body-systems',
-                'records',
-                'checklists',
-                'results',
-              }.contains(widget.section)
-              ? null
-              : (_) => _reload(),
-          decoration: InputDecoration(
-            hintText: 'بحث...',
-            prefixIcon: const Icon(Icons.search_rounded),
-            suffixIcon:
-                {
-                  'rare-cases',
-                  'volunteers',
-                  'cases',
-                  'assignments',
-                  'centers',
-                  'departments',
-                  'body-systems',
-                  'records',
-                  'checklists',
-                  'results',
-                }.contains(widget.section)
-                ? (_search.text.trim().isEmpty
-                      ? null
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _search,
+                onChanged: (text) {
+                  if (widget.section == 'records' ||
+                      widget.section == 'checklists' ||
+                      widget.section == 'results' ||
+                      widget.section == 'portfolios') {
+                    _update(() {});
+                  }
+                },
+                onSubmitted:
+                    {
+                      'rare-cases',
+                      'volunteers',
+                      'cases',
+                      'assignments',
+                      'centers',
+                      'departments',
+                      'body-systems',
+                      'records',
+                      'checklists',
+                      'results',
+                      'portfolios',
+                    }.contains(widget.section)
+                    ? null
+                    : (_) => _reload(),
+                decoration: InputDecoration(
+                  hintText: 'بحث...',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon:
+                      {
+                        'rare-cases',
+                        'volunteers',
+                        'cases',
+                        'assignments',
+                        'centers',
+                        'departments',
+                        'body-systems',
+                        'records',
+                        'checklists',
+                        'results',
+                        'portfolios',
+                      }.contains(widget.section)
+                      ? (_search.text.trim().isEmpty
+                            ? null
+                            : IconButton(
+                                onPressed: () {
+                                  _search.clear();
+                                  if (widget.section == 'portfolios') {
+                                    _portfolioMajor = null;
+                                    _portfolioLevel = null;
+                                    _portfolioSort = 'name_asc';
+                                  }
+                                  if (widget.section == 'records' ||
+                                      widget.section == 'checklists' ||
+                                      widget.section == 'results' ||
+                                      widget.section == 'portfolios') {
+                                    _update(() {});
+                                  }
+                                },
+                                icon: const Icon(Icons.close_rounded),
+                              ))
                       : IconButton(
-                          onPressed: () {
-                            _search.clear();
-                            if (widget.section == 'records' ||
-                                widget.section == 'checklists' ||
-                                widget.section == 'results') {
-                              _update(() {});
-                            }
-                          },
-                          icon: const Icon(Icons.close_rounded),
-                        ))
-                : IconButton(
-                    onPressed: _reload,
-                    icon: const Icon(Icons.arrow_forward_rounded),
+                          onPressed: _reload,
+                          icon: const Icon(Icons.arrow_forward_rounded),
+                        ),
+                ),
+              ),
+            ),
+            if (widget.section == 'portfolios') ...[
+              const SizedBox(width: 10),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _showPortfolioFiltersBottomSheet(data),
+                  borderRadius: BorderRadius.circular(16),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color:
+                          (_portfolioMajor != null ||
+                              _portfolioLevel != null ||
+                              _portfolioSort != 'name_asc')
+                          ? AppColors.royalBlue.withValues(alpha: 0.1)
+                          : AppColors.slate50,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color:
+                            (_portfolioMajor != null ||
+                                _portfolioLevel != null ||
+                                _portfolioSort != 'name_asc')
+                            ? AppColors.royalBlue
+                            : AppColors.slate200,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.tune_rounded,
+                      color:
+                          (_portfolioMajor != null ||
+                              _portfolioLevel != null ||
+                              _portfolioSort != 'name_asc')
+                          ? AppColors.royalBlue
+                          : AppColors.slate600,
+                      size: 22,
+                    ),
                   ),
-          ),
+                ),
+              ),
+            ],
+          ],
         ),
         if ({
           'cases',
@@ -378,6 +435,139 @@ extension _DoctorClinicalSectionContent on _DoctorClinicalSectionScreenState {
           ),
         ],
       ],
+    );
+  }
+
+  void _showPortfolioFiltersBottomSheet(_Json? data) {
+    showMoeenBottomSheet<void>(
+      context: context,
+      title: 'خيارات التصفية والفرز',
+      icon: Icons.tune_rounded,
+      color: AppColors.royalBlue,
+      child: StatefulBuilder(
+        builder: (context, setModalState) {
+          final allItems = _itemsFrom(data ?? const {});
+          final majors = allItems
+              .map((item) => _docText(_docMap(item['major'])['name']))
+              .where((val) => val.isNotEmpty)
+              .toSet()
+              .toList();
+          final levels = allItems
+              .map((item) => _docText(_docMap(item['level'])['name']))
+              .where((val) => val.isNotEmpty)
+              .toSet()
+              .toList();
+
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: _portfolioMajor,
+                decoration: const InputDecoration(
+                  labelText: 'التخصص',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(16)),
+                  ),
+                ),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('كل التخصصات'),
+                  ),
+                  ...majors.map(
+                    (m) => DropdownMenuItem(value: m, child: Text(m)),
+                  ),
+                ],
+                onChanged: (val) {
+                  _update(() {
+                    _portfolioMajor = val;
+                  });
+                  setModalState(() {});
+                },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _portfolioLevel,
+                decoration: const InputDecoration(
+                  labelText: 'المستوى الدراسي',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(16)),
+                  ),
+                ),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('كل المستويات'),
+                  ),
+                  ...levels.map(
+                    (l) => DropdownMenuItem(value: l, child: Text(l)),
+                  ),
+                ],
+                onChanged: (val) {
+                  _update(() {
+                    _portfolioLevel = val;
+                  });
+                  setModalState(() {});
+                },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _portfolioSort,
+                decoration: const InputDecoration(
+                  labelText: 'ترتيب حسب',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(16)),
+                  ),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'name_asc',
+                    child: Text('الاسم (أ - ي)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'name_desc',
+                    child: Text('الاسم (ي - أ)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'activities_desc',
+                    child: Text('الأكثر إنجازاً للأنشطة'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'activities_asc',
+                    child: Text('الأقل إنجازاً للأنشطة'),
+                  ),
+                ],
+                onChanged: (val) {
+                  _update(() {
+                    _portfolioSort = val ?? 'name_asc';
+                  });
+                  setModalState(() {});
+                },
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.royalBlue,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'تطبيق الفلاتر',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -1608,20 +1798,66 @@ extension _DoctorClinicalSectionContent on _DoctorClinicalSectionScreenState {
   List<Widget> _buildPortfolios(_Json data) {
     final allItems = _itemsFrom(data);
     final query = _search.text.trim().toLowerCase();
-    final items = allItems.where((item) {
-      if (query.isEmpty) return true;
-      final major = _docText(_docMap(item['major'])['name']).toLowerCase();
-      final level = _docText(_docMap(item['level'])['name']).toLowerCase();
-      return _docText(item['name']).toLowerCase().contains(query) ||
-          _docText(item['student_number']).toLowerCase().contains(query) ||
-          _docText(item['email']).toLowerCase().contains(query) ||
-          major.contains(query) ||
-          level.contains(query);
+
+    var items = allItems.where((item) {
+      if (query.isNotEmpty) {
+        final major = _docText(_docMap(item['major'])['name']).toLowerCase();
+        final level = _docText(_docMap(item['level'])['name']).toLowerCase();
+        final matches =
+            _docText(item['name']).toLowerCase().contains(query) ||
+            _docText(item['student_number']).toLowerCase().contains(query) ||
+            _docText(item['email']).toLowerCase().contains(query) ||
+            major.contains(query) ||
+            level.contains(query);
+        if (!matches) return false;
+      }
+
+      if (_portfolioMajor != null && _portfolioMajor!.isNotEmpty) {
+        final major = _docText(_docMap(item['major'])['name']);
+        if (major != _portfolioMajor) return false;
+      }
+
+      if (_portfolioLevel != null && _portfolioLevel!.isNotEmpty) {
+        final level = _docText(_docMap(item['level'])['name']);
+        if (level != _portfolioLevel) return false;
+      }
+
+      return true;
     }).toList();
+
+    if (_portfolioSort != null) {
+      items.sort((a, b) {
+        switch (_portfolioSort) {
+          case 'name_desc':
+            return _docText(b['name']).compareTo(_docText(a['name']));
+          case 'activities_desc':
+            final aCount = _docInt(
+              _docMap(a['summary'])['approved_activities'],
+            );
+            final bCount = _docInt(
+              _docMap(b['summary'])['approved_activities'],
+            );
+            return bCount.compareTo(aCount);
+          case 'activities_asc':
+            final aCount = _docInt(
+              _docMap(a['summary'])['approved_activities'],
+            );
+            final bCount = _docInt(
+              _docMap(b['summary'])['approved_activities'],
+            );
+            return aCount.compareTo(bCount);
+          case 'name_asc':
+          default:
+            return _docText(a['name']).compareTo(_docText(b['name']));
+        }
+      });
+    }
 
     if (items.isEmpty) {
       return [
-        const _DocEmpty('لا توجد إنجازات عملية معتمدة مطابقة للبحث الحالي.'),
+        const _DocEmpty(
+          'لا توجد إنجازات عملية معتمدة مطابقة للبحث أو الفلتر الحالي.',
+        ),
       ];
     }
 
@@ -1720,6 +1956,9 @@ extension _DoctorClinicalSectionContent on _DoctorClinicalSectionScreenState {
     }).toList();
 
     return [
+      _EvaluationPortfoliosEntryCard(
+        onTap: () => context.push(DoctorEvaluationPortfoliosScreen.route),
+      ),
       if (items.isEmpty)
         const _DocEmpty('لا توجد نتائج تقييم مطابقة.')
       else

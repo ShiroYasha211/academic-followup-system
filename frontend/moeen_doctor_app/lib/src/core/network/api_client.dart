@@ -6,8 +6,9 @@ import '../config/app_config.dart';
 import 'api_exception.dart';
 
 class ApiClient {
-  ApiClient({String? token})
-    : _dio = Dio(
+  ApiClient({String? token, Future<void> Function()? onUnauthorized})
+    : _onUnauthorized = onUnauthorized,
+      _dio = Dio(
         BaseOptions(
           baseUrl: AppConfig.apiBaseUrl,
           connectTimeout: const Duration(seconds: 20),
@@ -20,6 +21,7 @@ class ApiClient {
       );
 
   final Dio _dio;
+  final Future<void> Function()? _onUnauthorized;
 
   Future<Map<String, dynamic>> get(
     String path, {
@@ -60,12 +62,22 @@ class ApiClient {
         ),
       );
       final statusCode = response.statusCode ?? 0;
+      if (statusCode == 401 && _onUnauthorized != null) {
+        final exception = _sessionExpiredException;
+        await _handleUnauthorized(exception);
+        throw exception;
+      }
       if (statusCode >= 400) {
-        throw ApiException('تعذر تحميل الملف. رمز الخطأ $statusCode.');
+        throw ApiException(
+          'تعذر تحميل الملف. رمز الخطأ $statusCode.',
+          statusCode: statusCode,
+        );
       }
       return response.data ?? const [];
     } on DioException catch (error) {
-      throw _exceptionFromDio(error, fallback: 'تعذر تحميل الملف.');
+      final exception = _exceptionFromDio(error, fallback: 'تعذر تحميل الملف.');
+      await _handleUnauthorized(exception);
+      throw exception;
     }
   }
 
@@ -83,14 +95,25 @@ class ApiClient {
       }
       throw const ApiException('استجابة غير متوقعة من الخادم.');
     } on DioException catch (error) {
-      throw _exceptionFromDio(error, fallback: 'تعذر تنفيذ الطلب.');
+      final exception = _exceptionFromDio(error, fallback: 'تعذر تنفيذ الطلب.');
+      await _handleUnauthorized(exception);
+      throw exception;
     }
+  }
+
+  Future<void> _handleUnauthorized(ApiException exception) async {
+    if (exception.statusCode != 401 || _onUnauthorized == null) return;
+    await _onUnauthorized();
   }
 
   ApiException _exceptionFromDio(
     DioException error, {
     required String fallback,
   }) {
+    if (error.response?.statusCode == 401 && _onUnauthorized != null) {
+      return _sessionExpiredException;
+    }
+
     final data = error.response?.data;
     if (data is Map<String, dynamic>) {
       return ApiException(
@@ -116,4 +139,10 @@ class ApiClient {
     }
     return ApiException(fallback, statusCode: error.response?.statusCode);
   }
+
+  static const _sessionExpiredException = ApiException(
+    'انتهت جلسة تسجيل الدخول أو تم تسجيل الحساب من جهاز آخر. يرجى تسجيل الدخول مجددًا.',
+    statusCode: 401,
+    code: 'session_expired',
+  );
 }
