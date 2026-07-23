@@ -1,0 +1,792 @@
+﻿{
+    "info":  {
+                 "_postman_id":  "migration-guide-2026-03-04",
+                 "name":  "Sample Name",
+                 "description":  "Sample description",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "auth":  {
+                 "type":  "bearer",
+                 "bearer":  [
+                                {
+                                    "key":  "token",
+                                    "value":  "{{delegate_token}}",
+                                    "type":  "string"
+                                }
+                            ]
+             },
+    "item":  [
+                 {
+                     "name":  "Section 1",
+                     "description":  "Sample description",
+                     "item":  [
+                                  {
+                                      "name":  "POST /api/register",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"name\":  \"Sample Name\",\r\n    \"email\":  \"ahmed@example.com\",\r\n    \"password\":  \"password123\",\r\n    \"password_confirmation\":  \"password123\",\r\n    \"role\":  \"student\",\r\n    \"student_number\":  \"20230001\",\r\n    \"university_id\":  1,\r\n    \"college_id\":  1,\r\n    \"major_id\":  1,\r\n    \"level_id\":  1\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/register",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "register"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  },
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Section 2",
+                     "description":  "Sample description",
+                     "item":  [
+                                  {
+                                      "name":  "PUT /api/profile/password",
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"current_password\":  \"oldpassword123\",\r\n    \"password\":  \"newpassword123\",\r\n    \"password_confirmation\":  \"newpassword123\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/profile/password",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "profile",
+                                                                               "password"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  },
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Section 3",
+                     "description":  "Sample description",
+                     "item":  [
+                                  {
+                                      "name":  "POST /api/admin/users/1/reset-password",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"new_password\":  \"securePass123!\"\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/admin/users/1/reset-password",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "admin",
+                                                                               "users",
+                                                                               "1",
+                                                                               "reset-password"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  },
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "name":  "POST /api/admin/users/1/kick",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/admin/users/1/kick",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "admin",
+                                                                               "users",
+                                                                               "1",
+                                                                               "kick"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  },
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Section 4",
+                     "description":  "Sample description",
+                     "item":  [
+                                  {
+                                      "name":  "GET /api/delegate/attendances",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/delegate/attendances",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "delegate",
+                                                                               "attendances"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "GET /api/delegate/attendances/1/2024-05-18",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/delegate/attendances/1/2024-05-18",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "delegate",
+                                                                               "attendances",
+                                                                               "1",
+                                                                               "2024-05-18"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "POST /api/delegate/attendances",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"date\":  \"2024-05-18\",\r\n    \"subject_id\":  1,\r\n    \"students\":  [\r\n                     {\r\n                         \"id\":  2,\r\n                         \"status\":  \"present\"\r\n                     },\r\n                     {\r\n                         \"id\":  3,\r\n                         \"status\":  \"late\"\r\n                     },\r\n                     {\r\n                         \"id\":  4,\r\n                         \"status\":  \"absent\"\r\n                     },\r\n                     {\r\n                         \"id\":  5,\r\n                         \"status\":  \"excused\"\r\n                     }\r\n                 ]\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/delegate/attendances",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "delegate",
+                                                                               "attendances"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Section 5",
+                     "description":  "Sample description",
+                     "item":  [
+                                  {
+                                      "name":  "GET /api/delegate/attendances",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/delegate/attendances",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "delegate",
+                                                                               "attendances"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "GET /api/delegate/attendances/7",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/delegate/attendances/7",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "delegate",
+                                                                               "attendances",
+                                                                               "7"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "POST /api/delegate/attendances",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"date\":  \"2024-05-18\",\r\n    \"subject_id\":  1,\r\n    \"title\":  \"Sample Title\",\r\n    \"lecture_number\":  \"1\",\r\n    \"start_time\":  \"08:00\",\r\n    \"end_time\":  \"10:00\",\r\n    \"students\":  [\r\n                     {\r\n                         \"id\":  2,\r\n                         \"status\":  \"present\"\r\n                     },\r\n                     {\r\n                         \"id\":  3,\r\n                         \"status\":  \"late\"\r\n                     },\r\n                     {\r\n                         \"id\":  4,\r\n                         \"status\":  \"absent\"\r\n                     },\r\n                     {\r\n                         \"id\":  5,\r\n                         \"status\":  \"excused\"\r\n                     }\r\n                 ]\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/delegate/attendances",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "delegate",
+                                                                               "attendances"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Section 6",
+                     "description":  "Sample description",
+                     "item":  [
+                                  {
+                                      "name":  "GET /api/qr-attendance/1/status",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/qr-attendance/1/status",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "qr-attendance",
+                                                                               "1",
+                                                                               "status"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Section 7",
+                     "description":  "Sample description",
+                     "item":  [
+                                  {
+                                      "name":  "GET /api/doctor/attendances",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/doctor/attendances",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "doctor",
+                                                                               "attendances"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "GET /api/doctor/attendances/7",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/doctor/attendances/7",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "doctor",
+                                                                               "attendances",
+                                                                               "7"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "POST /api/doctor/attendances",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"date\":  \"2024-05-18\",\r\n    \"subject_id\":  1,\r\n    \"title\":  \"Sample Title\",\r\n    \"lecture_number\":  \"1\",\r\n    \"start_time\":  \"08:00\",\r\n    \"end_time\":  \"10:00\",\r\n    \"students\":  {\r\n                     \"id\":  2,\r\n                     \"status\":  \"present\"\r\n                 }\r\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/doctor/attendances",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "doctor",
+                                                                               "attendances"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Section 8",
+                     "description":  "Sample description",
+                     "item":  [
+                                  {
+                                      "name":  "GET /api/student/schedules",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/student/schedules",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "student",
+                                                                               "schedules"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Section 9",
+                     "description":  "Sample description",
+                     "item":  [
+
+                              ]
+                 },
+                 {
+                     "name":  "Section 10",
+                     "description":  "Sample description",
+                     "item":  [
+
+                              ]
+                 },
+                 {
+                     "name":  "Section 11",
+                     "description":  "Sample description",
+                     "item":  [
+                                  {
+                                      "name":  "GET /api/delegate/clinical/delegations",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/delegate/clinical/delegations",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "delegate",
+                                                                               "clinical",
+                                                                               "delegations"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "GET /api/delegate/clinical/delegations/students",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/delegate/clinical/delegations/students",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "delegate",
+                                                                               "clinical",
+                                                                               "delegations",
+                                                                               "students"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "POST /api/delegate/clinical/delegations",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"student_id\":  15,\r\n    \"duration_hours\":  24\r\n}"
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/delegate/clinical/delegations",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "delegate",
+                                                                               "clinical",
+                                                                               "delegations"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "GET /api/delegate/clinical/cases/pending",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/delegate/clinical/cases/pending",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "delegate",
+                                                                               "clinical",
+                                                                               "cases",
+                                                                               "pending"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "POST /api/delegate/clinical/cases/10/approve",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/delegate/clinical/cases/10/approve",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "delegate",
+                                                                               "clinical",
+                                                                               "cases",
+                                                                               "10",
+                                                                               "approve"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "POST /api/delegate/clinical/cases/10/reject",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"rejection_reason\":  \"Sample reason\"\r\n}"
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/delegate/clinical/cases/10/reject",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "delegate",
+                                                                               "clinical",
+                                                                               "cases",
+                                                                               "10",
+                                                                               "reject"
+                                                                           ]
+                                                              }
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Section 12",
+                     "description":  "Sample description",
+                     "item":  [
+                                  {
+                                      "name":  "GET /api/admin/subjects",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/admin/subjects?term_id=1\u0026semester_id=1",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "query":  [
+                                                                                {
+                                                                                    "key":  "term_id",
+                                                                                    "value":  "1"
+                                                                                },
+                                                                                {
+                                                                                    "key":  "semester_id",
+                                                                                    "value":  "1"
+                                                                                }
+                                                                            ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "admin",
+                                                                               "subjects"
+                                                                           ]
+                                                              },
+                                                      "description":  "Sample description"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "POST /api/admin/subjects",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Accept",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\r\n    \"name\":  \"Sample Name\",\r\n    \"term_id\":  1,\r\n    \"semester_id\":  1,\r\n    \"doctor_id\":  5,\r\n    \"max_absences\":  3,\r\n    \"lecture_count\":  12\r\n}"
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/admin/subjects",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "admin",
+                                                                               "subjects"
+                                                                           ]
+                                                              }
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Section 13",
+                     "description":  "Sample description",
+                     "item":  [
+
+                              ]
+                 }
+             ],
+    "variable":  [
+                     {
+                         "key":  "base_url",
+                         "value":  "http://127.0.0.1:8000",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "delegate_token",
+                         "value":  "",
+                         "type":  "string"
+                     }
+                 ]
+}

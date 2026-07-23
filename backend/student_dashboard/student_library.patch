@@ -1,0 +1,92 @@
+diff --git a/resources/views/student/library/index.blade.php b/resources/views/student/library/index.blade.php
+--- a/resources/views/student/library/index.blade.php
++++ b/resources/views/student/library/index.blade.php
+@@ -15,4 +15,16 @@
+         </h1>
+         <p style="color: var(--text-secondary); margin: 0; font-size: 1rem;">أرشيف شامل لجميع الملفات والملخصات والمحاضرات عبر السنوات الدراسية</p>
+     </div>
++    @if(auth()->user()->hasPermission('upload_shared_library'))
++    <button onclick="document.getElementById('uploadModal').style.display='flex'" 
++            style="background: var(--primary-color); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2); transition: all 0.2s;">
++        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
++            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
++            <polyline points="17 8 12 3 7 8"></polyline>
++            <line x1="12" y1="3" x2="12" y2="15"></line>
++        </svg>
++        رفع ملف جديد
++    </button>
++    @endif
+ </div>
+ 
+@@ -685,7 +697,49 @@
+ 
+-    document.querySelectorAll('#importModal, #addToHubModal').forEach(m => {
++    document.querySelectorAll('#importModal, #addToHubModal, #uploadModal').forEach(m => {
+         m.addEventListener('click', function(e) {
+             if (e.target === this) this.style.display = 'none';
+         });
+     });
+ </script>
++
++<!-- Upload Modal (Student with Permission) -->
++@if(auth()->user()->hasPermission('upload_shared_library'))
++<div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
++    <div style="background: white; border-radius: 16px; width: 100%; max-width: 550px; padding: 2rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); margin: 1rem; animation: slideUp 0.3s ease-out;">
++        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
++            <h3 style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary); margin: 0;">رفع ملف للمكتبة المشتركة</h3>
++            <button onclick="document.getElementById('uploadModal').style.display='none'" style="background: none; border: none; color: var(--text-secondary); cursor: pointer;">
++                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
++                    <line x1="18" y1="6" x2="6" y2="18"></line>
++                    <line x1="6" y1="6" x2="18" y2="18"></line>
++                </svg>
++            </button>
++        </div>
++        <form action="{{ route('student.library.store') }}" method="POST" enctype="multipart/form-data">
++            @csrf
++            <div style="margin-bottom: 1.25rem;">
++                <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-weight: 600;">المادة الدراسية</label>
++                <select name="subject_id" required style="width: 100%; height: 50px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 1rem; font-family: inherit; outline: none; font-weight: 600;">
++                    @foreach($subjects as $subject)
++                    <option value="{{ $subject->id }}">{{ $subject->name }}</option>
++                    @endforeach
++                </select>
++            </div>
++            
++            <div style="margin-bottom: 1.25rem;">
++                <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-weight: 600;">عنوان الملف</label>
++                <input type="text" name="title" required placeholder="مثال: ملخص مراجعة نهائية" style="width: 100%; height: 50px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 1rem; font-family: inherit; outline: none;">
++            </div>
++
++            <!-- Category & File Selection -->
++            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
++                <div>
++                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-weight: 600;">التصنيف</label>
++                    <select name="category" required style="width: 100%; height: 50px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 1rem; font-family: inherit; outline: none; font-weight: 600;">
++                        <option value="lectures">محاضرات</option>
++                        <option value="references">مراجع</option>
++                        <option value="summaries">ملخصات</option>
++                        <option value="exams">اختبارات</option>
++                        <option value="other">أخرى</option>
++                    </select>
++                </div>
++                <div>
++                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-weight: 600;">الملف (بحد أقصى 20 ميجا)</label>
++                    <input type="file" name="file" required style="width: 100%; padding-top: 10px;">
++                </div>
++            </div>
++
++            <div style="margin-bottom: 1.5rem;">
++                <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-weight: 600;">وصف مختصر</label>
++                <textarea name="description" rows="2" style="width: 100%; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 12px; resize: none; font-family: inherit; outline: none;"></textarea>
++            </div>
++
++            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
++                <button type="button" onclick="document.getElementById('uploadModal').style.display='none'" style="background: #f1f5f9; color: var(--text-secondary); border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 700; cursor: pointer; font-family: inherit;">إلغاء</button>
++                <button type="submit" style="background: var(--primary-color); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 700; cursor: pointer; font-family: inherit;">بدء الرفع</button>
++            </div>
++        </form>
++    </div>
++</div>
++@endif
+ 
+ @endsection

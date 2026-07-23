@@ -1,0 +1,114 @@
+<?php
+
+namespace App\Http\Controllers\Api\Doctor;
+
+use App\Models\PollOption;
+use App\Models\PollVote;
+use App\Models\StudentNotification;
+use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+
+class NewsController extends DoctorApiController
+{
+    public function index(Request $request)
+    {
+        $user = $request->user();
+
+        $newsItems = StudentNotification::with('sender:id,name,role')
+            ->where('user_id', $user->id)
+            ->whereNotNull('batch_id')
+            ->whereIn('type', ['announcement', 'exam', 'assignment', 'attendance', 'poll'])
+            ->latest()
+            ->get()
+            ->groupBy('batch_id')
+            ->map(function ($group) {
+                return $group->first()->append('attachment_url');
+            })
+            ->values();
+
+        $perPage = $request->integer('per_page', 15);
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $news = new LengthAwarePaginator(
+            $newsItems->forPage($page, $perPage)->values(),
+            $newsItems->count(),
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
+
+        return $this->paginated($news, 'تم جلب مركز الأخبار بنجاح');
+    }
+
+    public function show(Request $request, string $batchId)
+    {
+        $notifications = StudentNotification::where('user_id', $request->user()->id)
+            ->where('batch_id', $batchId)
+            ->with('sender:id,name')
+            ->get();
+
+        if ($notifications->isEmpty()) {
+            return $this->error('الخبر غير موجود', 404);
+        }
+
+        $item = $notifications->first();
+        $item->markAsRead();
+        $notifications->each->append('attachment_url');
+        $item->append('attachment_url');
+
+        $data = [
+            'item' => $item,
+            'related_notifications' => $notifications,
+            'poll_options' => [],
+            'user_vote' => null,
+            'has_voted' => false,
+        ];
+
+        if ($item->type === 'poll') {
+            $data['poll_options'] = PollOption::where('batch_id', $batchId)->get();
+
+            $userVote = PollVote::where('batch_id', $batchId)
+                ->where('student_id', $request->user()->id)
+                ->first();
+
+            $data['user_vote'] = $userVote;
+            $data['has_voted'] = $userVote !== null;
+        }
+
+        return $this->success($data, 'تم جلب تفاصيل الخبر');
+    }
+
+    public function vote(Request $request, string $batchId)
+    {
+        $notification = StudentNotification::where('user_id', $request->user()->id)
+            ->where('batch_id', $batchId)
+            ->where('type', 'poll')
+            ->first();
+
+        if (! $notification) {
+            return $this->error('الاستبيان غير موجود', 404);
+        }
+
+        $validated = $request->validate([
+            'option_id' => 'required|exists:poll_options,id',
+        ]);
+
+        $alreadyVoted = PollVote::where('batch_id', $batchId)
+            ->where('student_id', $request->user()->id)
+            ->exists();
+
+        if ($alreadyVoted) {
+            return $this->error('لقد قمت بالتصويت بالفعل', 400);
+        }
+
+        $vote = PollVote::create([
+            'student_id' => $request->user()->id,
+            'batch_id' => $batchId,
+            'poll_option_id' => $validated['option_id'],
+        ]);
+
+        return $this->success($vote, 'تم تسجيل صوتك بنجاح', 201);
+    }
+}

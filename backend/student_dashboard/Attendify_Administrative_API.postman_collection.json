@@ -1,0 +1,2351 @@
+{
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://127.0.0.1:8000"
+        },
+        {
+            "key": "token",
+            "value": ""
+        },
+        {
+            "key": "student_id",
+            "value": "1"
+        },
+        {
+            "key": "doctor_id",
+            "value": "1"
+        },
+        {
+            "key": "major_id",
+            "value": "1"
+        },
+        {
+            "key": "subject_id",
+            "value": "1"
+        },
+        {
+            "key": "level_id",
+            "value": "1"
+        },
+        {
+            "key": "term_id",
+            "value": "1"
+        },
+        {
+            "key": "batch_id",
+            "value": ""
+        },
+        {
+            "key": "excuse_id",
+            "value": "1"
+        },
+        {
+            "key": "exam_id",
+            "value": "1"
+        },
+        {
+            "key": "schedule_id",
+            "value": "1"
+        },
+        {
+            "key": "attendance_id",
+            "value": "1"
+        },
+        {
+            "key": "delegate_user_id",
+            "value": "1"
+        }
+    ],
+    "info": {
+        "name": "Attendify Administrative API",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "description": "Administrative workspace endpoints for Attendify.\n\nFrontend auth flow for this collection:\n1. `POST /api/administrative/login`\n2. Save `response.data.data.token` and `response.data.data.user`\n3. `GET /api/administrative/me`\n4. If the account is a promoted doctor, inspect `administrative_access` and `available_workspaces`; the same token can access both doctor and administrative workspaces\n5. `POST /api/administrative/devices/token` if Firebase push is enabled\n6. Use the bearer token on all later requests\n7. `DELETE /api/administrative/devices/token` before `POST /api/administrative/logout`\n\nNew administrative access is granted to doctor accounts through `administrative_access=true`; direct creation of new standalone administrative accounts is disabled. Legacy standalone administrative accounts may still exist and remain supported."
+    },
+    "item": [
+        {
+            "name": "Auth",
+            "item": [
+                {
+                    "name": "Login",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"email\": \"admin@college.test\",\n  \"password\": \"password\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/login",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "login"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "description": "Authenticate into the administrative workspace.\n\nRequest body:\n- `email`\n- `password`\n\nSave the returned token from `response.data.data.token`, save the user object from `response.data.data.user`, then call `GET /api/administrative/me`. If the same account also has doctor access, the profile exposes `available_workspaces` and the same token can be reused for both workspaces."
+                    }
+                },
+                {
+                    "name": "Me",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/me",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "me"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "description": "Use this request immediately after login and on app start to verify the saved administrative token and inspect `administrative_access` plus `available_workspaces`."
+                    }
+                },
+                {
+                    "name": "Register Device Token",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"device_token\": \"FCM_DEVICE_TOKEN\",\r\n    \"platform\": \"android\",\r\n    \"device_name\": \"Pixel 8\",\r\n    \"app_version\": \"1.0.0\"\r\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/administrative/devices/token",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "administrative",
+                                "devices",
+                                "token"
+                            ]
+                        },
+                        "description": "Register or refresh the Firebase device token for the current administrative session.\n\nCall this immediately after a successful login and again whenever the FCM token changes."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove Device Token",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"device_token\": \"FCM_DEVICE_TOKEN\"\r\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/administrative/devices/token",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "administrative",
+                                "devices",
+                                "token"
+                            ]
+                        },
+                        "description": "Remove the Firebase device token for the current administrative session.\n\nCall this before logout when push notifications are enabled, then call the normal logout endpoint and clear local storage."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Change Password",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"current_password\": \"old-password\",\n  \"password\": \"new-password-123\",\n  \"password_confirmation\": \"new-password-123\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/change-password",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "change-password"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Logout",
+                    "request": {
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/logout",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "logout"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "description": "If push is enabled, call `DELETE /api/administrative/devices/token` first with the current FCM token, then call logout and clear local storage."
+                    }
+                }
+            ],
+            "description": "Authentication runtime for administrative clients:\n1. Login with `email` and `password`\n2. Save `response.data.data.token`\n3. Call `GET /api/administrative/me`\n4. Inspect `administrative_access` and `available_workspaces`\n5. Register Firebase token with `POST /api/administrative/devices/token`\n6. Reuse the same token if the same account also opens the doctor workspace\n7. Remove the device token before logout"
+        },
+        {
+            "name": "Dashboard",
+            "item": [
+                {
+                    "name": "Dashboard Overview",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/dashboard",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "dashboard"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Get Settings",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/settings",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "settings"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Update Settings",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"absence_deprivation_percentage\": 25,\n  \"excuses_deadline_days\": 3,\n  \"excuse_receiver\": \"administrative\",\n  \"qr_rotation_seconds\": 30\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "PUT",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/settings",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "settings"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "description": "Update college-level attendance settings. excuse_receiver accepts administrative or doctor, and qr_rotation_seconds controls QR token rotation and expiry."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Subscription & Ledger",
+            "item": [
+                {
+                    "name": "Subscription Status",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/subscription",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "subscription"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Redeem Card",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"code\": \"ABC123DEF456\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/subscription/redeem",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "subscription",
+                                "redeem"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Subscribe Package",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"package_id\": 1\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/subscription/subscribe",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "subscription",
+                                "subscribe"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Toggle Auto Renew",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"auto_renew\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/subscription/auto-renew",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "subscription",
+                                "auto-renew"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Ledger",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/ledger",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "ledger"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Ledger Export",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/ledger/export",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "ledger",
+                                "export"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Students",
+            "item": [
+                {
+                    "name": "List Students",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/students",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "students"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Create Student",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"name\": \"???? ????\",\n  \"email\": \"student.new@example.com\",\n  \"student_number\": \"S-10001\",\n  \"gender\": \"male\",\n  \"password\": \"password123\",\n  \"level_id\": {{level_id}}\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/students",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "students"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Student Details",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/students/{{student_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "students",
+                                "{{student_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Update Student",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"name\": \"???? ????\",\n  \"email\": \"student.updated@example.com\",\n  \"student_number\": \"S-10001\",\n  \"gender\": \"male\",\n  \"level_id\": {{level_id}}\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "PUT",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/students/{{student_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "students",
+                                "{{student_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Delete Student",
+                    "request": {
+                        "method": "DELETE",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/students/{{student_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "students",
+                                "{{student_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Doctors",
+            "item": [
+                {
+                    "name": "List Doctors",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/doctors",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "doctors"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Create Doctor",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"name\": \"????? ????\",\n  \"email\": \"doctor.new@example.com\",\n  \"password\": \"password123\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/doctors",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "doctors"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Doctor Details",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/doctors/{{doctor_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "doctors",
+                                "{{doctor_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Update Doctor",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"name\": \"????? ????\",\n  \"email\": \"doctor.updated@example.com\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "PUT",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/doctors/{{doctor_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "doctors",
+                                "{{doctor_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Delete Doctor",
+                    "request": {
+                        "method": "DELETE",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/doctors/{{doctor_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "doctors",
+                                "{{doctor_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Majors",
+            "item": [
+                {
+                    "name": "List Majors",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/majors",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "majors"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Create Major",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"name\": \"???? ????\",\n  \"levels_count\": 4,\n  \"terms_count\": 2,\n  \"has_clinical\": false,\n  \"has_semesters\": false\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/majors",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "majors"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Major Details",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/majors/{{major_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "majors",
+                                "{{major_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Update Major",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"name\": \"???? ????\",\n  \"has_clinical\": true,\n  \"has_semesters\": false\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "PUT",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/majors/{{major_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "majors",
+                                "{{major_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Major Levels",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/majors/{{major_id}}/levels",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "majors",
+                                "{{major_id}}",
+                                "levels"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Delete Major",
+                    "request": {
+                        "method": "DELETE",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/majors/{{major_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "majors",
+                                "{{major_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Subjects",
+            "item": [
+                {
+                    "name": "List Subjects",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/subjects",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "subjects"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Create Subject",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"name\": \"Clinical Pharmacology\",\n  \"code\": \"SUB101\",\n  \"term_id\": {{term_id}},\n  \"doctor_id\": {{doctor_id}}\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/subjects",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "subjects"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Subject Details",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/subjects/{{subject_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "subjects",
+                                "{{subject_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Update Subject",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"name\": \"Clinical Pharmacology - Updated\",\n  \"code\": \"SUB101\",\n  \"term_id\": {{term_id}},\n  \"doctor_id\": {{doctor_id}}\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "PUT",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/subjects/{{subject_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "subjects",
+                                "{{subject_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Delete Subject",
+                    "request": {
+                        "method": "DELETE",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/subjects/{{subject_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "subjects",
+                                "{{subject_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Delegates",
+            "item": [
+                {
+                    "name": "List Delegates",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/delegates",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "delegates"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Update Role",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"role\": \"delegate\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "PATCH",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/delegates/{{delegate_user_id}}/role",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "delegates",
+                                "{{delegate_user_id}}",
+                                "role"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Update Permissions",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"permissions\": [\n    \"students.read\",\n    \"attendance.update\"\n  ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/delegates/{{delegate_user_id}}/permissions",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "delegates",
+                                "{{delegate_user_id}}",
+                                "permissions"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Notifications",
+            "item": [
+                {
+                    "name": "List Notifications",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/notifications",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "notifications"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Notification Create Data",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/notifications/create-data",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "notifications",
+                                "create-data"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Create Notification",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"title\": \"Faculty attendance notice\",\n  \"message\": \"Please review the updated attendance policy for this week.\",\n  \"type\": \"announcement\",\n  \"target\": \"doctors\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/notifications",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "notifications"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "description": "Create a college broadcast. When `target=doctors`, the announcement is delivered to all doctor accounts in the current college."
+                    }
+                },
+                {
+                    "name": "Notification Details",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/notifications/{{batch_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "notifications",
+                                "{{batch_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Delete Notification",
+                    "request": {
+                        "method": "DELETE",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/notifications/{{batch_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "notifications",
+                                "{{batch_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Excuses",
+            "item": [
+                {
+                    "name": "List Excuses",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/excuses",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "excuses"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "description": "Lists excuses for this college. Each excuse now includes all uploaded attachments, including legacy single-file excuses and new attachments[]."
+                    }
+                },
+                {
+                    "name": "Review Excuse",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"status\": \"accepted\",\n  \"resolution\": \"excused_permission\",\n  \"comment\": \"Approved by the administrative office\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "PATCH",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/excuses/{{excuse_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "excuses",
+                                "{{excuse_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "description": "Review an excuse only when this college routes excuses to the administrative office. resolution values: excused_permission, excused_exemption, keep_absent."
+                    }
+                },
+                {
+                    "name": "Update Attendance Record",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"status\": \"permitted\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "PATCH",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/attendance/{{attendance_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "attendance",
+                                "{{attendance_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "description": "Directly update a single attendance record. Allowed statuses are present, absent, late, permitted, and exempted."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Reports",
+            "item": [
+                {
+                    "name": "Reports Overview",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/reports",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "reports"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "description": "Returns attendance analytics with separate counts for present, absent, late, permitted, exempted, and the aggregate excused_total."
+                    }
+                },
+                {
+                    "name": "Attendance Report",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/reports/attendance?major_id={{major_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "reports",
+                                "attendance?major_id={{major_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "description": "term_id must belong to the same college and selected level. Use the majors endpoint to inspect levels and the subject/exam helper endpoints to resolve valid academic ids before creating records."
+                    }
+                },
+                {
+                    "name": "Subject Report",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/reports/subject?subject_id={{subject_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "reports",
+                                "subject?subject_id={{subject_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Threshold Report",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/reports/threshold?level_id={{level_id}}&threshold=25",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "reports",
+                                "threshold?level_id={{level_id}}&threshold=25"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Level Summary",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/reports/level-summary?level_id={{level_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "reports",
+                                "level-summary?level_id={{level_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Doctor Performance",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/reports/doctor-performance",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "reports",
+                                "doctor-performance"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "description": "Use a real attendance record id from the attendance report endpoints. The status must be one of the editable attendance states configured by the backend, such as present, absent, late, permitted, or exempted."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Exams",
+            "item": [
+                {
+                    "name": "List Exams",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/exams",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "exams"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Exams Create Data",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/exams/create-data",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "exams",
+                                "create-data"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Exam Levels Helper",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/exams/helper/levels/{{major_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "exams",
+                                "helper",
+                                "levels",
+                                "{{major_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Exam Subjects Helper",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/exams/helper/subjects/{{level_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "exams",
+                                "helper",
+                                "subjects",
+                                "{{level_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Create Exam Schedule",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"major_id\": {{major_id}},\n  \"level_id\": {{level_id}},\n  \"term_id\": {{term_id}},\n  \"title\": \"Midterm Schedule\",\n  \"description\": \"Spring exam schedule\",\n  \"is_published\": true,\n  \"items\": [\n    {\n      \"subject_id\": {{subject_id}},\n      \"exam_date\": \"2026-05-01\",\n      \"start_time\": \"09:00\",\n      \"end_time\": \"11:00\",\n      \"location\": \"Hall A\"\n    }\n  ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/exams",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "exams"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "description": "Use create-data and helper endpoints first to resolve a valid major_id, level_id, term_id, and subject_id combination. A hard-coded term outside the selected level will correctly fail validation."
+                    }
+                },
+                {
+                    "name": "Exam Details",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/exams/{{exam_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "exams",
+                                "{{exam_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Update Exam Schedule",
+                    "request": {
+                        "body": {
+                            "raw": "{\n  \"major_id\": {{major_id}},\n  \"level_id\": {{level_id}},\n  \"term_id\": {{term_id}},\n  \"title\": \"Midterm Schedule Updated\",\n  \"description\": \"Updated spring exam schedule\",\n  \"is_published\": true,\n  \"items\": [\n    {\n      \"subject_id\": {{subject_id}},\n      \"exam_date\": \"2026-05-03\",\n      \"start_time\": \"10:00\",\n      \"end_time\": \"12:00\",\n      \"location\": \"Hall B\"\n    }\n  ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "PUT",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/exams/{{exam_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "exams",
+                                "{{exam_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Delete Exam Schedule",
+                    "request": {
+                        "method": "DELETE",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/exams/{{exam_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "exams",
+                                "{{exam_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Schedules",
+            "item": [
+                {
+                    "name": "List Schedules",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/schedules",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "schedules"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Schedules Create Data",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/schedules/create-data",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "schedules",
+                                "create-data"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Schedules Subjects Helper",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/schedules/helper/subjects/{{level_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "schedules",
+                                "helper",
+                                "subjects",
+                                "{{level_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Create Schedule",
+                    "request": {
+                        "body": {
+                            "raw": "{\"subject_id\":{{subject_id}},\"day_of_week\":1,\"start_time\":\"08:00\",\"end_time\":\"10:00\",\"hall_name\":null}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/schedules",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "schedules"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "description": "Create an academic schedule row. hall_name is optional and can be null."
+                    }
+                },
+                {
+                    "name": "Schedule Details",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/schedules/{{schedule_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "schedules",
+                                "{{schedule_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Update Schedule",
+                    "request": {
+                        "body": {
+                            "raw": "{\"subject_id\":{{subject_id}},\"day_of_week\":2,\"start_time\":\"10:00\",\"end_time\":\"12:00\",\"hall_name\":null}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "PUT",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/schedules/{{schedule_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "schedules",
+                                "{{schedule_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "description": "Update an academic schedule row. hall_name remains optional."
+                    }
+                },
+                {
+                    "name": "Delete Schedule",
+                    "request": {
+                        "method": "DELETE",
+                        "url": {
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "raw": "{{base_url}}/api/administrative/schedules/{{schedule_id}}",
+                            "path": [
+                                "api",
+                                "administrative",
+                                "schedules",
+                                "{{schedule_id}}"
+                            ]
+                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    ]
+}

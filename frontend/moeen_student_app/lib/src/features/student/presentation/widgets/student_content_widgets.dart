@@ -1,0 +1,5011 @@
+part of '../student_content_screens.dart';
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  _SliverAppBarDelegate({required this.child, this.height = 64});
+  final Widget child;
+  final double height;
+
+  @override
+  double get minExtent => height;
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) => child;
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
+}
+
+class _AsyncBody<T> extends StatelessWidget {
+  const _AsyncBody({
+    required this.state,
+    required this.builder,
+    required this.onRetry,
+    this.loading,
+  });
+
+  final AsyncValue<T> state;
+  final Widget Function(T data) builder;
+  final VoidCallback onRetry;
+  final Widget? loading;
+
+  @override
+  Widget build(BuildContext context) {
+    return state.when(
+      loading: () =>
+          loading ?? const Center(child: CircularProgressIndicator()),
+      error: (error, _) =>
+          ErrorState(message: error.toString(), onRetry: onRetry),
+      data: builder,
+    );
+  }
+}
+
+class _HeroPanel extends StatelessWidget {
+  const _HeroPanel({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.colors,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final List<Color> colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: colors,
+        ),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: colors.first.withValues(alpha: 0.22),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(icon, color: Colors.white, size: 30),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 22,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.84),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubjectCard extends StatelessWidget {
+  const _SubjectCard({
+    required this.color,
+    required this.subject,
+    required this.doctorName,
+    required this.termName,
+    required this.semesterName,
+    required this.onTap,
+  });
+
+  final Color color;
+  final Map<String, dynamic> subject;
+  final String doctorName;
+  final String termName;
+  final String semesterName;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: color.withValues(alpha: 0.18)),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.06),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Icon(Icons.auto_stories_rounded, color: color),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        text(subject, 'name', fallback: 'مقرر'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'د. $doctorName',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          if (termName.isNotEmpty)
+                            _MiniBadge(label: termName, color: color),
+                          if (semesterName.isNotEmpty)
+                            _MiniBadge(
+                              label: semesterName,
+                              color: AppColors.info,
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.arrow_forward_ios_rounded, color: color, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ColorSection extends StatelessWidget {
+  const _ColorSection({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.child,
+  });
+
+  final String title;
+  final IconData icon;
+  final Color color;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: color),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(color: color),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: color.withValues(alpha: 0.10)),
+          Padding(padding: const EdgeInsets.all(14), child: child),
+        ],
+      ),
+    );
+  }
+}
+
+class _Metric {
+  const _Metric(this.label, this.value, this.icon, this.color, {this.id});
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final String? id;
+}
+
+class _MetricGrid extends StatelessWidget {
+  const _MetricGrid({required this.items, this.onTap, this.selectedId});
+
+  final List<_Metric> items;
+  final ValueChanged<String>? onTap;
+  final String? selectedId;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      childAspectRatio: 1.68,
+      children: items
+          .map(
+            (item) => _MetricCard(
+              item: item,
+              onTap: onTap != null && item.id != null
+                  ? () => onTap!(item.id!)
+                  : null,
+              isSelected: selectedId != null && item.id == selectedId,
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({required this.item, this.onTap, this.isSelected = false});
+
+  final _Metric item;
+  final VoidCallback? onTap;
+  final bool isSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected ? item.color : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? Colors.white.withValues(alpha: 0.2)
+                : item.color.withValues(alpha: 0.15),
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: item.color.withValues(alpha: 0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          children: [
+            Icon(item.icon, color: isSelected ? Colors.white : item.color),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    item.value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : item.color,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                    ),
+                  ),
+                  Text(
+                    item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isSelected
+                          ? Colors.white.withValues(alpha: 0.8)
+                          : AppColors.slate500,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DeprivationCard extends StatelessWidget {
+  const _DeprivationCard({required this.info});
+
+  final Map<String, dynamic> info;
+
+  @override
+  Widget build(BuildContext context) {
+    final warningLevel = text(info, 'warning_level');
+    final isBanned = warningLevel == 'danger';
+    final isWarning = warningLevel == 'warning';
+    final color = isBanned
+        ? AppColors.danger
+        : isWarning
+        ? AppColors.warning
+        : AppColors.success;
+    final icon = isBanned
+        ? Icons.gpp_bad_rounded
+        : isWarning
+        ? Icons.warning_amber_rounded
+        : Icons.verified_user_rounded;
+    final statusLabel = isBanned
+        ? 'حرمان فعلي'
+        : isWarning
+        ? 'إنذار مبكر'
+        : 'ضمن النطاق الآمن';
+    return _ColorSection(
+      title: 'حالة الحرمان',
+      icon: icon,
+      color: color,
+      child: Column(
+        children: [
+          _InfoRow(
+            label: 'نسبة الغياب',
+            value: '${text(info, 'absence_percent', fallback: '0')}%',
+          ),
+          _InfoRow(
+            label: 'الحد الأقصى للغياب',
+            value: text(info, 'max_absences_allowed', fallback: '-'),
+          ),
+          _InfoRow(
+            label: 'المتبقي قبل الحد',
+            value: text(info, 'remaining_absences', fallback: '-'),
+          ),
+          _InfoRow(
+            label: 'نسبة الحرمان المعتمدة',
+            value:
+                '${text(info, 'deprivation_threshold_percent', fallback: '0')}%',
+          ),
+          _InfoRow(label: 'الحالة', value: statusLabel),
+        ],
+      ),
+    );
+  }
+}
+
+class _StudyStats extends StatelessWidget {
+  const _StudyStats({
+    required this.stats,
+    this.activeFilter,
+    this.onFilterChanged,
+  });
+
+  final Map<String, dynamic> stats;
+  final String? activeFilter;
+  final ValueChanged<String>? onFilterChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _MetricGrid(
+      onTap: onFilterChanged,
+      selectedId: activeFilter,
+      items: [
+        _Metric(
+          'مهام اليوم',
+          text(stats, 'today', fallback: '0'),
+          Icons.today_rounded,
+          AppColors.primary,
+          id: 'today',
+        ),
+        _Metric(
+          'متأخرة',
+          text(stats, 'overdue', fallback: '0'),
+          Icons.error_outline_rounded,
+          AppColors.danger,
+          id: 'overdue',
+        ),
+        _Metric(
+          'مكتملة',
+          text(stats, 'completed', fallback: '0'),
+          Icons.check_circle_outline_rounded,
+          AppColors.success,
+          id: 'completed',
+        ),
+        _Metric(
+          'أولوية قصوى',
+          text(stats, 'high_priority', fallback: '0'),
+          Icons.bolt_rounded,
+          AppColors.gold,
+          id: 'high',
+        ),
+      ],
+    );
+  }
+}
+
+class _LectureTile extends ConsumerWidget {
+  const _LectureTile(this.lecture, {required this.subjectId});
+
+  final Map<String, dynamic> lecture;
+  final int subjectId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final studied = boolValue(lecture, 'is_studied');
+    final color = studied ? AppColors.success : AppColors.royalBlue;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+        border: Border.all(color: color.withValues(alpha: 0.1)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () {},
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    studied
+                        ? Icons.check_circle_rounded
+                        : Icons.play_lesson_rounded,
+                    color: color,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        text(lecture, 'title', fallback: 'محاضرة'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                          color: AppColors.midnight,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        [
+                              dateOnly(text(lecture, 'date')),
+                              if (text(lecture, 'description').isNotEmpty)
+                                text(lecture, 'description'),
+                            ]
+                            .where((item) => item.isNotEmpty && item != '-')
+                            .join(' • '),
+                        style: const TextStyle(
+                          color: AppColors.slate500,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  children: [
+                    Transform.scale(
+                      scale: 0.8,
+                      child: Switch(
+                        value: studied,
+                        activeThumbColor: AppColors.success,
+                        onChanged: (val) async {
+                          final id = number(lecture, 'id').toInt();
+                          if (id <= 0) return;
+                          try {
+                            await ref
+                                .read(studentContentRepositoryProvider)
+                                .toggleLectureListen(id);
+                            ref.invalidate(_subjectDetailsProvider(subjectId));
+                          } on ApiException catch (error) {
+                            if (!context.mounted) return;
+                            await showMoeenInfoDialog(
+                              context: context,
+                              title: 'تعذر تحديث المحاضرة',
+                              message: error.message,
+                              icon: error.isOffline
+                                  ? Icons.wifi_off_rounded
+                                  : Icons.error_outline_rounded,
+                              color: AppColors.danger,
+                            );
+                          } catch (_) {
+                            if (!context.mounted) return;
+                            await showMoeenInfoDialog(
+                              context: context,
+                              title: 'تعذر تحديث المحاضرة',
+                              message: 'حدث خطأ غير متوقع. حاول مرة أخرى.',
+                              icon: Icons.error_outline_rounded,
+                              color: AppColors.danger,
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                    Text(
+                      studied ? 'تمت الدراسة' : 'لم تدرس',
+                      style: TextStyle(
+                        color: studied ? AppColors.success : AppColors.slate400,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AssignmentTile extends StatelessWidget {
+  const _AssignmentTile(this.item);
+
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = text(item, 'status');
+    final color = switch (status) {
+      'submitted' => AppColors.success,
+      'missing' => AppColors.danger,
+      _ => AppColors.warning,
+    };
+    final requiresFile =
+        boolValue(item, 'requires_file') ||
+        boolValue(item, 'requires_submission');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () => context.push('/student/assignments/${item['id']}'),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(Icons.assignment_rounded, color: color, size: 26),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        text(item, 'title', fallback: 'تكليف دراسي'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                          color: AppColors.midnight,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            size: 10,
+                            color: AppColors.slate400,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'الموعد: ${dateOnly(text(item, 'due_date'))}',
+                            style: const TextStyle(
+                              color: AppColors.slate500,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (requiresFile) ...[
+                        const SizedBox(height: 8),
+                        const _MiniBadge(
+                          label: 'يتطلب رفع ملف',
+                          color: AppColors.royalBlue,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                _MiniBadge(label: _assignmentStatus(status), color: color),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AttendanceTile extends ConsumerWidget {
+  const _AttendanceTile(this.item, {required this.subjectId});
+
+  final Map<String, dynamic> item;
+  final int subjectId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = text(item, 'status').trim().toLowerCase();
+    final color = _attendanceColor(status);
+    final excuse = asMap(item['excuse']);
+    final canSubmit = boolValue(item, 'can_submit_excuse');
+    final deadline = asMap(item['deadline_info']);
+    final isAbsent = status == 'absent';
+    final isExpired = boolValue(deadline, 'is_expired');
+    final maxDeadlineDays = number(deadline, 'max_deadline_days').toInt();
+    final daysSinceAbsence = number(deadline, 'days_since_absence').toInt();
+    final remainingDays = (maxDeadlineDays - daysSinceAbsence).clamp(0, 999);
+    final excuseMessage = isAbsent
+        ? (excuse.isNotEmpty
+              ? 'حالة العذر: ${_translateExcuseStatus(text(excuse, 'status'))}'
+              : (isExpired
+                    ? 'انتهت فترة تقديم العذر لهذا الغياب'
+                    : (canSubmit
+                          ? 'يمكنك تقديم عذر خلال ${remainingDays == 0 ? 'اليوم' : '$remainingDays يوم'}'
+                          : 'لا يمكن تقديم عذر لغرض تقديم عذر')))
+        : ''; // No message for present/late students
+
+    final excuseColor = excuse.isNotEmpty
+        ? AppColors.info
+        : (canSubmit
+              ? AppColors.warning
+              : (isAbsent && isExpired
+                    ? AppColors.danger
+                    : AppColors.slate400));
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: color.withValues(alpha: 0.2),
+                    width: 2,
+                  ),
+                ),
+                child: Icon(_attendanceIcon(status), color: color, size: 20),
+              ),
+              Container(width: 2, height: 30, color: AppColors.slate100),
+            ],
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.slate50,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.slate100),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        dateOnly(text(item, 'date')),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                          color: AppColors.midnight,
+                        ),
+                      ),
+                      _MiniBadge(label: _attendanceLabel(status), color: color),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    excuseMessage,
+                    style: TextStyle(
+                      color: excuseColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (canSubmit) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        onPressed: () => _showSubmitExcuseSheet(context, ref),
+                        icon: const Icon(Icons.add_moderator_rounded, size: 16),
+                        label: const Text(
+                          'تقديم عذر طبي/رسمي',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          backgroundColor: AppColors.royalBlue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSubmitExcuseSheet(BuildContext context, WidgetRef ref) {
+    final reasonController = TextEditingController();
+    String? filePath;
+    String? fileName;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'تقديم عذر غياب',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.midnight,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'تاريخ الغياب: ${dateOnly(text(item, 'date'))}',
+                style: const TextStyle(
+                  color: AppColors.slate500,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'سبب الغياب',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: reasonController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'اكتب تفاصيل العذر هنا...',
+                  filled: true,
+                  fillColor: AppColors.slate50,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'المرفقات (اختياري)',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () async {
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.custom,
+                    allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+                  );
+                  if (result != null) {
+                    setModalState(() {
+                      filePath = result.files.single.path;
+                      fileName = result.files.single.name;
+                    });
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.slate50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: filePath != null
+                          ? AppColors.success
+                          : AppColors.slate200,
+                      style: BorderStyle.none,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        filePath != null
+                            ? Icons.file_present_rounded
+                            : Icons.upload_file_rounded,
+                        color: filePath != null
+                            ? AppColors.success
+                            : AppColors.slate400,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          fileName ?? 'ارفق ملف (PDF, Image)',
+                          style: TextStyle(
+                            color: fileName != null
+                                ? AppColors.midnight
+                                : AppColors.slate400,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      if (fileName != null)
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          color: AppColors.success,
+                          size: 16,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (reasonController.text.trim().isEmpty) {
+                      MoeenDialogs.showError(
+                        context,
+                        message: 'يرجى كتابة سبب العذر.',
+                      );
+                      return;
+                    }
+                    try {
+                      MoeenDialogs.showLoading(context);
+                      final msg = await ref
+                          .read(studentContentRepositoryProvider)
+                          .submitExcuse(
+                            attendanceId: number(item, 'id').toInt(),
+                            reason: reasonController.text.trim(),
+                            filePath: filePath,
+                            fileName: fileName,
+                          );
+                      if (context.mounted) {
+                        Navigator.pop(context); // Close loading
+                        Navigator.pop(context); // Close sheet
+                        MoeenDialogs.showSuccess(context, message: msg);
+                        ref.invalidate(_subjectDetailsProvider(subjectId));
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        Navigator.pop(context); // Close loading
+                        MoeenDialogs.showError(context, message: e.toString());
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.royalBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'إرسال الطلب الآن',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResourceMiniTile extends StatelessWidget {
+  const _ResourceMiniTile(this.item);
+
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final fileType = text(item, 'file_type').toLowerCase();
+    final color = switch (fileType) {
+      'pdf' => AppColors.danger,
+      'doc' || 'docx' => AppColors.info,
+      'xls' || 'xlsx' => AppColors.success,
+      'ppt' || 'pptx' => AppColors.orange,
+      _ => AppColors.royalBlue,
+    };
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.slate100),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            fileType == 'pdf'
+                ? Icons.picture_as_pdf_rounded
+                : Icons.insert_drive_file_rounded,
+            color: color,
+            size: 22,
+          ),
+        ),
+        title: Text(
+          text(
+            item,
+            'title',
+            fallback: text(item, 'name', fallback: 'مورد تعليمي'),
+          ),
+          style: const TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 14,
+            color: AppColors.midnight,
+          ),
+        ),
+        subtitle: Text(
+          text(item, 'category', fallback: fileType.toUpperCase()),
+          style: const TextStyle(
+            color: AppColors.slate400,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        trailing: Icon(
+          Icons.download_for_offline_rounded,
+          color: AppColors.slate300,
+        ),
+        onTap: () async {
+          final path = text(item, 'file_path');
+          if (path.isEmpty) return;
+
+          final url = absoluteUrl(
+            path.startsWith('storage/') ? path : 'storage/$path',
+          );
+          await _downloadUrlToFile(
+            context,
+            url,
+            text(item, 'title', fallback: 'resource'),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _StudyItemCard extends ConsumerWidget {
+  const _StudyItemCard(this.item, {required this.tab});
+
+  final Map<String, dynamic> item;
+  final String tab;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final id = number(item, 'id').toInt();
+    final completed =
+        boolValue(item, 'is_completed') || text(item, 'status') == 'completed';
+    final priority = text(item, 'priority');
+    final priorityColor = _priorityColor(priority);
+    final reference = asMap(item['reference']);
+    final subject = asMap(reference['subject']);
+    final scheduledDate = text(item, 'scheduled_date');
+    final sessionSummary = asMap(item['session_summary']);
+
+    return Material(
+      color: Colors.transparent,
+      clipBehavior: Clip.antiAlias,
+      borderRadius: BorderRadius.circular(26),
+      child: InkWell(
+        onTap: id <= 0
+            ? null
+            : () => context.push(StudentStudySessionScreen.path(id)),
+        borderRadius: BorderRadius.circular(26),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(
+              color: completed
+                  ? AppColors.success.withValues(alpha: 0.24)
+                  : AppColors.slate200.withValues(alpha: 0.65),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: priorityColor.withValues(alpha: 0.08),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 7,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        priorityColor,
+                        priorityColor.withValues(alpha: 0.55),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: priorityColor.withValues(alpha: 0.11),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Icon(
+                                _studyItemIcon(text(item, 'item_type')),
+                                color: priorityColor,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    text(item, 'title', fallback: 'عنصر دراسي'),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 16,
+                                      decoration: completed
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                      color: completed
+                                          ? AppColors.slate400
+                                          : AppColors.midnight,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: [
+                                      _PriorityBadge(priority: priority),
+                                      _StudyStatusPill(
+                                        completed: completed,
+                                        label: completed
+                                            ? 'مكتملة'
+                                            : text(
+                                                item,
+                                                'item_type_label',
+                                                fallback: 'تفاصيل',
+                                              ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.chevron_left_rounded,
+                              color: AppColors.slate400,
+                            ),
+                          ],
+                        ),
+                        if (text(item, 'note').isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            text(item, 'note'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.slate500,
+                              fontSize: 13,
+                              height: 1.45,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (text(subject, 'name').isNotEmpty)
+                              _SessionMiniStat(
+                                icon: Icons.auto_stories_rounded,
+                                label: text(subject, 'name'),
+                                color: AppColors.primary,
+                              ),
+                            if (scheduledDate.isNotEmpty)
+                              _SessionMiniStat(
+                                icon: Icons.calendar_today_rounded,
+                                label: dateOnly(scheduledDate),
+                                color: AppColors.gold,
+                              ),
+                            _SessionMiniStat(
+                              icon: Icons.view_column_rounded,
+                              label:
+                                  '${text(sessionSummary, 'columns_count', fallback: '0')} أعمدة',
+                              color: AppColors.teal,
+                            ),
+                            _SessionMiniStat(
+                              icon: Icons.touch_app_rounded,
+                              label:
+                                  '${text(sessionSummary, 'total_actions', fallback: '0')} تنفيذ',
+                              color: AppColors.teal,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: id <= 0
+                                    ? null
+                                    : () => context.push(
+                                        StudentStudySessionScreen.path(id),
+                                      ),
+                                icon: const Icon(Icons.open_in_new_rounded),
+                                label: const Text(
+                                  'فتح التفاصيل',
+                                  style: TextStyle(fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _ActionIconButton(
+                              icon: Icons.edit_note_rounded,
+                              onPressed: id <= 0
+                                  ? null
+                                  : () => _showEditStudyItem(
+                                      context,
+                                      ref,
+                                      item,
+                                      tab,
+                                    ),
+                            ),
+                            const SizedBox(width: 8),
+                            _ActionIconButton(
+                              icon: Icons.delete_outline_rounded,
+                              color: AppColors.danger,
+                              onPressed: id <= 0
+                                  ? null
+                                  : () =>
+                                        _deleteStudyItem(context, ref, id, tab),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SessionMiniStat extends StatelessWidget {
+  const _SessionMiniStat({
+    required this.icon,
+    required this.label,
+    this.color = AppColors.teal,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StudyStatusPill extends StatelessWidget {
+  const _StudyStatusPill({required this.completed, required this.label});
+
+  final bool completed;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = completed ? AppColors.success : AppColors.slate500;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            completed ? Icons.verified_rounded : Icons.open_in_new_rounded,
+            size: 12,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _studyItemIcon(String itemType) {
+  return switch (itemType) {
+    'reminder' => Icons.notifications_active_rounded,
+    'resource' => Icons.folder_copy_rounded,
+    'assignment' => Icons.assignment_turned_in_rounded,
+    _ => Icons.menu_book_rounded,
+  };
+}
+
+class _PriorityBadge extends StatelessWidget {
+  const _PriorityBadge({required this.priority});
+  final String priority;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _priorityColor(priority);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        _priorityLabel(priority),
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionIconButton extends StatelessWidget {
+  const _ActionIconButton({
+    required this.icon,
+    this.onPressed,
+    this.color = AppColors.primary,
+  });
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, size: 18, color: color),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScheduleStatsRow extends StatelessWidget {
+  const _ScheduleStatsRow({
+    required this.totalLectures,
+    required this.totalHours,
+    required this.totalSubjects,
+  });
+
+  final int totalLectures;
+  final String totalHours;
+  final int totalSubjects;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.midnight.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _ScheduleStatItem(
+            value: totalLectures.toString(),
+            label: 'محاضرة',
+            icon: Icons.school_rounded,
+            color: AppColors.primary,
+          ),
+          _VerticalDivider(),
+          _ScheduleStatItem(
+            value: totalHours,
+            label: 'ساعة',
+            icon: Icons.timer_rounded,
+            color: AppColors.orange,
+          ),
+          _VerticalDivider(),
+          _ScheduleStatItem(
+            value: totalSubjects.toString(),
+            label: 'مواد',
+            icon: Icons.auto_stories_rounded,
+            color: const Color(0xFF7C3AED),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScheduleStatItem extends StatelessWidget {
+  const _ScheduleStatItem({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            color: AppColors.midnight,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppColors.slate500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _VerticalDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: 1, height: 40, color: AppColors.slate200);
+  }
+}
+
+class _ScheduleCard extends StatelessWidget {
+  const _ScheduleCard(this.item);
+
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final startTime = text(item, 'start_time');
+    final endTime = text(item, 'end_time');
+    final isLive = isTimeInRange(startTime, endTime);
+
+    final subject = asMap(item['subject']);
+    final doctorObj = asMap(item['doctor']).isNotEmpty
+        ? asMap(item['doctor'])
+        : asMap(subject['doctor']);
+
+    final doctorName = text(doctorObj, 'name').isNotEmpty
+        ? text(doctorObj, 'name')
+        : (item['doctor'] is String
+              ? item['doctor'].toString()
+              : (subject['doctor'] is String
+                    ? subject['doctor'].toString()
+                    : ''));
+
+    final creator = asMap(item['creator']);
+    final isOfficial = creator.isNotEmpty;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isLive
+              ? AppColors.primary
+              : (isOfficial
+                    ? AppColors.success.withValues(alpha: 0.2)
+                    : AppColors.slate200),
+          width: isLive ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isLive ? AppColors.primary : AppColors.midnight).withValues(
+              alpha: 0.05,
+            ),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Timeline Side
+            Container(
+              width: 85,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: isLive
+                    ? AppColors.primary.withValues(alpha: 0.05)
+                    : AppColors.slate50,
+                border: BorderDirectional(
+                  end: BorderSide(
+                    color: isLive
+                        ? AppColors.primary.withValues(alpha: 0.2)
+                        : AppColors.slate200,
+                  ),
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    timeOnly(startTime),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: isLive ? AppColors.primary : AppColors.midnight,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    height: 24,
+                    width: 2,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          isLive ? AppColors.primary : AppColors.slate300,
+                          isLive
+                              ? AppColors.primary.withValues(alpha: 0)
+                              : AppColors.slate200.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    timeOnly(endTime),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.slate500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Content Side
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        if (isLive) ...[_LiveBadge(), const SizedBox(width: 8)],
+                        Expanded(
+                          child: Text(
+                            text(
+                              subject,
+                              'name',
+                              fallback: text(
+                                item,
+                                'subject_name',
+                                fallback: 'محاضرة',
+                              ),
+                            ),
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.midnight,
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                        if (isOfficial)
+                          _MiniBadge(label: 'رسمي', color: AppColors.success),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _IconInfo(
+                      icon: Icons.account_circle_rounded,
+                      text: doctorName.isNotEmpty
+                          ? doctorName
+                          : text(
+                              item,
+                              'doctor_name',
+                              fallback: text(
+                                subject,
+                                'doctor_name',
+                                fallback: 'دكتور غير محدد',
+                              ),
+                            ),
+                      color: AppColors.slate600,
+                    ),
+                    const SizedBox(height: 6),
+                    _IconInfo(
+                      icon: Icons.room_preferences_rounded,
+                      text: text(
+                        item,
+                        'hall_name',
+                        fallback: text(
+                          item,
+                          'location',
+                          fallback: 'قاعة غير محددة',
+                        ),
+                      ),
+                      color: AppColors.goldDeep,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.danger,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Text(
+            'LIVE',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IconInfo extends StatelessWidget {
+  const _IconInfo({
+    required this.icon,
+    required this.text,
+    this.color = AppColors.slate500,
+  });
+
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color.withValues(alpha: 0.7)),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TapScaleContainer extends StatefulWidget {
+  const _TapScaleContainer({
+    required this.child,
+    required this.onTap,
+    this.margin,
+    this.decoration,
+    this.clipBehavior = Clip.none,
+  });
+
+  final Widget child;
+  final VoidCallback onTap;
+  final EdgeInsetsGeometry? margin;
+  final Decoration? decoration;
+  final Clip clipBehavior;
+
+  @override
+  State<_TapScaleContainer> createState() => _TapScaleContainerState();
+}
+
+class _TapScaleContainerState extends State<_TapScaleContainer>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+      lowerBound: 0.97,
+      upperBound: 1.0,
+    )..value = 1.0;
+    _scaleAnimation = _controller;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _controller.reverse(),
+      onTapUp: (_) => _controller.forward(),
+      onTapCancel: () => _controller.forward(),
+      onTap: widget.onTap,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Container(
+          margin: widget.margin,
+          decoration: widget.decoration,
+          clipBehavior: widget.clipBehavior,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactPollWidget extends ConsumerStatefulWidget {
+  const _CompactPollWidget({required this.item, required this.sourceColor});
+
+  final Map<String, dynamic> item;
+  final Color sourceColor;
+
+  @override
+  ConsumerState<_CompactPollWidget> createState() => _CompactPollWidgetState();
+}
+
+class _CompactPollWidgetState extends ConsumerState<_CompactPollWidget> {
+  Map<String, dynamic>? _localPollData;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.item['poll_data'] != null) {
+      _localPollData = Map<String, dynamic>.from(widget.item['poll_data']);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _CompactPollWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.item['poll_data'] != null) {
+      _localPollData = Map<String, dynamic>.from(widget.item['poll_data']);
+    }
+  }
+
+  Future<void> _castVote(int optionId) async {
+    final rawId = text(widget.item, 'id');
+    if (!rawId.startsWith('center-')) return;
+    final notificationId = int.tryParse(rawId.substring('center-'.length));
+    if (notificationId == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await ref
+          .read(studentContentRepositoryProvider)
+          .voteNotification(notificationId: notificationId, optionId: optionId);
+
+      // Optimistically update local state
+      setState(() {
+        if (_localPollData != null) {
+          final options = List<Map<String, dynamic>>.from(
+            asList(_localPollData!['options']).map(asMap),
+          );
+
+          for (var i = 0; i < options.length; i++) {
+            final opt = Map<String, dynamic>.from(options[i]);
+            if (number(opt, 'id').toInt() == optionId) {
+              opt['votes_count'] = (number(opt, 'votes_count').toInt() + 1);
+            }
+            options[i] = opt;
+          }
+
+          _localPollData!['options'] = options;
+          _localPollData!['has_voted'] = true;
+          _localPollData!['voted_option_id'] = optionId;
+        }
+        _isLoading = false;
+      });
+
+      // Synchronize backends/lists
+      ref.invalidate(_newsProvider('all'));
+      ref.invalidate(_newsProvider('administration'));
+      ref.invalidate(_newsProvider('doctor'));
+      ref.invalidate(_newsProvider('delegate'));
+      ref.invalidate(studentUnreadNotificationsCountProvider);
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        MoeenDialogs.showError(
+          context,
+          message: 'فشل التصويت: ${e.toString()}',
+        );
+      }
+    }
+  }
+
+  Future<void> _retractVote() async {
+    final rawId = text(widget.item, 'id');
+    if (!rawId.startsWith('center-')) return;
+    final notificationId = int.tryParse(rawId.substring('center-'.length));
+    if (notificationId == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await ref
+          .read(studentContentRepositoryProvider)
+          .retractVoteNotification(notificationId: notificationId);
+
+      // Optimistically update local state
+      setState(() {
+        if (_localPollData != null) {
+          final options = List<Map<String, dynamic>>.from(
+            asList(_localPollData!['options']).map(asMap),
+          );
+          final votedOptionId = number(
+            _localPollData!,
+            'voted_option_id',
+          ).toInt();
+
+          for (var i = 0; i < options.length; i++) {
+            final opt = Map<String, dynamic>.from(options[i]);
+            if (number(opt, 'id').toInt() == votedOptionId) {
+              opt['votes_count'] = (number(opt, 'votes_count').toInt() - 1)
+                  .clamp(0, 99999);
+            }
+            options[i] = opt;
+          }
+
+          _localPollData!['options'] = options;
+          _localPollData!['has_voted'] = false;
+          _localPollData!['voted_option_id'] = 0;
+        }
+        _isLoading = false;
+      });
+
+      // Synchronize backends/lists
+      ref.invalidate(_newsProvider('all'));
+      ref.invalidate(_newsProvider('administration'));
+      ref.invalidate(_newsProvider('doctor'));
+      ref.invalidate(_newsProvider('delegate'));
+      ref.invalidate(studentUnreadNotificationsCountProvider);
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        MoeenDialogs.showError(
+          context,
+          message: 'فشل سحب التصويت: ${e.toString()}',
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_localPollData == null) return const SizedBox.shrink();
+
+    final options = List<Map<String, dynamic>>.from(
+      asList(_localPollData!['options']).map(asMap),
+    );
+    final hasVoted = boolValue(_localPollData!, 'has_voted');
+    final votedId = number(_localPollData!, 'voted_option_id').toInt();
+
+    final totalVotes = options.fold<int>(
+      0,
+      (sum, item) => sum + number(item, 'votes_count').toInt(),
+    );
+
+    final color = widget.sourceColor;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.15), width: 1),
+      ),
+      child: Stack(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.analytics_outlined, size: 14, color: color),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'استطلاع سريع',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.midnight,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '$totalVotes صوت',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ...options.map((option) {
+                final id = number(option, 'id').toInt();
+                final selected = id == votedId;
+                final votes = number(option, 'votes_count').toInt();
+                final percent = totalVotes == 0 ? 0.0 : (votes / totalVotes);
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Container(
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: selected
+                            ? color
+                            : AppColors.slate200.withValues(alpha: 0.8),
+                        width: selected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Stack(
+                        children: [
+                          if (hasVoted)
+                            Positioned.fill(
+                              child: Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: FractionallySizedBox(
+                                  widthFactor: percent,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: color.withValues(
+                                        alpha: selected ? 0.14 : 0.06,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: _isLoading || hasVoted
+                                  ? null
+                                  : () => _castVote(id),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                child: Row(
+                                  children: [
+                                    if (hasVoted) ...[
+                                      if (selected)
+                                        Icon(
+                                          Icons.check_circle_rounded,
+                                          color: color,
+                                          size: 16,
+                                        )
+                                      else
+                                        const SizedBox(width: 16),
+                                    ] else ...[
+                                      Container(
+                                        width: 14,
+                                        height: 14,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: color.withValues(alpha: 0.5),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        text(option, 'text'),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontFamily: 'Cairo',
+                                          fontWeight: selected
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                          fontSize: 11,
+                                          color: selected
+                                              ? AppColors.midnight
+                                              : AppColors.slate700,
+                                        ),
+                                      ),
+                                    ),
+                                    if (hasVoted)
+                                      Text(
+                                        '${(percent * 100).toInt()}%',
+                                        style: TextStyle(
+                                          fontFamily: 'Cairo',
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 11,
+                                          color: selected
+                                              ? color
+                                              : AppColors.slate600,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              if (hasVoted) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.center,
+                  child: TextButton.icon(
+                    onPressed: _isLoading ? null : _retractVote,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      textStyle: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w800,
+                        fontSize: 10,
+                      ),
+                    ),
+                    icon: const Icon(Icons.undo_rounded, size: 12),
+                    label: const Text('سحب أو تغيير التصويت'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (_isLoading)
+            Positioned.fill(
+              child: Container(
+                color: Colors.white24,
+                child: Center(
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NewsCard extends ConsumerWidget {
+  const _NewsCard(
+    this.item, {
+    this.isLast = false,
+    this.isPinned = false,
+    this.onOpen,
+  });
+
+  final Map<String, dynamic> item;
+  final bool isLast;
+  final bool isPinned;
+  final Future<void> Function(Map<String, dynamic> item)? onOpen;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final source = text(item, 'source');
+    final color = _sourceColor(source);
+    final attachment = absoluteUrl(text(item, 'attachment_url'));
+    final hasImage = attachment.isNotEmpty && isImageUrl(attachment);
+    final title = text(item, 'title', fallback: 'إعلان');
+    final excerpt = text(item, 'excerpt', fallback: text(item, 'body'));
+    final isUnread =
+        text(item, 'id').startsWith('center-') && text(item, 'read_at').isEmpty;
+    final isBookmarked = ref
+        .watch(newsBookmarksProvider)
+        .any((b) => text(b, 'id') == text(item, 'id'));
+    final pollData = item['poll_data'] != null
+        ? Map<String, dynamic>.from(item['poll_data'])
+        : null;
+
+    final IconData publisherIcon = switch (source) {
+      'doctor' => Icons.school_rounded,
+      'delegate' => Icons.groups_rounded,
+      _ => Icons.account_balance_rounded,
+    };
+
+    return _TapScaleContainer(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isPinned
+              ? AppColors.teal.withValues(alpha: 0.3)
+              : AppColors.slate200.withValues(alpha: 0.6),
+          width: isPinned ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isPinned
+                ? AppColors.teal.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      onTap: () async {
+        await onOpen?.call(item);
+        if (context.mounted) {
+          context.push('/student/news/details', extra: item);
+        }
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Publisher Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Row(
+              children: [
+                // Avatar / Icon
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: color.withValues(alpha: 0.2),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(publisherIcon, color: color, size: 20),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Publisher Info Text
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            _sourceLabel(source),
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              color: color,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (isPinned) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.teal.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(
+                                    Icons.push_pin_rounded,
+                                    color: AppColors.teal,
+                                    size: 10,
+                                  ),
+                                  SizedBox(width: 2),
+                                  Text(
+                                    'مثبت',
+                                    style: TextStyle(
+                                      fontFamily: 'Cairo',
+                                      color: AppColors.teal,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Text(
+                            text(item, 'author_name', fallback: 'النظام'),
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              color: AppColors.slate500,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 3,
+                            height: 3,
+                            decoration: const BoxDecoration(
+                              color: AppColors.slate300,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            timeAgo(text(item, 'created_at')),
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              color: AppColors.slate500,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Actions (Bookmark & Unread)
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    ref
+                        .read(newsBookmarksProvider.notifier)
+                        .toggleBookmark(item);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isBookmarked
+                          ? AppColors.teal.withValues(alpha: 0.08)
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isBookmarked
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_border_rounded,
+                      size: 18,
+                      color: isBookmarked ? AppColors.teal : AppColors.slate400,
+                    ),
+                  ),
+                ),
+                if (isUnread) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: AppColors.danger,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // 2. Image (if exists)
+          if (hasImage)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Hero(
+                        tag: 'news-image-${text(item, 'id')}',
+                        child: Image.network(
+                          attachment,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              color: AppColors.slate50,
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.slate200,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          errorBuilder: (_, __, ___) =>
+                              const _NewsImageFallback(height: 180),
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.25),
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.4),
+                              ],
+                              stops: const [0.0, 0.5, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // 3. Title & Content
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.midnight,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  excerpt,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.slate600,
+                    height: 1.45,
+                  ),
+                ),
+
+                // 4. Attachment banner (if exists and no image)
+                if (attachment.isNotEmpty && !hasImage) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: color.withValues(alpha: 0.15),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.attach_file_rounded, color: color, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'يوجد ملف مرفق جاهز للتحميل',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: color,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 12,
+                          color: color.withValues(alpha: 0.7),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // 5. Compact Poll Widget (if exists)
+                if (pollData != null)
+                  _CompactPollWidget(item: item, sourceColor: color),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NewsSkeleton extends StatelessWidget {
+  const _NewsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Container(
+        height: 160,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.grey.shade100),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: AppColors.slate100,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: AppColors.slate100,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        width: 40,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: AppColors.ghostWhite,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Container(
+                    width: 70,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: AppColors.slate100,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: AppColors.slate100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: 220,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: AppColors.ghostWhite,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationSkeleton extends StatelessWidget {
+  const _NotificationSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: AppColors.ghostWhite,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 120,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: AppColors.slate100,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 80,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: AppColors.ghostWhite,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            height: 14,
+            decoration: BoxDecoration(
+              color: AppColors.slate100,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 200,
+            height: 14,
+            decoration: BoxDecoration(
+              color: AppColors.ghostWhite,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MessageSkeleton extends StatelessWidget {
+  const _MessageSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: const BoxDecoration(
+              color: AppColors.ghostWhite,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 140,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: AppColors.slate100,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: 200,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: AppColors.ghostWhite,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuizTile extends ConsumerWidget {
+  const _QuizTile(this.quiz);
+  final Map<String, dynamic> quiz;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isCompetition = boolValue(quiz, 'is_competition');
+    final isAdmin = text(quiz, 'creator_type') == 'admin';
+    final isUpcoming = boolValue(quiz, 'is_upcoming');
+    final isAttempted = boolValue(quiz, 'is_attempted');
+    final title = text(quiz, 'title', fallback: 'كويز');
+    final subjectName = text(
+      quiz,
+      'subject_name',
+      fallback: isAdmin ? 'الإدارة المركزية' : 'مقرر دراسي',
+    );
+    final creatorName = text(
+      quiz,
+      'creator_name',
+      fallback: isAdmin ? 'الإدارة' : 'دكتور',
+    );
+    final questionsCount = number(quiz, 'questions_count').toInt();
+    final durationMin = number(quiz, 'duration_minutes').toInt();
+    final modelsCount = number(quiz, 'models_count').toInt();
+    final statusLabel = text(quiz, 'status_label', fallback: 'منشور');
+    final closesAt = text(quiz, 'closes_at');
+    final startsAt = text(quiz, 'starts_at');
+    final showCountdown = boolValue(quiz, 'show_countdown');
+    final attemptId = number(quiz, 'attempt_id').toInt();
+
+    final Color bannerColor = isAdmin
+        ? AppColors.primary
+        : isCompetition
+        ? AppColors.warning
+        : AppColors.teal;
+    final Color cardBg = Colors.white;
+    final Color borderColor = AppColors.slate100;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: bannerColor.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(width: 6, color: bannerColor),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            if (isCompetition)
+                              _QuizBadge(
+                                label: 'مسابقة',
+                                icon: Icons.emoji_events_rounded,
+                                color: const Color(0xFF92400E),
+                                bg: const Color(0xFFFEF3C7),
+                              ),
+                            if (isAdmin)
+                              _QuizBadge(
+                                label: 'إدارة النظام',
+                                icon: Icons.shield_rounded,
+                                color: Colors.white,
+                                bg: AppColors.primary,
+                              ),
+                            if (isUpcoming)
+                              _QuizBadge(
+                                label: 'قادماً',
+                                icon: Icons.schedule_rounded,
+                                color: const Color(0xFF92400E),
+                                bg: const Color(0xFFFFFBEB),
+                              ),
+                            if (isAttempted)
+                              _QuizBadge(
+                                label: 'مكتمل',
+                                icon: Icons.check_circle_rounded,
+                                color: const Color(0xFF3730A3),
+                                bg: const Color(0xFFE0E7FF),
+                              ),
+                            if (!isUpcoming && !isAttempted)
+                              _QuizBadge(
+                                label: statusLabel,
+                                icon: Icons.circle,
+                                color: Colors.white,
+                                bg: bannerColor,
+                              ),
+                          ],
+                        ),
+                        Text(
+                          isUpcoming && startsAt.isNotEmpty
+                              ? 'يبدأ في ${timeOnly(startsAt)}'
+                              : timeAgo(text(quiz, 'created_at')),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppColors.slate400,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              color: AppColors.midnight,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                        if (isAdmin) ...[
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.verified_rounded,
+                            color: AppColors.primary,
+                            size: 18,
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isAdmin
+                          ? 'الإدارة المركزية'
+                          : '$creatorName — $subjectName',
+                      style: const TextStyle(
+                        color: AppColors.slate500,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (showCountdown && isUpcoming && startsAt.isNotEmpty) ...[
+                      _CardCountdown(targetDate: startsAt, label: 'يبدأ خلال:'),
+                      const SizedBox(height: 12),
+                    ],
+                    if (showCountdown &&
+                        !isUpcoming &&
+                        !isAttempted &&
+                        closesAt.isNotEmpty) ...[
+                      _CardCountdown(
+                        targetDate: closesAt,
+                        label: 'ينتهي خلال:',
+                        isDanger: true,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        if (questionsCount > 0)
+                          _InfoTag(
+                            icon: Icons.help_outline_rounded,
+                            label: '$questionsCount سؤال',
+                          ),
+                        if (durationMin > 0)
+                          _InfoTag(
+                            icon: Icons.timer_outlined,
+                            label: '$durationMin دقيقة',
+                          ),
+                        if (modelsCount > 0)
+                          _InfoTag(
+                            icon: Icons.layers_outlined,
+                            label: '$modelsCount نموذج',
+                          ),
+                        if (closesAt.isNotEmpty)
+                          _InfoTag(
+                            icon: Icons.event_busy_rounded,
+                            label: 'ينتهي ${dateTime(closesAt)}',
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(color: AppColors.slate100, height: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        _buildActionBtn(
+                          context,
+                          ref,
+                          isUpcoming,
+                          isAttempted,
+                          attemptId,
+                          bannerColor,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionBtn(
+    BuildContext context,
+    WidgetRef ref,
+    bool isUpcoming,
+    bool isAttempted,
+    int attemptId,
+    Color bannerColor,
+  ) {
+    if (isAttempted && attemptId > 0) {
+      return FilledButton.icon(
+        onPressed: () =>
+            context.push(StudentQuizzesScreen.resultPath(attemptId)),
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.midnight,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+        ),
+        icon: const Icon(Icons.visibility_rounded, size: 16),
+        label: const Text('النتيجة'),
+      );
+    }
+    if (isUpcoming) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.slate100,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_rounded, size: 14, color: AppColors.slate400),
+            SizedBox(width: 4),
+            Text(
+              'غير متاح',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.slate400,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return FilledButton.icon(
+      onPressed: () => _handleStart(context, ref),
+      style: FilledButton.styleFrom(
+        backgroundColor: bannerColor,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+      ),
+      icon: const Icon(Icons.play_arrow_rounded, size: 16),
+      label: const Text('ابدأ'),
+    );
+  }
+
+  Future<void> _handleStart(BuildContext context, WidgetRef ref) async {
+    final id = number(quiz, 'id').toInt();
+    if (id <= 0) return;
+
+    if (!context.mounted) return;
+    context.push('/student/quizzes/$id/prepare', extra: quiz);
+  }
+}
+
+class _AttemptTile extends StatelessWidget {
+  const _AttemptTile(this.attempt);
+  final Map<String, dynamic> attempt;
+
+  @override
+  Widget build(BuildContext context) {
+    final quizTitle = text(
+      attempt,
+      'quiz_title',
+      fallback: text(asMap(attempt['quiz']), 'title', fallback: 'كويز'),
+    );
+    final subjectName = text(attempt, 'subject_name', fallback: '');
+    final modelName = text(attempt, 'model_name', fallback: '');
+    final resultsHidden =
+        attempt['results_hidden'] == true ||
+        text(attempt, 'results_visibility', fallback: '') == 'hidden';
+    final score = number(attempt, 'score').toDouble();
+    final maxScore = number(attempt, 'max_score').toDouble();
+    final pct = number(attempt, 'percentage').toDouble();
+    final Color barColor = resultsHidden
+        ? AppColors.slate400
+        : pct >= 70
+        ? AppColors.success
+        : pct >= 50
+        ? const Color(0xFFF59E0B)
+        : AppColors.danger;
+    final id = number(attempt, 'id').toInt();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.slate100),
+      ),
+      child: InkWell(
+        onTap: () {
+          if (id > 0) context.push(StudentQuizzesScreen.resultPath(id));
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: barColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      resultsHidden
+                          ? Icons.visibility_off_rounded
+                          : pct >= 50
+                          ? Icons.check_circle_rounded
+                          : Icons.cancel_rounded,
+                      color: barColor,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          quizTitle,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14,
+                            color: AppColors.midnight,
+                          ),
+                        ),
+                        Text(
+                          [
+                            if (subjectName.isNotEmpty) subjectName,
+                            if (modelName.isNotEmpty) 'نموذج: $modelName',
+                          ].join(' — '),
+                          style: const TextStyle(
+                            color: AppColors.slate400,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (resultsHidden) ...[
+                        const Text(
+                          'النتيجة مخفية',
+                          style: TextStyle(
+                            color: AppColors.slate500,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ] else ...[
+                        Text(
+                          '${score.toStringAsFixed(0)}/${maxScore.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            color: barColor,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                          ),
+                        ),
+                        Text(
+                          '${pct.toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            color: AppColors.slate400,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (!resultsHidden) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: pct / 100,
+                    minHeight: 6,
+                    backgroundColor: AppColors.slate100,
+                    valueColor: AlwaysStoppedAnimation(barColor),
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+              Text(
+                dateOnly(text(attempt, 'submitted_at')),
+                style: const TextStyle(
+                  color: AppColors.slate400,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuizBadge extends StatelessWidget {
+  const _QuizBadge({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.bg,
+  });
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Color bg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoTag extends StatelessWidget {
+  const _InfoTag({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.slate500),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: AppColors.slate600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExamScheduleCard extends StatefulWidget {
+  const _ExamScheduleCard(this.schedule);
+
+  final Map<String, dynamic> schedule;
+
+  @override
+  State<_ExamScheduleCard> createState() => _ExamScheduleCardState();
+}
+
+class _ExamScheduleCardState extends State<_ExamScheduleCard> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = asList(widget.schedule['items']).map(asMap).toList()
+      ..sort((a, b) => text(a, 'exam_date').compareTo(text(b, 'exam_date')));
+    final term = asMap(widget.schedule['term']);
+    final isOfficial = boolValue(widget.schedule, 'is_official');
+    final color = isOfficial
+        ? const Color(0xFF0F172A)
+        : const Color(0xFF475569);
+
+    // Calculate days until next exam if any
+    int daysDiff = -1;
+    if (items.isNotEmpty) {
+      final nextExam = items.first;
+      final examDate = DateTime.tryParse(text(nextExam, 'exam_date'));
+      if (examDate != null) {
+        daysDiff = examDate.difference(DateTime.now()).inDays;
+      }
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(
+          color: color.withValues(alpha: 0.15),
+          width: isOfficial ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.08),
+            blurRadius: 30,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          // Header
+          InkWell(
+            onTap: () => setState(() => _isExpanded = !_isExpanded),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [color, color.withValues(alpha: 0.85)],
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isOfficial
+                                  ? Icons.verified_rounded
+                                  : Icons.person_pin_rounded,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              isOfficial ? 'جدول معتمد' : 'بواسطة المندوب',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          _isExpanded
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    text(widget.schedule, 'title'),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 8,
+                    children: [
+                      _HeaderStat(
+                        icon: Icons.school_rounded,
+                        text: text(term, 'name', fallback: 'الفصل الحالي'),
+                      ),
+                      _HeaderStat(
+                        icon: Icons.auto_stories_rounded,
+                        text: '${items.length} مقرر',
+                      ),
+                      if (daysDiff >= 0)
+                        _HeaderStat(
+                          icon: Icons.timer_rounded,
+                          text: daysDiff == 0 ? 'اليوم' : 'بقي $daysDiff يوم',
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Body
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (text(widget.schedule, 'description').isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.info.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: AppColors.info.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.info_rounded,
+                          size: 18,
+                          color: AppColors.info,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            text(widget.schedule, 'description'),
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.5,
+                              color: AppColors.slate700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      return _ExamTimelineItem(
+                        items[index],
+                        isLast: index == items.length - 1,
+                        color: color,
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+            crossFadeState: _isExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 400),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderStat extends StatelessWidget {
+  const _HeaderStat({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.white.withValues(alpha: 0.7)),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Colors.white.withValues(alpha: 0.9),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ExamTimelineItem extends StatelessWidget {
+  const _ExamTimelineItem(
+    this.item, {
+    this.isLast = false,
+    required this.color,
+  });
+  final Map<String, dynamic> item;
+  final bool isLast;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final subject = asMap(item['subject']);
+    final dateStr = text(item, 'exam_date');
+    final date = DateTime.tryParse(dateStr);
+
+    final day = date != null ? date.day.toString().padLeft(2, '0') : '--';
+    final month = _monthName(date?.month ?? 0);
+    final dayLabel = _dayLabel(date?.weekday.toString() ?? '');
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Timeline Indicator
+          Container(
+            width: 50,
+            margin: const EdgeInsetsDirectional.only(start: 16),
+            child: Column(
+              children: [
+                Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: color, width: 3),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: color.withValues(alpha: 0.15),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Exam Content
+          Expanded(
+            child: Container(
+              margin: EdgeInsets.only(
+                bottom: isLast ? 10 : 20,
+                left: 20,
+                right: 4,
+              ),
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppColors.slate100),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.midnight.withValues(alpha: 0.03),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  // Calendar Style Date
+                  Container(
+                    width: 54,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: color.withValues(alpha: 0.1)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(14),
+                            ),
+                          ),
+                          child: Text(
+                            dayLabel,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Column(
+                            children: [
+                              Text(
+                                day,
+                                style: TextStyle(
+                                  color: color,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1,
+                                ),
+                              ),
+                              Text(
+                                month,
+                                style: TextStyle(
+                                  color: color.withValues(alpha: 0.7),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // Details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          text(subject, 'name', fallback: 'مقرر غير معروف'),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.midnight,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 6,
+                          children: [
+                            _TimelineIconInfo(
+                              icon: Icons.access_time_filled_rounded,
+                              text:
+                                  '${timeOnly(text(item, 'start_time'))} - ${timeOnly(text(item, 'end_time'))}',
+                              color: AppColors.slate500,
+                            ),
+                            _TimelineIconInfo(
+                              icon: Icons.location_on_rounded,
+                              text: text(
+                                item,
+                                'location',
+                                fallback: 'قاعة غير محددة',
+                              ),
+                              color: AppColors.goldDeep,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _monthName(int month) {
+    const names = [
+      '',
+      'يناير',
+      'فبراير',
+      'مارس',
+      'إبريل',
+      'مايو',
+      'يونيو',
+      'يوليو',
+      'أغسطس',
+      'سبتمبر',
+      'أكتوبر',
+      'نوفمبر',
+      'ديسمبر',
+    ];
+    return month > 0 && month <= 12 ? names[month] : '';
+  }
+}
+
+class _TimelineIconInfo extends StatelessWidget {
+  const _TimelineIconInfo({
+    required this.icon,
+    required this.text,
+    required this.color,
+  });
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: color),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: color.withValues(alpha: 0.8),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CourseResourceCard extends StatefulWidget {
+  const _CourseResourceCard({
+    required this.item,
+    required this.onDownload,
+    required this.onOpen,
+  });
+
+  final Map<String, dynamic> item;
+  final VoidCallback onDownload;
+  final VoidCallback onOpen;
+
+  @override
+  State<_CourseResourceCard> createState() => _CourseResourceCardState();
+}
+
+class _CourseResourceCardState extends State<_CourseResourceCard> {
+  bool _isDownloading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final subject = asMap(widget.item['subject']);
+    final fileType = _displayFileType(widget.item).toLowerCase();
+    final color = _fileColor(fileType);
+    final size = text(widget.item, 'file_size', fallback: '---');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate200),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.midnight.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => _showPreview(
+          context,
+          widget.item,
+          widget.onDownload,
+          widget.onOpen,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Center(
+                  child: Icon(_fileIcon(fileType), color: color, size: 24),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      text(widget.item, 'title', fallback: 'ملف دراسي'),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.midnight,
+                        height: 1.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      text(subject, 'name', fallback: 'المادة الدراسية'),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.slate500,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _FileMeta(label: size, icon: Icons.sd_storage_rounded),
+                        const SizedBox(width: 12),
+                        _FileMeta(
+                          label: prettyDate(text(widget.item, 'created_at')),
+                          icon: Icons.calendar_today_rounded,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filledTonal(
+                onPressed: widget.onOpen,
+                style: IconButton.styleFrom(
+                  backgroundColor: color.withValues(alpha: 0.1),
+                  foregroundColor: color,
+                ),
+                icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                tooltip: 'فتح',
+              ),
+              const SizedBox(width: 6),
+              IconButton.filledTonal(
+                onPressed: _isDownloading
+                    ? null
+                    : () async {
+                        setState(() => _isDownloading = true);
+                        widget.onDownload();
+                        await Future.delayed(const Duration(seconds: 2));
+                        if (mounted) setState(() => _isDownloading = false);
+                      },
+                style: IconButton.styleFrom(
+                  backgroundColor: AppColors.slate100,
+                  foregroundColor: AppColors.midnight,
+                ),
+                icon: _isDownloading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.midnight,
+                        ),
+                      )
+                    : const Icon(Icons.download_rounded, size: 18),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
+class _ModernBadge extends StatelessWidget {
+  const _ModernBadge({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    if (label.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _fileIcon(String type) {
+  final lower = type.toLowerCase();
+  if (lower.contains('pdf')) return Icons.picture_as_pdf_rounded;
+  if (lower.contains('ppt')) return Icons.slideshow_rounded;
+  if (lower.contains('doc')) return Icons.description_rounded;
+  if (lower.contains('xls')) return Icons.table_chart_rounded;
+  if (lower.contains('mp4') ||
+      lower.contains('mov') ||
+      lower.contains('video')) {
+    return Icons.movie_rounded;
+  }
+  if (lower.contains('mp3') ||
+      lower.contains('wav') ||
+      lower.contains('audio')) {
+    return Icons.audiotrack_rounded;
+  }
+  if (lower.contains('txt')) return Icons.notes_rounded;
+  if (lower.contains('csv')) return Icons.table_rows_rounded;
+  if (lower.contains('zip') || lower.contains('rar')) {
+    return Icons.archive_rounded;
+  }
+  if (lower.contains('jpg') ||
+      lower.contains('png') ||
+      lower.contains('jpeg')) {
+    return Icons.image_rounded;
+  }
+  return Icons.insert_drive_file_rounded;
+}
+
+Color _fileColor(String type) {
+  final lower = type.toLowerCase();
+  if (lower.contains('pdf')) return const Color(0xFFE11D48); // Rose 600
+  if (lower.contains('ppt')) return const Color(0xFFEA580C); // Orange 600
+  if (lower.contains('doc')) return const Color(0xFF2563EB); // Blue 600
+  if (lower.contains('xls')) return const Color(0xFF16A34A); // Green 600
+  if (lower.contains('mp4') ||
+      lower.contains('mov') ||
+      lower.contains('video')) {
+    return const Color(0xFFDB2777);
+  }
+  if (lower.contains('mp3') ||
+      lower.contains('wav') ||
+      lower.contains('audio')) {
+    return const Color(0xFF0891B2);
+  }
+  if (lower.contains('txt') || lower.contains('csv')) return AppColors.teal;
+  if (lower.contains('zip') || lower.contains('rar')) {
+    return const Color(0xFF7C3AED); // Violet 600
+  }
+  return AppColors.slate500;
+}
+
+String _displayFileType(Map<String, dynamic> item) {
+  final explicit = text(item, 'file_type').replaceAll('.', '').trim();
+  if (explicit.isNotEmpty) return explicit.toUpperCase();
+  final path = text(item, 'file_path');
+  final clean = path.split('?').first;
+  final ext = clean.contains('.') ? clean.split('.').last : '';
+  return ext.isEmpty ? 'FILE' : ext.toUpperCase();
+}
+
+// ignore: unused_element
+class _ResourceSkeleton extends StatelessWidget {
+  // ignore: unused_element_parameter
+  const _ResourceSkeleton({this.isGrid = false});
+  final bool isGrid;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isGrid) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.slate200),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            _SkeletonBox(height: 60, width: 60, radius: 16),
+            const SizedBox(height: 12),
+            _SkeletonBox(height: 14, width: 100),
+            const SizedBox(height: 8),
+            _SkeletonBox(height: 10, width: 60),
+          ],
+        ),
+      );
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.slate200),
+      ),
+      child: Row(
+        children: [
+          _SkeletonBox(height: 50, width: 50, radius: 14),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SkeletonBox(height: 14, width: 140),
+                const SizedBox(height: 8),
+                _SkeletonBox(height: 10, width: 80),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkeletonBox extends StatelessWidget {
+  const _SkeletonBox({
+    required this.height,
+    required this.width,
+    this.radius = 4,
+  });
+  final double height;
+  final double width;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      width: width,
+      decoration: BoxDecoration(
+        color: AppColors.slate100,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
+}
+
+class _EntryAnimation extends StatelessWidget {
+  const _EntryAnimation({required this.child, required this.index});
+  final Widget child;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 300 + (index * 50).clamp(0, 400)),
+      tween: Tween(begin: 0.0, end: 1.0),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 20 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+}
+
+class _CourseResourceGridCard extends StatefulWidget {
+  const _CourseResourceGridCard({
+    required this.item,
+    required this.onDownload,
+    required this.onOpen,
+  });
+  final Map<String, dynamic> item;
+  final VoidCallback onDownload;
+  final VoidCallback onOpen;
+
+  @override
+  State<_CourseResourceGridCard> createState() =>
+      _CourseResourceGridCardState();
+}
+
+class _CourseResourceGridCardState extends State<_CourseResourceGridCard> {
+  bool _isDownloading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final fileType = _displayFileType(widget.item).toLowerCase();
+    final color = _fileColor(fileType);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.slate200),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => _showPreview(
+          context,
+          widget.item,
+          widget.onDownload,
+          widget.onOpen,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.08),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(_fileIcon(fileType), color: color, size: 32),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                text(widget.item, 'title', fallback: 'ملف دراسي'),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.midnight,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                text(widget.item, 'file_size', fallback: '---'),
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.slate500,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.tonal(
+                      onPressed: widget.onOpen,
+                      style: FilledButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Icon(Icons.open_in_new_rounded, size: 16),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.tonal(
+                      onPressed: _isDownloading
+                          ? null
+                          : () async {
+                              setState(() => _isDownloading = true);
+                              widget.onDownload();
+                              await Future.delayed(const Duration(seconds: 2));
+                              if (mounted) {
+                                setState(() => _isDownloading = false);
+                              }
+                            },
+                      style: FilledButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: _isDownloading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.download_rounded, size: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FileMeta extends StatelessWidget {
+  const _FileMeta({required this.label, required this.icon});
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 10, color: AppColors.slate400),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            color: AppColors.slate500,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+void _showPreview(
+  BuildContext context,
+  Map<String, dynamic> item,
+  VoidCallback onDownload,
+  VoidCallback onOpen,
+) {
+  final fileType = text(item, 'file_type', fallback: 'file');
+  final displayType = _displayFileType(item);
+  final color = _fileColor(displayType);
+  final subject = asMap(item['subject']);
+  final uploader = asMap(item['uploader']);
+
+  showMoeenBottomSheet(
+    context: context,
+    title: 'تفاصيل المصدر',
+    icon: Icons.info_outline_rounded,
+    color: color,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(_fileIcon(fileType), color: color, size: 32),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    text(item, 'title'),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    text(subject, 'name', fallback: 'مقرر غير محدد'),
+                    style: TextStyle(
+                      color: AppColors.slate500,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        if (text(item, 'description').isNotEmpty) ...[
+          const Text(
+            'الوصف',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            text(item, 'description'),
+            style: TextStyle(color: AppColors.slate700, height: 1.5),
+          ),
+          const SizedBox(height: 20),
+        ],
+        _PreviewInfoTile(
+          icon: _fileIcon(displayType),
+          label: 'نوع الملف',
+          value: displayType,
+        ),
+        _PreviewInfoTile(
+          icon: Icons.category_rounded,
+          label: 'تصنيف الملف',
+          value: _categoryLabel(text(item, 'category')),
+        ),
+        _PreviewInfoTile(
+          icon: Icons.person_rounded,
+          label: 'المرفوع بواسطة',
+          value: text(uploader, 'name', fallback: 'غير معروف'),
+        ),
+        _PreviewInfoTile(
+          icon: Icons.calendar_month_rounded,
+          label: 'تاريخ الرفع',
+          value: dateOnly(text(item, 'created_at')),
+        ),
+        _PreviewInfoTile(
+          icon: Icons.download_done_rounded,
+          label: 'مرات التحميل',
+          value: text(item, 'downloads_count', fallback: '0'),
+        ),
+        const SizedBox(height: 30),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  onOpen();
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: color.withValues(alpha: 0.1),
+                  foregroundColor: color,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                icon: const Icon(Icons.open_in_new_rounded),
+                label: const Text('فتح'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  onDownload();
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: color,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                icon: const Icon(Icons.download_rounded),
+                label: const Text(
+                  'تحميل',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+      ],
+    ),
+  );
+}
+
+class _PreviewInfoTile extends StatelessWidget {
+  const _PreviewInfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppColors.slate400),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: TextStyle(
+              color: AppColors.slate500,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuestionCard extends StatefulWidget {
+  const _QuestionCard({
+    required this.question,
+    required this.index,
+    required this.total,
+    required this.answers,
+    required this.onOptionSelected,
+  });
+
+  final Map<String, dynamic> question;
+  final int index;
+  final int total;
+  final Map<String, dynamic> answers;
+  final VoidCallback onOptionSelected;
+
+  @override
+  State<_QuestionCard> createState() => _QuestionCardState();
+}
+
+class _QuestionCardState extends State<_QuestionCard> {
+  @override
+  Widget build(BuildContext context) {
+    final questionId = number(widget.question, 'id').toInt().toString();
+    final options = asList(widget.question['options']);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+      children: [
+        Text(
+          'السؤال ${widget.index + 1} من ${widget.total}',
+          style: const TextStyle(
+            color: AppColors.slate400,
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          text(
+            widget.question,
+            'question_text',
+            fallback: text(widget.question, 'title'),
+          ),
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: AppColors.midnight,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 30),
+        ...options.asMap().entries.map((entry) {
+          final map = asMap(entry.value);
+          final optionId = number(map, 'id').toInt();
+          final selected = widget.answers[questionId] == optionId;
+          final color = selected ? AppColors.royalBlue : AppColors.slate100;
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: InkWell(
+              onTap: () {
+                setState(() => widget.answers[questionId] = optionId);
+                widget.onOptionSelected();
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 18,
+                ),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? color.withValues(alpha: 0.05)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: selected ? color : AppColors.slate200,
+                    width: 2,
+                  ),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: selected ? color : AppColors.slate300,
+                          width: 2,
+                        ),
+                        color: selected ? color : Colors.transparent,
+                      ),
+                      child: selected
+                          ? const Icon(
+                              Icons.check,
+                              size: 18,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        text(map, 'option_text', fallback: text(map, 'text')),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: selected
+                              ? FontWeight.w900
+                              : FontWeight.w700,
+                          color: selected
+                              ? AppColors.midnight
+                              : AppColors.slate600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+class _MiniBadge extends StatelessWidget {
+  const _MiniBadge({
+    required this.label,
+    required this.color,
+    this.textColor,
+    this.blur = false,
+  });
+
+  final String label;
+  final Color color;
+  final Color? textColor;
+  final bool blur;
+
+  @override
+  Widget build(BuildContext context) {
+    if (label.isEmpty) return const SizedBox.shrink();
+
+    Widget child = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: blur
+            ? color.withValues(alpha: 0.7)
+            : color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: blur ? null : Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: blur ? Colors.white : (textColor ?? color),
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+
+    if (blur) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+          child: child,
+        ),
+      );
+    }
+
+    return child;
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+          ),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactHeader extends StatelessWidget {
+  const _CompactHeader({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+  });
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Icon(icon, color: color, size: 22),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.slate500,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ignore: unused_element
+class _CategoryScrollRow extends StatelessWidget {
+  const _CategoryScrollRow({
+    required this.selected,
+    required this.options,
+    required this.onChanged,
+  });
+  final String selected;
+  final Map<String, String> options;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: options.entries.map((entry) {
+          final isSelected = selected == entry.key;
+          return Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: ChoiceChip(
+              label: Text(entry.value),
+              selected: isSelected,
+              onSelected: (val) => onChanged(entry.key),
+              selectedColor: AppColors.primary,
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : AppColors.slate700,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+              showCheckmark: false,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(
+                  color: isSelected ? AppColors.primary : AppColors.slate200,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _IconButton extends StatelessWidget {
+  const _IconButton({
+    required this.icon,
+    required this.onTap,
+    this.color,
+    this.iconColor,
+  });
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color? color;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color ?? AppColors.slate100,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          width: 50,
+          height: 50,
+          child: Icon(icon, color: iconColor ?? AppColors.slate700, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
+class _QuickFilterChip extends StatelessWidget {
+  const _QuickFilterChip({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.slate200),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 16, color: AppColors.slate500),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.slate700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CardCountdown extends StatefulWidget {
+  const _CardCountdown({
+    required this.targetDate,
+    required this.label,
+    this.isDanger = false,
+  });
+  final String targetDate;
+  final String label;
+  final bool isDanger;
+
+  @override
+  State<_CardCountdown> createState() => _CardCountdownState();
+}
+
+class _CardCountdownState extends State<_CardCountdown> {
+  late DateTime _target;
+  late Stream<Duration> _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _target = DateTime.tryParse(widget.targetDate) ?? DateTime.now();
+    _ticker = Stream.periodic(const Duration(seconds: 1), (_) {
+      return _target.difference(DateTime.now());
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Duration>(
+      stream: _ticker,
+      builder: (context, snapshot) {
+        final diff = snapshot.data ?? _target.difference(DateTime.now());
+        if (diff.isNegative) return const SizedBox.shrink();
+
+        final hours = diff.inHours.toString().padLeft(2, '0');
+        final minutes = (diff.inMinutes % 60).toString().padLeft(2, '0');
+        final seconds = (diff.inSeconds % 60).toString().padLeft(2, '0');
+
+        final color = widget.isDanger
+            ? AppColors.danger
+            : const Color(0xFFF59E0B);
+        final bg = widget.isDanger
+            ? const Color(0xFFFEF2F2)
+            : const Color(0xFFFFF7ED);
+        final border = widget.isDanger
+            ? const Color(0xFFFEE2E2)
+            : const Color(0xFFFFEDD5);
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: border),
+          ),
+          child: Column(
+            children: [
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: color.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$hours:$minutes:$seconds',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: color,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+String _translateExcuseStatus(String status) {
+  return switch (status.toLowerCase()) {
+    'pending' => 'قيد المراجعة',
+    'accepted' || 'approved' => 'مقبول',
+    'rejected' => 'مرفوض',
+    _ => status,
+  };
+}

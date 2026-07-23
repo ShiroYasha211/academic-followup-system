@@ -1,0 +1,1668 @@
+{
+    "info": {
+        "_postman_id": "attendify-student-api-master",
+        "name": "Attendify - Student API [MASTER]",
+        "description": "Student workspace endpoints for Attendify.\n\nFrontend auth flow for this collection:\n1. `POST /login`\n2. Save `response.data.data.token` and `response.data.data.user`\n3. `GET /me`\n4. `POST /devices/token` if Firebase push is enabled\n5. Use the bearer token on all later requests\n6. `DELETE /devices/token` before `POST /logout`\n\nImportant distinctions: `/resources` is course-specific material for the current student scope, `/library` is the shared study library, `/notifications` is the personal inbox, `/news-hub` is the public communication stream, and `/authorized-grades` is only for users who received delegated grading tasks.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://127.0.0.1:8000/api/student",
+            "type": "string"
+        },
+        {
+            "key": "token",
+            "value": "",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "01 Section",
+            "item": [
+                {
+                    "name": "Login",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "var jsonData = pm.response.json();",
+                                    "if (jsonData.success && jsonData.data.token) {",
+                                    "    pm.collectionVariables.set('token', jsonData.data.token);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"login\":  \"student1@example.com\",\r\n    \"password\":  \"password\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "login"
+                            ]
+                        },
+                        "description": "Authenticate a student account.\n\nRequest body:\n- `login`: email or student_number\n- `password`\n\nSave the returned token from `response.data.data.token`, save the user object from `response.data.data.user`, then call `GET /me`."
+                    }
+                },
+                {
+                    "name": "Get Profile (Me)",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/me",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "me"
+                            ]
+                        },
+                        "description": "Use this request immediately after login and on app start to verify the saved student token and hydrate the current profile."
+                    }
+                },
+                {
+                    "name": "Register Device Token",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"device_token\": \"FCM_DEVICE_TOKEN\",\r\n    \"platform\": \"android\",\r\n    \"device_name\": \"Pixel 8\",\r\n    \"app_version\": \"1.0.0\"\r\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/devices/token",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "devices",
+                                "token"
+                            ]
+                        },
+                        "description": "Register or refresh the Firebase device token for the current student session.\n\nCall this immediately after a successful login and again whenever the FCM token changes.\nRequest body:\n- `device_token`: the Firebase/FCM token from the device\n- `platform`: `android`, `ios`, or `web`\n- `device_name`: optional human-readable device label\n- `app_version`: optional app version string"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove Device Token",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"device_token\": \"FCM_DEVICE_TOKEN\"\r\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/devices/token",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "devices",
+                                "token"
+                            ]
+                        },
+                        "description": "Remove the Firebase device token for the current student session.\n\nCall this before logout when push notifications are enabled, then call the normal logout endpoint and clear local storage."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Logout",
+                    "request": {
+                        "method": "POST",
+                        "url": {
+                            "raw": "{{base_url}}/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "logout"
+                            ]
+                        },
+                        "description": "If push is enabled, call `DELETE /devices/token` first with the current FCM token, then call logout and clear local storage."
+                    }
+                },
+                {
+                    "name": "Change Password",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"current_password\":  \"password\",\r\n    \"new_password\":  \"new_password\",\r\n    \"new_password_confirmation\":  \"new_password\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/change-password",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "change-password"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "description": "Authentication runtime for student clients:\n1. Login with `login` and `password`\n2. Save `response.data.data.token`\n3. Call `GET /me`\n4. Register Firebase token with `POST /devices/token`\n5. Send `Authorization: Bearer <token>` on all protected requests\n6. Remove the device token before logout"
+        },
+        {
+            "name": "02 Section",
+            "item": [
+                {
+                    "name": "Dashboard Stats",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/dashboard",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "dashboard"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "03 Section",
+            "item": [
+                {
+                    "name": "Unified News Hub",
+                    "request": {
+                        "method": "GET",
+                        "description": "Recommended endpoint for the student announcements page. Use `source=all|administration|doctor|delegate` to switch between the combined feed or a specific source.",
+                        "url": {
+                            "raw": "{{base_url}}/news-hub?source=all",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "news-hub"
+                            ],
+                            "query": [
+                                {
+                                    "key": "source",
+                                    "value": "all",
+                                    "description": "Allowed values: all, administration, doctor, delegate"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Batch News (Admin/Delegate)",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/announcements",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "announcements"
+                            ]
+                        },
+                        "description": "Major/level announcements only. Use this when you need batch announcements without doctor posts. Administrative and delegate posts share this endpoint and are split by creator role."
+                    }
+                },
+                {
+                    "name": "Subject News (Doctor)",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/doctor-announcements",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "doctor-announcements"
+                            ]
+                        },
+                        "description": "Doctor-only subject announcements. Supports the `type` filter in the API to narrow the feed to doctor announcement types."
+                    }
+                },
+                {
+                    "name": "Notifications Feed (Polls)",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/notifications",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "notifications"
+                            ]
+                        },
+                        "description": "Personal student inbox notifications, including polls and unread state. This is not the same as the public news feed."
+                    }
+                },
+                {
+                    "name": "Unread Notifications Count",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/notifications/unread-count",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "notifications",
+                                "unread-count"
+                            ]
+                        },
+                        "description": "Returns the current unread notifications count for the student inbox."
+                    }
+                },
+                {
+                    "name": "Vote on Poll",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"poll_option_id\":  1\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/notifications/1/vote",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "notifications",
+                                "1",
+                                "vote"
+                            ]
+                        },
+                        "description": "Cast a vote on a poll notification from the personal inbox."
+                    }
+                },
+                {
+                    "name": "Mark Notification as Read",
+                    "request": {
+                        "method": "POST",
+                        "url": {
+                            "raw": "{{base_url}}/notifications/1/read",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "notifications",
+                                "1",
+                                "read"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Mark All as Read",
+                    "request": {
+                        "method": "POST",
+                        "url": {
+                            "raw": "{{base_url}}/notifications/mark-all-read",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "notifications",
+                                "mark-all-read"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Reminders (Academic Events)",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/reminders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "reminders"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "description": "Unified student communication area.\n\n- `news-hub`: the recommended endpoint. It combines official news center items, administrative announcements, doctor announcements, and delegate announcements in one feed with a `source` filter.\n- `announcements`: major/level announcements only. In practice this endpoint can contain administrative or delegate posts depending on the creator role.\n- `doctor-announcements`: doctor-only subject announcements.\n- `notifications`: personal inbox-style notifications for the logged-in student, including polls and unread state."
+        },
+        {
+            "name": "04 Academic Timetable",
+            "item": [
+                {
+                    "name": "Weekly Schedule",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/schedules",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "schedules"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Exam Schedule",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/exams",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "exams"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "05 Subjects And Library",
+            "item": [
+                {
+                    "name": "List Subjects",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/subjects",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "subjects"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Subject Details",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/subjects/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "subjects",
+                                "1"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Toggle Listen to Lecture",
+                    "request": {
+                        "method": "POST",
+                        "url": {
+                            "raw": "{{base_url}}/lectures/1/toggle-listen",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "lectures",
+                                "1",
+                                "toggle-listen"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Browse Shared Library",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/library",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "library"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Upload to Library",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "file",
+                                    "type": "file"
+                                },
+                                {
+                                    "key": "title",
+                                    "value": "sample",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "subject_id",
+                                    "value": "1",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "category",
+                                    "value": "summaries",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "semester_info",
+                                    "value": "First",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "visibility",
+                                    "value": "batch",
+                                    "type": "text"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/library/upload",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "library",
+                                "upload"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Course Resources (Subject Specific)",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/resources",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "resources"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "06 Flashcards",
+            "item": [
+                {
+                    "name": "My Packs",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/flashcards",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "flashcards"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Create Pack",
+                    "request": {
+                        "method": "POST",
+                        "description": "Create a flashcard tree node. `display_mode` is now the default type for newly added items, while each item can carry its own `item_type`. Use `parent_pack_id` to nest the new pack under another pack.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"title\":  \"Clinical Review Root\",\r\n    \"description\":  \"Main tree pack\",\r\n    \"display_mode\":  \"flash_card\",\r\n    \"parent_pack_id\":  null,\r\n    \"repeat_cycle\":  \"daily\",\r\n    \"daily_notification_count\":  5,\r\n    \"notifications_enabled\":  true\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/flashcards",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "flashcards"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Public Store",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/flashcards/store",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "flashcards",
+                                "store"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Clone Pack",
+                    "request": {
+                        "method": "POST",
+                        "url": {
+                            "raw": "{{base_url}}/flashcards/clone/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "flashcards",
+                                "clone",
+                                "1"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Daily Queue (Flutter Local Notifications)",
+                    "request": {
+                        "method": "GET",
+                        "description": "Returns due items only, sorted by review weight and priority. Each queue entry now includes `item_type`, `item_color`, and `response_actions` for Easy / Medium / Hard notification actions.",
+                        "url": {
+                            "raw": "{{base_url}}/flashcards/daily-queue",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "flashcards",
+                                "daily-queue"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Review Session",
+                    "request": {
+                        "method": "GET",
+                        "description": "Returns a mixed review session for the selected pack tree. Items may be `flash_card`, `one_line`, `qa`, or `mcq` inside the same pack tree.",
+                        "url": {
+                            "raw": "{{base_url}}/flashcards/1/review",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "flashcards",
+                                "1",
+                                "review"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Record Progress",
+                    "request": {
+                        "method": "POST",
+                        "description": "Use `response_level` instead of the old boolean rating. Valid values: `easy`, `medium`, `hard`.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"item_id\":  1,\r\n    \"response_level\":  \"hard\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/flashcards/progress",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "flashcards",
+                                "progress"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "07 Study Center",
+            "item": [
+                {
+                    "name": "Study Center Dashboard",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/study-center",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "study-center"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Add Study Center Item",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"title\":  \"Read cardiology notes\",\r\n    \"scheduled_date\":  \"2026-04-12\",\r\n    \"item_type\":  \"study\",\r\n    \"priority\":  \"high\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/study-center",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "study-center"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Add Custom Task",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"title\":  \"Prepare tomorrow reminder\",\r\n    \"scheduled_date\":  \"2026-04-13\",\r\n    \"item_type\":  \"reminder\",\r\n    \"priority\":  \"medium\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/study-center/custom-task",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "study-center",
+                                "custom-task"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "description": "Canonical Study Center endpoints.\n\n- `GET /study-center` returns the personal study hub with normalized items, stats, tabs, and non-duplicated reference summaries.\n- `GET /schedules` is different: it returns the official weekly timetable only.\n- Legacy `/schedule` endpoints still work, but new clients should use `/study-center`."
+        },
+        {
+            "name": "08 Section",
+            "item": [
+                {
+                    "name": "List Assignments",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/assignments",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "assignments"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Assignment Details",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/assignments/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "assignments",
+                                "1"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Assignment Details (Explicit Details Route)",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/assignments/1/details",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "assignments",
+                                "1",
+                                "details"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Update Assignment Sort Preference",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"sort_by\":  \"priority\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/assignments/preference",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "assignments",
+                                "preference"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Update Assignment Priority",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"priority\":  2\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/assignments/1/priority",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "assignments",
+                                "1",
+                                "priority"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Submit Assignment",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "notes",
+                                    "value": "sample",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "file",
+                                    "type": "file"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/assignments/1/submit",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "assignments",
+                                "1",
+                                "submit"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "09 Section",
+            "item": [
+                {
+                    "name": "Attendance History",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/attendance",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "attendance"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Submit Excuse",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "attendance_id",
+                                    "value": "1",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "reason",
+                                    "value": "???",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "attachments[]",
+                                    "type": "file",
+                                    "src": "",
+                                    "description": "Optional first file attachment"
+                                },
+                                {
+                                    "key": "attachments[]",
+                                    "type": "file",
+                                    "src": "",
+                                    "description": "Optional second file attachment"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/excuse",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "excuse"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "10 Section",
+            "item": [
+                {
+                    "name": "Logbook Index",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/clinical/logbook",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "clinical",
+                                "logbook"
+                            ]
+                        },
+                        "description": "Returns the student's clinical dashboard payload including daily logs, assignments, and form options. Assignment objects now include workflow fields such as `status`, `student_completion_message`, `submitted_at`, `review_notes`, and `reviewed_at`."
+                    }
+                },
+                {
+                    "name": "Submit Assignment For Review",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"student_completion_message\":  \"I completed the history, examination, and documented the key findings.\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/clinical/assignments/1/submit-review",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "clinical",
+                                "assignments",
+                                "1",
+                                "submit-review"
+                            ]
+                        },
+                        "description": "Submit a clinical assignment back to the doctor for review. Allowed for assignments in `assigned` or `rejected` status."
+                    }
+                },
+                {
+                    "name": "Evaluations (OSCE) Results",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/clinical/evaluations",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "clinical",
+                                "evaluations"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Mock Exams List",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/clinical/mock-exams",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "clinical",
+                                "mock-exams"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Start Mock Exam",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/clinical/mock-exams/1/take",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "clinical",
+                                "mock-exams",
+                                "1",
+                                "take"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Pending Cases (Sub-Delegate Only)",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/clinical/cases/pending",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "clinical",
+                                "cases",
+                                "pending"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Rare Cases Explorer",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/clinical/rare-cases",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "clinical",
+                                "rare-cases"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Rare Case Details",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/clinical/rare-cases/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "clinical",
+                                "rare-cases",
+                                "1"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "11 Section",
+            "item": [
+                {
+                    "name": "List Quizzes",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/quizzes",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "quizzes"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Start/Resume Quiz",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/quizzes/1/take?access_code=123",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "quizzes",
+                                "1",
+                                "take"
+                            ],
+                            "query": [
+                                {
+                                    "key": "access_code",
+                                    "value": "123"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Submit Quiz Answers",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"answers\":  {\r\n                    \"1\":  10,\r\n                    \"2\":  15\r\n                }\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/quizzes/1/submit",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "quizzes",
+                                "1",
+                                "submit"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Quiz Result",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/quizzes/results/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "quizzes",
+                                "results",
+                                "1"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "12 Section",
+            "item": [
+                {
+                    "name": "Dashboard",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/stars",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stars"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Search Users to Gift",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/stars/search-users?query=ahmed",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stars",
+                                "search-users"
+                            ],
+                            "query": [
+                                {
+                                    "key": "query",
+                                    "value": "ahmed"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Gift Stars",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"recipient_id\":  2,\r\n    \"amount\":  10,\r\n    \"message\":  \"Sample message\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/stars/gift",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stars",
+                                "gift"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "13 Section",
+            "item": [
+                {
+                    "name": "Grades (My Stats)",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/grades",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "grades"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Attendance PDF Report",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/reports/attendance",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "reports",
+                                "attendance"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Grades PDF Report",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/reports/grades",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "reports",
+                                "grades"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "14 Section",
+            "item": [
+                {
+                    "name": "Subscription Status",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/subscription",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "subscription"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Redeem Code",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"code\":  \"ATTENDIFY-FREE\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/subscription/redeem",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "subscription",
+                                "redeem"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "15 Section",
+            "item": [
+                {
+                    "name": "My Ledger",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/ledger",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "ledger"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Export PDF Ledger",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/ledger/export",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "ledger",
+                                "export"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "16 Section",
+            "item": [
+                {
+                    "name": "List Conversations",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/messages",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "messages"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Show Conversation Details",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/messages/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "messages",
+                                "1"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Start Conversation with Delegate",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/messages/start",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "messages",
+                                "start"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Send Message (Legacy incorrect payload)",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"message\":  \"Sample message\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/messages/1/send",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "messages",
+                                "1",
+                                "send"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Send Message (Correct body payload)",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"body\":  \"Sample body\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/messages/1/send",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "messages",
+                                "1",
+                                "send"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Inquiry Create Options",
+                    "request": {
+                        "method": "GET",
+                        "description": "Returns the allowed inquiry destinations for the logged-in student. Display each item as doctor name - subject name, and show the inquiry status_label/status_message so the student can block closed subjects before submitting.",
+                        "url": {
+                            "raw": "{{base_url}}/inquiries/options",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "inquiries",
+                                "options"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "List Doctor Inquiries",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/inquiries",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "inquiries"
+                            ]
+                        },
+                        "description": "Returns the student inquiries list. Inquiry items now include subject, doctor, and responder context for easier display."
+                    }
+                },
+                {
+                    "name": "Ask Doctor (Legacy incorrect payload)",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"doctor_id\":  3,\r\n    \"question\":  \"Sample question\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/inquiries",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "inquiries"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Ask Doctor (Correct payload)",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"subject_id\":  1,\r\n    \"title\":  \"Sample Title\",\r\n    \"question\":  \"Sample question\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/inquiries",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "inquiries"
+                            ]
+                        },
+                        "description": "Create a new doctor inquiry. First call Inquiry Create Options to present selectable items as doctor name + subject name, then send the chosen subject_id with title and question. If the selected subject is closed, the API returns a clear rejection."
+                    }
+                },
+                {
+                    "name": "Inquiry Details",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/inquiries/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "inquiries",
+                                "1"
+                            ]
+                        },
+                        "description": "Returns the full inquiry details with subject, related doctor information, and the responder information when the inquiry has been answered."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "17 Section",
+            "item": [
+                {
+                    "name": "Scan QR for Attendance",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"token\":  \"QR_RANDOM_TOKEN\"\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/qr-attendance/scan",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "qr-attendance",
+                                "scan"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Generated Cards Dashboard",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/cards-generate",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "cards-generate"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Auto Generation Logic (Cards) - Legacy incomplete payload",
+                    "request": {
+                        "method": "POST",
+                        "url": {
+                            "raw": "{{base_url}}/cards-generate",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "cards-generate"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Generate Cards (Correct payload)",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"count\":  5,\r\n    \"amount\":  100\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/cards-generate",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "cards-generate"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "18 Section",
+            "item": [
+                {
+                    "name": "My Delegated Grades (Monitor)",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/authorized-grades",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "authorized-grades"
+                            ]
+                        },
+                        "description": "Delegated grade tasks only. This endpoint is empty for regular students unless a doctor or delegate has explicitly assigned a grading task."
+                    }
+                },
+                {
+                    "name": "Delegated Grade Category Details",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/authorized-grades/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "authorized-grades",
+                                "1"
+                            ]
+                        },
+                        "description": "Loads one delegated grade category. The response now distinguishes access_mode=direct or helper, and helper tasks may be full-scope or partial to selected students only."
+                    }
+                },
+                {
+                    "name": "Store Delegated Grades",
+                    "request": {
+                        "method": "POST",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\r\n    \"grades\":  [\r\n                   {\r\n                       \"student_id\":  1,\r\n                       \"score\":  8.5\r\n                   },\r\n                   {\r\n                       \"student_id\":  2,\r\n                       \"score\":  9\r\n                   }\r\n               ]\r\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/authorized-grades/1/store",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "authorized-grades",
+                                "1",
+                                "store"
+                            ]
+                        },
+                        "description": "Stores delegated grades as pending review. Direct and helper delegations are both supported, but helper tasks are restricted to their assigned scope only."
+                    }
+                }
+            ],
+            "description": "Authorized grade tasks for students/delegates. This section is used only when a doctor delegates a specific grade category to the current user. It is not available in practice for every student. Workflow: doctor creates grade category -> delegates category -> authorized user enters scores -> doctor reviews pending grades."
+        }
+    ]
+}
