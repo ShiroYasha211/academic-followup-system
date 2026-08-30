@@ -117,8 +117,76 @@ int _flashcardItemId(Map<String, dynamic> item) {
   return number(item, 'item_id').toInt();
 }
 
+bool _isOneLineShotItem(Map<String, dynamic> item) {
+  return _itemType(item) == 'one_line';
+}
+
+List<Map<String, dynamic>> _oneLineShotNotificationItems(
+  Map<String, dynamic> data, {
+  bool scheduledOnly = false,
+}) {
+  final settings = asMap(data['settings']);
+  final rawItems = data.containsKey('items') ? data['items'] : data['queue'];
+  return asList(rawItems)
+      .map(asMap)
+      .map((item) => _withRuntimeAvailability(item, settings))
+      .where(_isOneLineShotItem)
+      .where((item) {
+        if (!scheduledOnly) return true;
+        final scheduledAt = _parseFlashcardDateTime(text(item, 'scheduled_at'));
+        if (scheduledAt == null) return false;
+        final now = DateTime.now();
+        return scheduledAt.isAfter(now) ||
+            now.difference(scheduledAt) <= const Duration(minutes: 5);
+      })
+      .toList();
+}
+
 Future<void> _scheduleNextSmartReviewNotification(WidgetRef ref) async {
   await PushNotificationService.cancelFlashcardSmartReview();
+
+  final store = ref.read(flashcardLocalStoreProvider);
+  final state = await store.load();
+  if (!state.smartReviewEnabled) return;
+
+  Map<String, dynamic>? data;
+  try {
+    data = await ref
+        .read(studentContentRepositoryProvider)
+        .flashcardDailyQueue();
+    await store.cacheDailyQueue(data);
+  } on ApiException catch (error) {
+    if (!error.isOffline) return;
+    data = await store.loadDailyQueue();
+  } catch (_) {
+    data = await store.loadDailyQueue();
+  }
+  if (data == null) return;
+
+  final queue = _todayPendingReviewItems(data, state);
+  if (queue.isEmpty) return;
+
+  final settings = asMap(data['settings']);
+  final frequency = number(
+    settings,
+    'smart_review_frequency_minutes',
+    fallback: state.smartReviewSnoozeMinutes,
+  ).toInt();
+  var delay = _delayForSmartReviewItem(
+    _nextSmartReviewScheduleItem(queue),
+    frequency > 0 ? frequency : state.smartReviewSnoozeMinutes,
+  );
+
+  final snoozeUntil = DateTime.tryParse(
+    state.smartReviewSnoozeUntil ?? '',
+  )?.toLocal();
+  if (snoozeUntil != null) {
+    final snoozeDelay = snoozeUntil.difference(DateTime.now());
+    if (snoozeDelay > delay) delay = snoozeDelay;
+  }
+  if (delay <= Duration.zero) delay = const Duration(seconds: 10);
+
+  await PushNotificationService.scheduleFlashcardSmartReview(delay: delay);
 }
 
 Future<void> scheduleStudentFlashcardSmartReviewNotification(WidgetRef ref) {
@@ -127,7 +195,7 @@ Future<void> scheduleStudentFlashcardSmartReviewNotification(WidgetRef ref) {
 
 Duration _delayForSmartReviewItem(Map<String, dynamic> item, int frequency) {
   final frequencyDelay = Duration(minutes: frequency);
-  final scheduledAt = DateTime.tryParse(text(item, 'scheduled_at'));
+  final scheduledAt = _parseFlashcardDateTime(text(item, 'scheduled_at'));
   if (scheduledAt != null) {
     final scheduledDelay = scheduledAt.difference(DateTime.now());
     if (scheduledDelay.isNegative) {
@@ -157,6 +225,21 @@ Duration _delayForSmartReviewItem(Map<String, dynamic> item, int frequency) {
       : scheduledDelay;
 }
 
+Map<String, dynamic> _nextSmartReviewScheduleItem(
+  List<Map<String, dynamic>> items,
+) {
+  final sorted = [...items];
+  sorted.sort((first, second) {
+    final firstDate = _parseFlashcardDateTime(text(first, 'scheduled_at'));
+    final secondDate = _parseFlashcardDateTime(text(second, 'scheduled_at'));
+    if (firstDate == null && secondDate == null) return 0;
+    if (firstDate == null) return 1;
+    if (secondDate == null) return -1;
+    return firstDate.compareTo(secondDate);
+  });
+  return sorted.first;
+}
+
 int? _minutesFromTime(String value) {
   if (value.length < 5) return null;
   final hour = int.tryParse(value.substring(0, 2));
@@ -180,6 +263,7 @@ List<Map<String, dynamic>> _todayPendingReviewItems(
         return _withRuntimeAvailability(item, settings);
       })
       .where((item) {
+        if (_isOneLineShotItem(item)) return false;
         if (seen.contains(_flashcardItemId(item))) return false;
         if (availableOnly && !_boolValueFallback(item, 'available_now', true)) {
           return false;
@@ -197,7 +281,10 @@ List<Map<String, dynamic>> _todayPendingReviewItems(
   final reviewed = _todayReviewedItems(data);
   final rescheduledReviewed = _rescheduleRestartReviewItems(reviewed, state);
   final rescheduledRemaining = rescheduledReviewed
-      .where((item) => !seen.contains(_flashcardItemId(item)))
+      .where(
+        (item) =>
+            !_isOneLineShotItem(item) && !seen.contains(_flashcardItemId(item)),
+      )
       .toList();
   if (rescheduledRemaining.isNotEmpty) {
     return availableOnly
@@ -207,8 +294,11 @@ List<Map<String, dynamic>> _todayPendingReviewItems(
         : rescheduledRemaining;
   }
   if (!state.smartReviewAutoRestart) return const [];
-  if (!availableOnly) return rescheduledReviewed;
-  return rescheduledReviewed
+  final filteredRestarted = rescheduledReviewed
+      .where((item) => !_isOneLineShotItem(item))
+      .toList();
+  if (!availableOnly) return filteredRestarted;
+  return filteredRestarted
       .where((item) => _boolValueFallback(item, 'available_now', true))
       .toList();
 }
@@ -217,7 +307,7 @@ Map<String, dynamic> _withRuntimeAvailability(
   Map<String, dynamic> item,
   Map<String, dynamic> settings,
 ) {
-  final scheduledAt = DateTime.tryParse(text(item, 'scheduled_at'));
+  final scheduledAt = _parseFlashcardDateTime(text(item, 'scheduled_at'));
   if (scheduledAt == null) return item;
 
   return {
@@ -310,14 +400,81 @@ DateTime? _latestReviewedAt(List<Map<String, dynamic>> items) {
 }
 
 String _formatFlashcardTime24(DateTime value) {
-  return '${value.hour.toString().padLeft(2, '0')}:'
-      '${value.minute.toString().padLeft(2, '0')}';
+  final localValue = value.toLocal();
+  return '${localValue.hour.toString().padLeft(2, '0')}:'
+      '${localValue.minute.toString().padLeft(2, '0')}';
 }
 
 String _formatFlashcardTime12(DateTime value) {
-  final suffix = value.hour >= 12 ? 'م' : 'ص';
-  final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
-  return '${hour.toString()}:${value.minute.toString().padLeft(2, '0')} $suffix';
+  final localValue = value.toLocal();
+  final suffix = localValue.hour >= 12 ? 'م' : 'ص';
+  final hour = localValue.hour % 12 == 0 ? 12 : localValue.hour % 12;
+  return '${hour.toString()}:${localValue.minute.toString().padLeft(2, '0')} $suffix';
+}
+
+DateTime? _parseFlashcardDateTime(String value) {
+  final parsed = DateTime.tryParse(value);
+  return parsed?.toLocal();
+}
+
+List<Map<String, dynamic>> _sortedOneLineSchedule(
+  List<Map<String, dynamic>> items,
+) {
+  final sorted = [...items];
+  sorted.sort((first, second) {
+    final firstDate = _parseFlashcardDateTime(text(first, 'scheduled_at'));
+    final secondDate = _parseFlashcardDateTime(text(second, 'scheduled_at'));
+    if (firstDate == null && secondDate == null) return 0;
+    if (firstDate == null) return 1;
+    if (secondDate == null) return -1;
+    return firstDate.compareTo(secondDate);
+  });
+  return sorted;
+}
+
+Map<String, dynamic>? _nextOneLineScheduleItem(
+  List<Map<String, dynamic>> items,
+) {
+  final now = DateTime.now();
+  for (final item in items) {
+    final scheduledAt = _parseFlashcardDateTime(text(item, 'scheduled_at'));
+    if (scheduledAt == null) continue;
+    if (!scheduledAt.isBefore(now.subtract(const Duration(minutes: 1)))) {
+      return item;
+    }
+  }
+  return null;
+}
+
+String _oneLineExactScheduleLabel(Map<String, dynamic> item) {
+  final scheduledAt = _parseFlashcardDateTime(text(item, 'scheduled_at'));
+  if (scheduledAt == null) {
+    return text(item, 'scheduled_time_label', fallback: 'وقت غير محدد');
+  }
+  final date =
+      '${scheduledAt.year.toString().padLeft(4, '0')}-'
+      '${scheduledAt.month.toString().padLeft(2, '0')}-'
+      '${scheduledAt.day.toString().padLeft(2, '0')}';
+  return '$date • ${_formatFlashcardTime12(scheduledAt)}';
+}
+
+String _oneLineScheduleStatus(Map<String, dynamic> item) {
+  final scheduledAt = _parseFlashcardDateTime(text(item, 'scheduled_at'));
+  if (scheduledAt == null) return 'غير محدد';
+  final now = DateTime.now();
+  final diff = scheduledAt.difference(now);
+  if (diff.inMinutes.abs() <= 1) return 'الآن';
+  if (scheduledAt.isBefore(now)) return 'مر';
+  return 'قادم';
+}
+
+Color _oneLineScheduleStatusColor(String status) {
+  return switch (status) {
+    'قادم' => AppColors.info,
+    'الآن' => AppColors.success,
+    'مر' => AppColors.slate500,
+    _ => AppColors.warning,
+  };
 }
 
 String _todayKey() {

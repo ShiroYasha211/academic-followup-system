@@ -39,7 +39,9 @@ class _StudentFlashcardReviewScreenState
         state: state,
         onRetry: () => ref.invalidate(_flashcardReviewProvider(widget.packId)),
         builder: (data) {
-          final items = asList(data['items']).map(asMap).toList();
+          final items = asList(
+            data['items'],
+          ).map(asMap).where((item) => !_isOneLineShotItem(item)).toList();
           if (items.isEmpty) {
             return const Center(
               child: EmptyState(message: 'لا توجد عناصر للمراجعة اليوم.'),
@@ -244,4 +246,3 @@ class _StudentFlashcardReviewScreenState
     await _syncFlashcardPendingProgress(ref);
   }
 }
-

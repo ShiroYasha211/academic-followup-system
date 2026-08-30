@@ -66,6 +66,23 @@ class AuthController extends AsyncNotifier<StaffAuthSession?> {
     state = AsyncData(updated);
   }
 
+  Future<void> refreshSession() async {
+    final session = state.valueOrNull;
+    if (session == null) return;
+
+    try {
+      final refreshed = await ref.read(authRepositoryProvider).refresh(session);
+      await ref.read(sessionStorageProvider).save(refreshed);
+      state = AsyncData(refreshed);
+    } on ApiException catch (error) {
+      if (error.statusCode == 401) {
+        await handleUnauthorized();
+      }
+    } catch (_) {
+      // Keep the last valid session when the refresh fails temporarily.
+    }
+  }
+
   Future<void> updateEmail(String email) async {
     final session = state.valueOrNull;
     if (session == null) return;

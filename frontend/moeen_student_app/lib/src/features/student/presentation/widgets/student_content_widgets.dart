@@ -1879,7 +1879,8 @@ class _TapScaleContainer extends StatefulWidget {
   State<_TapScaleContainer> createState() => _TapScaleContainerState();
 }
 
-class _TapScaleContainerState extends State<_TapScaleContainer> with SingleTickerProviderStateMixin {
+class _TapScaleContainerState extends State<_TapScaleContainer>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
 
@@ -1922,10 +1923,7 @@ class _TapScaleContainerState extends State<_TapScaleContainer> with SingleTicke
 }
 
 class _CompactPollWidget extends ConsumerStatefulWidget {
-  const _CompactPollWidget({
-    required this.item,
-    required this.sourceColor,
-  });
+  const _CompactPollWidget({required this.item, required this.sourceColor});
 
   final Map<String, dynamic> item;
   final Color sourceColor;
@@ -1965,10 +1963,9 @@ class _CompactPollWidgetState extends ConsumerState<_CompactPollWidget> {
     });
 
     try {
-      await ref.read(studentContentRepositoryProvider).voteNotification(
-        notificationId: notificationId,
-        optionId: optionId,
-      );
+      await ref
+          .read(studentContentRepositoryProvider)
+          .voteNotification(notificationId: notificationId, optionId: optionId);
 
       // Optimistically update local state
       setState(() {
@@ -2003,7 +2000,10 @@ class _CompactPollWidgetState extends ConsumerState<_CompactPollWidget> {
         _isLoading = false;
       });
       if (mounted) {
-        MoeenDialogs.showError(context, message: 'فشل التصويت: ${e.toString()}');
+        MoeenDialogs.showError(
+          context,
+          message: 'فشل التصويت: ${e.toString()}',
+        );
       }
     }
   }
@@ -2019,9 +2019,9 @@ class _CompactPollWidgetState extends ConsumerState<_CompactPollWidget> {
     });
 
     try {
-      await ref.read(studentContentRepositoryProvider).retractVoteNotification(
-        notificationId: notificationId,
-      );
+      await ref
+          .read(studentContentRepositoryProvider)
+          .retractVoteNotification(notificationId: notificationId);
 
       // Optimistically update local state
       setState(() {
@@ -2029,12 +2029,16 @@ class _CompactPollWidgetState extends ConsumerState<_CompactPollWidget> {
           final options = List<Map<String, dynamic>>.from(
             asList(_localPollData!['options']).map(asMap),
           );
-          final votedOptionId = number(_localPollData!, 'voted_option_id').toInt();
+          final votedOptionId = number(
+            _localPollData!,
+            'voted_option_id',
+          ).toInt();
 
           for (var i = 0; i < options.length; i++) {
             final opt = Map<String, dynamic>.from(options[i]);
             if (number(opt, 'id').toInt() == votedOptionId) {
-              opt['votes_count'] = (number(opt, 'votes_count').toInt() - 1).clamp(0, 99999);
+              opt['votes_count'] = (number(opt, 'votes_count').toInt() - 1)
+                  .clamp(0, 99999);
             }
             options[i] = opt;
           }
@@ -2057,7 +2061,10 @@ class _CompactPollWidgetState extends ConsumerState<_CompactPollWidget> {
         _isLoading = false;
       });
       if (mounted) {
-        MoeenDialogs.showError(context, message: 'فشل سحب التصويت: ${e.toString()}');
+        MoeenDialogs.showError(
+          context,
+          message: 'فشل سحب التصويت: ${e.toString()}',
+        );
       }
     }
   }
@@ -2085,10 +2092,7 @@ class _CompactPollWidgetState extends ConsumerState<_CompactPollWidget> {
       decoration: BoxDecoration(
         color: AppColors.slate50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withValues(alpha: 0.15),
-          width: 1,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.15), width: 1),
       ),
       child: Stack(
         children: [
@@ -2139,8 +2143,8 @@ class _CompactPollWidgetState extends ConsumerState<_CompactPollWidget> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: selected 
-                            ? color 
+                        color: selected
+                            ? color
                             : AppColors.slate200.withValues(alpha: 0.8),
                         width: selected ? 1.5 : 1,
                       ),
@@ -2168,16 +2172,22 @@ class _CompactPollWidgetState extends ConsumerState<_CompactPollWidget> {
                           Material(
                             color: Colors.transparent,
                             child: InkWell(
-                              onTap: _isLoading || hasVoted 
-                                  ? null 
+                              onTap: _isLoading || hasVoted
+                                  ? null
                                   : () => _castVote(id),
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
                                 child: Row(
                                   children: [
                                     if (hasVoted) ...[
                                       if (selected)
-                                        Icon(Icons.check_circle_rounded, color: color, size: 16)
+                                        Icon(
+                                          Icons.check_circle_rounded,
+                                          color: color,
+                                          size: 16,
+                                        )
                                       else
                                         const SizedBox(width: 16),
                                     ] else ...[
@@ -2201,9 +2211,13 @@ class _CompactPollWidgetState extends ConsumerState<_CompactPollWidget> {
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           fontFamily: 'Cairo',
-                                          fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                                          fontWeight: selected
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
                                           fontSize: 11,
-                                          color: selected ? AppColors.midnight : AppColors.slate700,
+                                          color: selected
+                                              ? AppColors.midnight
+                                              : AppColors.slate700,
                                         ),
                                       ),
                                     ),
@@ -2214,7 +2228,9 @@ class _CompactPollWidgetState extends ConsumerState<_CompactPollWidget> {
                                           fontFamily: 'Cairo',
                                           fontWeight: FontWeight.w800,
                                           fontSize: 11,
-                                          color: selected ? color : AppColors.slate600,
+                                          color: selected
+                                              ? color
+                                              : AppColors.slate600,
                                         ),
                                       ),
                                   ],
@@ -2236,7 +2252,10 @@ class _CompactPollWidgetState extends ConsumerState<_CompactPollWidget> {
                     onPressed: _isLoading ? null : _retractVote,
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.danger,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       textStyle: const TextStyle(
@@ -2295,9 +2314,14 @@ class _NewsCard extends ConsumerWidget {
     final hasImage = attachment.isNotEmpty && isImageUrl(attachment);
     final title = text(item, 'title', fallback: 'إعلان');
     final excerpt = text(item, 'excerpt', fallback: text(item, 'body'));
-    final isUnread = text(item, 'id').startsWith('center-') && text(item, 'read_at').isEmpty;
-    final isBookmarked = ref.watch(newsBookmarksProvider).any((b) => text(b, 'id') == text(item, 'id'));
-    final pollData = item['poll_data'] != null ? Map<String, dynamic>.from(item['poll_data']) : null;
+    final isUnread =
+        text(item, 'id').startsWith('center-') && text(item, 'read_at').isEmpty;
+    final isBookmarked = ref
+        .watch(newsBookmarksProvider)
+        .any((b) => text(b, 'id') == text(item, 'id'));
+    final pollData = item['poll_data'] != null
+        ? Map<String, dynamic>.from(item['poll_data'])
+        : null;
 
     final IconData publisherIcon = switch (source) {
       'doctor' => Icons.school_rounded,
@@ -2311,14 +2335,14 @@ class _NewsCard extends ConsumerWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isPinned 
+          color: isPinned
               ? AppColors.teal.withValues(alpha: 0.3)
               : AppColors.slate200.withValues(alpha: 0.6),
           width: isPinned ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: isPinned 
+            color: isPinned
                 ? AppColors.teal.withValues(alpha: 0.08)
                 : Colors.black.withValues(alpha: 0.03),
             blurRadius: 16,
@@ -2354,11 +2378,7 @@ class _NewsCard extends ConsumerWidget {
                     ),
                   ),
                   child: Center(
-                    child: Icon(
-                      publisherIcon,
-                      color: color,
-                      size: 20,
-                    ),
+                    child: Icon(publisherIcon, color: color, size: 20),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -2381,7 +2401,10 @@ class _NewsCard extends ConsumerWidget {
                           if (isPinned) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.teal.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
@@ -2389,7 +2412,11 @@ class _NewsCard extends ConsumerWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: const [
-                                  Icon(Icons.push_pin_rounded, color: AppColors.teal, size: 10),
+                                  Icon(
+                                    Icons.push_pin_rounded,
+                                    color: AppColors.teal,
+                                    size: 10,
+                                  ),
                                   SizedBox(width: 2),
                                   Text(
                                     'مثبت',
@@ -2446,19 +2473,21 @@ class _NewsCard extends ConsumerWidget {
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () {
-                    ref.read(newsBookmarksProvider.notifier).toggleBookmark(item);
+                    ref
+                        .read(newsBookmarksProvider.notifier)
+                        .toggleBookmark(item);
                   },
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: isBookmarked 
+                      color: isBookmarked
                           ? AppColors.teal.withValues(alpha: 0.08)
                           : Colors.transparent,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      isBookmarked 
-                          ? Icons.bookmark_rounded 
+                      isBookmarked
+                          ? Icons.bookmark_rounded
                           : Icons.bookmark_border_rounded,
                       size: 18,
                       color: isBookmarked ? AppColors.teal : AppColors.slate400,
@@ -2512,7 +2541,8 @@ class _NewsCard extends ConsumerWidget {
                               ),
                             );
                           },
-                          errorBuilder: (_, __, ___) => const _NewsImageFallback(height: 180),
+                          errorBuilder: (_, __, ___) =>
+                              const _NewsImageFallback(height: 180),
                         ),
                       ),
                       Positioned.fill(
@@ -2571,7 +2601,10 @@ class _NewsCard extends ConsumerWidget {
                 if (attachment.isNotEmpty && !hasImage) ...[
                   const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
@@ -2596,8 +2629,8 @@ class _NewsCard extends ConsumerWidget {
                           ),
                         ),
                         Icon(
-                          Icons.arrow_back_ios_new_rounded, 
-                          size: 12, 
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 12,
                           color: color.withValues(alpha: 0.7),
                         ),
                       ],
@@ -2607,10 +2640,7 @@ class _NewsCard extends ConsumerWidget {
 
                 // 5. Compact Poll Widget (if exists)
                 if (pollData != null)
-                  _CompactPollWidget(
-                    item: item,
-                    sourceColor: color,
-                  ),
+                  _CompactPollWidget(item: item, sourceColor: color),
               ],
             ),
           ),
@@ -2834,12 +2864,12 @@ class _MessageSkeleton extends StatelessWidget {
   }
 }
 
-class _QuizTile extends StatelessWidget {
+class _QuizTile extends ConsumerWidget {
   const _QuizTile(this.quiz);
   final Map<String, dynamic> quiz;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isCompetition = boolValue(quiz, 'is_competition');
     final isAdmin = text(quiz, 'creator_type') == 'admin';
     final isUpcoming = boolValue(quiz, 'is_upcoming');
@@ -2865,14 +2895,12 @@ class _QuizTile extends StatelessWidget {
     final attemptId = number(quiz, 'attempt_id').toInt();
 
     final Color bannerColor = isAdmin
-        ? const Color(0xFF2563EB)
+        ? AppColors.primary
         : isCompetition
-        ? const Color(0xFFF59E0B)
-        : const Color(0xFF059669);
-    final Color cardBg = isAdmin ? const Color(0xFFF0F9FF) : Colors.white;
-    final Color borderColor = isAdmin
-        ? const Color(0xFFBAE6FD)
-        : AppColors.slate100;
+        ? AppColors.warning
+        : AppColors.teal;
+    final Color cardBg = Colors.white;
+    final Color borderColor = AppColors.slate100;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -2882,171 +2910,188 @@ class _QuizTile extends StatelessWidget {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: bannerColor.withValues(alpha: 0.06),
-            blurRadius: 12,
+            color: bannerColor.withValues(alpha: 0.05),
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(height: 5, color: bannerColor),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(width: 6, color: bannerColor),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (isCompetition)
-                      _QuizBadge(
-                        label: 'مسابقة',
-                        icon: Icons.emoji_events_rounded,
-                        color: const Color(0xFF92400E),
-                        bg: const Color(0xFFFEF3C7),
-                      ),
-                    if (isAdmin)
-                      _QuizBadge(
-                        label: 'إدارة النظام',
-                        icon: Icons.shield_rounded,
-                        color: Colors.white,
-                        bg: const Color(0xFF0369A1),
-                      ),
-                    if (isUpcoming)
-                      _QuizBadge(
-                        label: 'قادماً',
-                        icon: Icons.schedule_rounded,
-                        color: const Color(0xFF92400E),
-                        bg: const Color(0xFFFFFBEB),
-                      ),
-                    if (isAttempted)
-                      _QuizBadge(
-                        label: 'مكتمل',
-                        icon: Icons.check_circle_rounded,
-                        color: const Color(0xFF3730A3),
-                        bg: const Color(0xFFE0E7FF),
-                      ),
-                    if (!isUpcoming && !isAttempted)
-                      _QuizBadge(
-                        label: statusLabel,
-                        icon: Icons.circle,
-                        color: Colors.white,
-                        bg: bannerColor,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
-                          color: AppColors.midnight,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            if (isCompetition)
+                              _QuizBadge(
+                                label: 'مسابقة',
+                                icon: Icons.emoji_events_rounded,
+                                color: const Color(0xFF92400E),
+                                bg: const Color(0xFFFEF3C7),
+                              ),
+                            if (isAdmin)
+                              _QuizBadge(
+                                label: 'إدارة النظام',
+                                icon: Icons.shield_rounded,
+                                color: Colors.white,
+                                bg: AppColors.primary,
+                              ),
+                            if (isUpcoming)
+                              _QuizBadge(
+                                label: 'قادماً',
+                                icon: Icons.schedule_rounded,
+                                color: const Color(0xFF92400E),
+                                bg: const Color(0xFFFFFBEB),
+                              ),
+                            if (isAttempted)
+                              _QuizBadge(
+                                label: 'مكتمل',
+                                icon: Icons.check_circle_rounded,
+                                color: const Color(0xFF3730A3),
+                                bg: const Color(0xFFE0E7FF),
+                              ),
+                            if (!isUpcoming && !isAttempted)
+                              _QuizBadge(
+                                label: statusLabel,
+                                icon: Icons.circle,
+                                color: Colors.white,
+                                bg: bannerColor,
+                              ),
+                          ],
                         ),
+                        Text(
+                          isUpcoming && startsAt.isNotEmpty
+                              ? 'يبدأ في ${timeOnly(startsAt)}'
+                              : timeAgo(text(quiz, 'created_at')),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppColors.slate400,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              color: AppColors.midnight,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                        if (isAdmin) ...[
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.verified_rounded,
+                            color: AppColors.primary,
+                            size: 18,
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isAdmin
+                          ? 'الإدارة المركزية'
+                          : '$creatorName — $subjectName',
+                      style: const TextStyle(
+                        color: AppColors.slate500,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    if (isAdmin)
-                      const Icon(
-                        Icons.verified_rounded,
-                        color: Color(0xFF2563EB),
-                        size: 18,
+                    const SizedBox(height: 12),
+                    if (showCountdown && isUpcoming && startsAt.isNotEmpty) ...[
+                      _CardCountdown(targetDate: startsAt, label: 'يبدأ خلال:'),
+                      const SizedBox(height: 12),
+                    ],
+                    if (showCountdown &&
+                        !isUpcoming &&
+                        !isAttempted &&
+                        closesAt.isNotEmpty) ...[
+                      _CardCountdown(
+                        targetDate: closesAt,
+                        label: 'ينتهي خلال:',
+                        isDanger: true,
                       ),
+                      const SizedBox(height: 12),
+                    ],
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        if (questionsCount > 0)
+                          _InfoTag(
+                            icon: Icons.help_outline_rounded,
+                            label: '$questionsCount سؤال',
+                          ),
+                        if (durationMin > 0)
+                          _InfoTag(
+                            icon: Icons.timer_outlined,
+                            label: '$durationMin دقيقة',
+                          ),
+                        if (modelsCount > 0)
+                          _InfoTag(
+                            icon: Icons.layers_outlined,
+                            label: '$modelsCount نموذج',
+                          ),
+                        if (closesAt.isNotEmpty)
+                          _InfoTag(
+                            icon: Icons.event_busy_rounded,
+                            label: 'ينتهي ${dateTime(closesAt)}',
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(color: AppColors.slate100, height: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        _buildActionBtn(
+                          context,
+                          ref,
+                          isUpcoming,
+                          isAttempted,
+                          attemptId,
+                          bannerColor,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  isAdmin ? 'الإدارة المركزية' : '$creatorName — $subjectName',
-                  style: const TextStyle(
-                    color: AppColors.slate500,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (showCountdown && isUpcoming && startsAt.isNotEmpty)
-                  _CardCountdown(targetDate: startsAt, label: 'يبدأ خلال:'),
-                if (showCountdown &&
-                    !isUpcoming &&
-                    !isAttempted &&
-                    closesAt.isNotEmpty)
-                  _CardCountdown(
-                    targetDate: closesAt,
-                    label: 'ينتهي خلال:',
-                    isDanger: true,
-                  ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: [
-                    if (questionsCount > 0)
-                      _InfoTag(
-                        icon: Icons.help_outline_rounded,
-                        label: '$questionsCount سؤال',
-                      ),
-                    if (durationMin > 0)
-                      _InfoTag(
-                        icon: Icons.timer_outlined,
-                        label: '$durationMin دقيقة',
-                      ),
-                    if (modelsCount > 0)
-                      _InfoTag(
-                        icon: Icons.layers_outlined,
-                        label: '$modelsCount نموذج',
-                      ),
-                    if (closesAt.isNotEmpty)
-                      _InfoTag(
-                        icon: Icons.event_busy_rounded,
-                        label: 'ينتهي ${dateTime(closesAt)}',
-                      ),
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.slate50,
-              border: Border(top: BorderSide(color: AppColors.slate100)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  isUpcoming && startsAt.isNotEmpty
-                      ? 'يبدأ في ${timeOnly(startsAt)}'
-                      : timeAgo(text(quiz, 'created_at')),
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.slate400,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                _buildActionBtn(
-                  context,
-                  isUpcoming,
-                  isAttempted,
-                  attemptId,
-                  bannerColor,
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildActionBtn(
     BuildContext context,
+    WidgetRef ref,
     bool isUpcoming,
     bool isAttempted,
     int attemptId,
@@ -3057,7 +3102,7 @@ class _QuizTile extends StatelessWidget {
         onPressed: () =>
             context.push(StudentQuizzesScreen.resultPath(attemptId)),
         style: FilledButton.styleFrom(
-          backgroundColor: const Color(0xFF4338CA),
+          backgroundColor: AppColors.midnight,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -3093,7 +3138,7 @@ class _QuizTile extends StatelessWidget {
       );
     }
     return FilledButton.icon(
-      onPressed: () => _handleStart(context),
+      onPressed: () => _handleStart(context, ref),
       style: FilledButton.styleFrom(
         backgroundColor: bannerColor,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -3105,77 +3150,12 @@ class _QuizTile extends StatelessWidget {
     );
   }
 
-  Future<void> _handleStart(BuildContext context) async {
+  Future<void> _handleStart(BuildContext context, WidgetRef ref) async {
     final id = number(quiz, 'id').toInt();
     if (id <= 0) return;
 
-    String? code;
-    if (boolValue(quiz, 'requires_access_code')) {
-      code = await _askAccessCode(context);
-      if (code == null || code.isEmpty) return;
-    }
-
     if (!context.mounted) return;
-    final path = StudentQuizzesScreen.takePath(id);
-    context.push(
-      code == null
-          ? path
-          : '$path?access_code=${Uri.encodeQueryComponent(code)}',
-    );
-  }
-
-  Future<String?> _askAccessCode(BuildContext context) async {
-    final controller = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    return showMoeenBottomSheet<String>(
-      context: context,
-      title: 'كود الدخول',
-      icon: Icons.password_rounded,
-      color: AppColors.violet,
-      child: Form(
-        key: formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'هذا الكويز يحتاج إلى كود دخول. أدخل الكود ثم تابع.',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-            ),
-            const SizedBox(height: 20),
-            TextFormField(
-              controller: controller,
-              autofocus: true,
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'أدخل كود الكويز أولاً.'
-                  : null,
-              decoration: const InputDecoration(
-                labelText: 'كود الكويز',
-                prefixIcon: Icon(Icons.key_rounded),
-                hintText: 'مثال: 123456',
-              ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: () {
-                if (formKey.currentState?.validate() != true) return;
-                Navigator.pop(context, controller.text.trim());
-              },
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text(
-                'بدء الاختبار الآن',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    context.push('/student/quizzes/$id/prepare', extra: quiz);
   }
 }
 
@@ -4579,132 +4559,117 @@ class _QuestionCardState extends State<_QuestionCard> {
     final questionId = number(widget.question, 'id').toInt().toString();
     final options = asList(widget.question['options']);
 
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'السؤال ${widget.index + 1} من ${widget.total}',
-            style: const TextStyle(
-              color: AppColors.slate400,
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-            ),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+      children: [
+        Text(
+          'السؤال ${widget.index + 1} من ${widget.total}',
+          style: const TextStyle(
+            color: AppColors.slate400,
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
           ),
-          const SizedBox(height: 12),
-          Text(
-            text(
-              widget.question,
-              'question_text',
-              fallback: text(widget.question, 'title'),
-            ),
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: AppColors.midnight,
-              height: 1.4,
-            ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          text(
+            widget.question,
+            'question_text',
+            fallback: text(widget.question, 'title'),
           ),
-          const SizedBox(height: 30),
-          Expanded(
-            child: ListView.builder(
-              itemCount: options.length,
-              itemBuilder: (context, idx) {
-                final map = asMap(options[idx]);
-                final optionId = number(map, 'id').toInt();
-                final selected = widget.answers[questionId] == optionId;
-                final color = selected
-                    ? AppColors.royalBlue
-                    : AppColors.slate100;
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: AppColors.midnight,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 30),
+        ...options.asMap().entries.map((entry) {
+          final map = asMap(entry.value);
+          final optionId = number(map, 'id').toInt();
+          final selected = widget.answers[questionId] == optionId;
+          final color = selected ? AppColors.royalBlue : AppColors.slate100;
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: InkWell(
-                    onTap: () {
-                      setState(() => widget.answers[questionId] = optionId);
-                      widget.onOptionSelected();
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 18,
-                      ),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: InkWell(
+              onTap: () {
+                setState(() => widget.answers[questionId] = optionId);
+                widget.onOptionSelected();
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 18,
+                ),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? color.withValues(alpha: 0.05)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: selected ? color : AppColors.slate200,
+                    width: 2,
+                  ),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
                       decoration: BoxDecoration(
-                        color: selected
-                            ? color.withValues(alpha: 0.05)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
+                        shape: BoxShape.circle,
                         border: Border.all(
-                          color: selected ? color : AppColors.slate200,
+                          color: selected ? color : AppColors.slate300,
                           width: 2,
                         ),
-                        boxShadow: selected
-                            ? [
-                                BoxShadow(
-                                  color: color.withValues(alpha: 0.1),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ]
-                            : null,
+                        color: selected ? color : Colors.transparent,
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: selected ? color : AppColors.slate300,
-                                width: 2,
-                              ),
-                              color: selected ? color : Colors.transparent,
-                            ),
-                            child: selected
-                                ? const Icon(
-                                    Icons.check,
-                                    size: 18,
-                                    color: Colors.white,
-                                  )
-                                : null,
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Text(
-                              text(
-                                map,
-                                'option_text',
-                                fallback: text(map, 'text'),
-                              ),
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: selected
-                                    ? FontWeight.w900
-                                    : FontWeight.w700,
-                                color: selected
-                                    ? AppColors.midnight
-                                    : AppColors.slate600,
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: selected
+                          ? const Icon(
+                              Icons.check,
+                              size: 18,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        text(map, 'option_text', fallback: text(map, 'text')),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: selected
+                              ? FontWeight.w900
+                              : FontWeight.w700,
+                          color: selected
+                              ? AppColors.midnight
+                              : AppColors.slate600,
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
-      ),
+          );
+        }),
+      ],
     );
   }
 }
-
 
 class _MiniBadge extends StatelessWidget {
   const _MiniBadge({

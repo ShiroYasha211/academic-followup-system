@@ -626,7 +626,7 @@ class _UserAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final initials = name.isNotEmpty
-        ? name.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
+        ? name.trim().split(' ').map((e) => e[0]).take(1).join().toUpperCase()
         : '?';
 
     return Container(

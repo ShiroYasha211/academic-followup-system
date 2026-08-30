@@ -159,109 +159,110 @@ class _DelegateAttendanceTrackingScreenState
           elevation: 0,
           centerTitle: true,
         ),
-        body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  _SubjectHeader(subject: widget.subject, doctor: doctor),
-                  const SizedBox(height: 20),
-                  _SessionForm(
-                    date: _date,
-                    onDateChanged: _changeDate,
-                    titleController: _titleController,
-                    lectureNumberController: _lectureNumberController,
-                    descriptionController: _descriptionController,
-                    lectureType: _lectureType,
-                    onTypeChanged: (val) =>
-                        setState(() => _lectureType = val ?? 'official'),
-                    startTime: _startTime,
-                    endTime: _endTime,
-                    onStartTimeChanged: (val) =>
-                        setState(() => _startTime = val),
-                    onEndTimeChanged: (val) => setState(() => _endTime = val),
-                  ),
-                  const SizedBox(height: 20),
-                  _IntegratedActionBar(
-                    isEnabled:
-                        widget.subject['allow_delegate_attendance'] == true,
-                    showStudents: _showStudents,
-                    qrActive: _hasActiveQr,
-                    qrStarting: _qrStarting,
-                    pairingWaiting: _pairingWaiting,
-                    onManual: () => setState(() => _showStudents = true),
-                    onQr: _startQr,
-                    onPairing: _startPairing,
-                  ),
-                  if (_hasActiveQr) ...[
+        body: SafeArea(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    _TrackingSubjectHeader(subject: widget.subject, doctor: doctor),
                     const SizedBox(height: 20),
-                    _QrLivePanel(
-                      token: _qrToken!,
-                      remainingSeconds: _remainingSeconds,
-                      scannedCount: number(_qrStatus, 'scanned_count').toInt(),
-                      totalStudents: number(
-                        _qrStatus,
-                        'total_students',
-                        fallback: _students.length,
-                      ).toInt(),
-                      recentScans: asList(_qrStatus?['recent_scans']),
-                      presentStudents: asList(_qrStatus?['students'])
-                          .where((s) => text(s, 'status') == 'present')
-                          .take(8)
-                          .toList(),
-                      finalizing: _qrFinalizing,
-                      onRefresh: _refreshQrStatus,
-                      onFinalize: _finalizeQrSession,
+                    _TrackingSessionForm(
+                      date: _date,
+                      onDateChanged: _changeDate,
+                      titleController: _titleController,
+                      lectureNumberController: _lectureNumberController,
+                      descriptionController: _descriptionController,
+                      lectureType: _lectureType,
+                      onTypeChanged: (val) =>
+                          setState(() => _lectureType = val ?? 'official'),
+                      startTime: _startTime,
+                      endTime: _endTime,
+                      onStartTimeChanged: (val) =>
+                          setState(() => _startTime = val),
+                      onEndTimeChanged: (val) => setState(() => _endTime = val),
                     ),
-                  ],
-                  if (_pairingWaiting && !_hasActiveQr) ...[
                     const SizedBox(height: 20),
-                    _PairingWaitingCard(
-                      onShowCode: _pairingCode == null
-                          ? null
-                          : () => _showPairingCodeDialog(
-                              context,
-                              _pairingCode!,
-                              _pairingExpiresAt ?? '',
-                            ),
-                      onCancel: () {
-                        _pairingTimer?.cancel();
-                        setState(() {
-                          _pairingWaiting = false;
-                          _pairingCode = null;
-                          _pairingExpiresAt = null;
-                        });
-                      },
+                    _TrackingAttendanceActionBar(
+                      isEnabled:
+                          widget.subject['allow_delegate_attendance'] == true,
+                      qrActive: _hasActiveQr,
+                      qrStarting: _qrStarting,
+                      pairingWaiting: _pairingWaiting,
+                      onManual: () => setState(() => _showStudents = true),
+                      onQr: _startQr,
+                      onPairing: _startPairing,
                     ),
-                  ],
-                  const SizedBox(height: 20),
-                  if (_showStudents) _buildStudentsSection(),
-                  const SizedBox(height: 18),
-                  ElevatedButton.icon(
-                    onPressed: _isSaving ? null : _saveAttendance,
-                    icon: _isSaving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.save_rounded),
-                    label: const Text('حفظ سجل الحضور'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.royalBlue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      minimumSize: const Size(double.infinity, 54),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                    if (_hasActiveQr) ...[
+                      const SizedBox(height: 20),
+                      _QrLivePanel(
+                        token: _qrToken!,
+                        remainingSeconds: _remainingSeconds,
+                        scannedCount: number(_qrStatus, 'scanned_count').toInt(),
+                        totalStudents: number(
+                          _qrStatus,
+                          'total_students',
+                          fallback: _students.length,
+                        ).toInt(),
+                        recentScans: asList(_qrStatus?['recent_scans']),
+                        presentStudents: asList(_qrStatus?['students'])
+                            .where((s) => text(s, 'status') == 'present')
+                            .take(8)
+                            .toList(),
+                        finalizing: _qrFinalizing,
+                        onRefresh: _refreshQrStatus,
+                        onFinalize: _finalizeQrSession,
+                      ),
+                    ],
+                    if (_pairingWaiting && !_hasActiveQr) ...[
+                      const SizedBox(height: 20),
+                      _PairingWaitingCard(
+                        onShowCode: _pairingCode == null
+                            ? null
+                            : () => _showPairingCodeDialog(
+                                context,
+                                _pairingCode!,
+                                _pairingExpiresAt ?? '',
+                              ),
+                        onCancel: () {
+                          _pairingTimer?.cancel();
+                          setState(() {
+                            _pairingWaiting = false;
+                            _pairingCode = null;
+                            _pairingExpiresAt = null;
+                          });
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    if (_showStudents) _buildStudentsSection(),
+                    const SizedBox(height: 18),
+                    ElevatedButton.icon(
+                      onPressed: _isSaving ? null : _saveAttendance,
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.save_rounded),
+                      label: const Text('حفظ سجل الحضور'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.royalBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        minimumSize: const Size(double.infinity, 54),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+        ),
       ),
     );
   }
@@ -347,7 +348,7 @@ class _DelegateAttendanceTrackingScreenState
         ),
         const SizedBox(height: 14),
         for (final student in filteredStudents)
-          _StudentAttendanceCard(
+          _TrackingStudentAttendanceCard(
             name: text(student, 'name'),
             studentNumber: text(student, 'student_number'),
             status: _statuses[number(student, 'id').toInt()] ?? 'present',
@@ -728,113 +729,7 @@ class _DelegateAttendanceTrackingScreenState
   }
 }
 
-class _IntegratedActionBar extends StatelessWidget {
-  const _IntegratedActionBar({
-    required this.isEnabled,
-    required this.showStudents,
-    required this.qrActive,
-    required this.qrStarting,
-    required this.pairingWaiting,
-    required this.onManual,
-    required this.onQr,
-    required this.onPairing,
-  });
-  final bool isEnabled;
-  final bool showStudents;
-  final bool qrActive;
-  final bool qrStarting;
-  final bool pairingWaiting;
-  final VoidCallback onManual;
-  final VoidCallback onQr;
-  final VoidCallback onPairing;
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: isEnabled ? onManual : null,
-                icon: const Icon(Icons.edit_calendar_rounded),
-                label: Text(showStudents ? 'قائمة الطلاب مفتوحة' : 'رصد يدوي'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.royalBlue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: isEnabled && !qrActive && !qrStarting ? onQr : null,
-                icon: qrStarting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.qr_code_scanner_rounded),
-                label: Text(qrActive ? 'QR نشط' : 'بدء QR'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.teal,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: isEnabled && !pairingWaiting ? onPairing : null,
-            icon: const Icon(Icons.cast_rounded),
-            label: Text(
-              pairingWaiting ? 'بانتظار اتصال تطبيق العرض' : 'ربط تطبيق العرض',
-            ),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              side: BorderSide(
-                color: isEnabled ? AppColors.royalBlue : AppColors.slate300,
-              ),
-              foregroundColor: isEnabled
-                  ? AppColors.royalBlue
-                  : AppColors.slate400,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-        ),
-        if (!isEnabled)
-          const Padding(
-            padding: EdgeInsets.only(top: 12),
-            child: Text(
-              'ليس لديك صلاحية التحضير لهذه المادة حالياً',
-              style: TextStyle(
-                color: AppColors.danger,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
 
 class _QrLivePanel extends StatelessWidget {
   const _QrLivePanel({
@@ -1152,226 +1047,7 @@ class _PairingWaitingCard extends StatelessWidget {
   }
 }
 
-class _SubjectHeader extends StatelessWidget {
-  const _SubjectHeader({required this.subject, required this.doctor});
-  final Map<String, dynamic> subject;
-  final Map<String, dynamic> doctor;
 
-  @override
-  Widget build(BuildContext context) {
-    return _GlassCard(
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.royalBlue.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.auto_stories_rounded,
-              color: AppColors.royalBlue,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  text(subject, 'name'),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 18,
-                  ),
-                ),
-                Text(
-                  text(doctor, 'name', fallback: 'دكتور المادة'),
-                  style: const TextStyle(
-                    color: AppColors.slate500,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SessionForm extends StatelessWidget {
-  const _SessionForm({
-    required this.date,
-    required this.onDateChanged,
-    required this.titleController,
-    required this.lectureNumberController,
-    required this.descriptionController,
-    required this.lectureType,
-    required this.onTypeChanged,
-    required this.startTime,
-    required this.endTime,
-    required this.onStartTimeChanged,
-    required this.onEndTimeChanged,
-  });
-
-  final String date;
-  final ValueChanged<String> onDateChanged;
-  final TextEditingController titleController;
-  final TextEditingController lectureNumberController;
-  final TextEditingController descriptionController;
-  final String lectureType;
-  final ValueChanged<String?> onTypeChanged;
-  final TimeOfDay? startTime;
-  final TimeOfDay? endTime;
-  final ValueChanged<TimeOfDay?> onStartTimeChanged;
-  final ValueChanged<TimeOfDay?> onEndTimeChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'تفاصيل الجلسة',
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-        ),
-        const SizedBox(height: 16),
-        _MoeenTextField(
-          controller: TextEditingController(text: date),
-          label: 'تاريخ التحضير',
-          readOnly: true,
-          onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: DateTime.tryParse(date) ?? DateTime.now(),
-              firstDate: DateTime.now().subtract(const Duration(days: 30)),
-              lastDate: DateTime.now().add(const Duration(days: 30)),
-            );
-            if (picked != null) {
-              onDateChanged(picked.toIso8601String().split('T').first);
-            }
-          },
-          prefixIcon: Icons.calendar_today_rounded,
-        ),
-        const SizedBox(height: 16),
-        _MoeenTextField(
-          controller: titleController,
-          label: 'عنوان المحاضرة',
-          prefixIcon: Icons.title_rounded,
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _MoeenTextField(
-                controller: lectureNumberController,
-                label: 'رقم المحاضرة',
-                prefixIcon: Icons.numbers_rounded,
-                keyboardType: TextInputType.number,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.slate200),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: lectureType,
-                    items: const [
-                      DropdownMenuItem(value: 'official', child: Text('رسمية')),
-                      DropdownMenuItem(value: 'special', child: Text('إضافية')),
-                    ],
-                    onChanged: onTypeChanged,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.midnight,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _TimePickerField(
-                label: 'وقت البدء',
-                time: startTime,
-                onChanged: onStartTimeChanged,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _TimePickerField(
-                label: 'وقت الانتهاء',
-                time: endTime,
-                onChanged: onEndTimeChanged,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _TimePickerField extends StatelessWidget {
-  const _TimePickerField({
-    required this.label,
-    required this.time,
-    required this.onChanged,
-  });
-  final String label;
-  final TimeOfDay? time;
-  final ValueChanged<TimeOfDay?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () async {
-        final picked = await showTimePicker(
-          context: context,
-          initialTime: time ?? TimeOfDay.now(),
-        );
-        if (picked != null) onChanged(picked);
-      },
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.slate200),
-        ),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.access_time_rounded,
-              size: 18,
-              color: AppColors.slate400,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              time?.format(context) ?? label,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: time != null ? AppColors.midnight : AppColors.slate400,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _PairingCodeDialog extends StatefulWidget {
   const _PairingCodeDialog({
@@ -1490,47 +1166,835 @@ class _PairingCodeDialogState extends State<_PairingCodeDialog>
   }
 }
 
-class _MoeenTextField extends StatelessWidget {
-  const _MoeenTextField({
-    required this.controller,
-    required this.label,
-    this.prefixIcon,
-    this.readOnly = false,
-    this.onTap,
-    this.keyboardType,
-  });
+// ==========================================
+// NEW REDESIGNED UI COMPONENTS FOR DELEGATE
+// ==========================================
 
-  final TextEditingController controller;
-  final String label;
-  final IconData? prefixIcon;
-  final bool readOnly;
-  final VoidCallback? onTap;
-  final TextInputType? keyboardType;
+class _TrackingSubjectHeader extends StatelessWidget {
+  const _TrackingSubjectHeader({required this.subject, required this.doctor});
+
+  final Map<String, dynamic> subject;
+  final Map<String, dynamic> doctor;
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return _TrackingGlassCard(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: AppColors.royalBlue.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppColors.royalBlue.withValues(alpha: 0.12),
+                width: 1.5,
+              ),
+            ),
+            child: const Icon(
+              Icons.menu_book_rounded,
+              color: AppColors.royalBlue,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text(subject, 'name', fallback: 'المقرر'),
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    color: AppColors.midnight,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  text(doctor, 'name', fallback: 'دكتور المادة'),
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    color: AppColors.slate500,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrackingSessionForm extends StatelessWidget {
+  const _TrackingSessionForm({
+    required this.date,
+    required this.onDateChanged,
+    required this.titleController,
+    required this.lectureNumberController,
+    required this.descriptionController,
+    required this.lectureType,
+    required this.onTypeChanged,
+    required this.startTime,
+    required this.endTime,
+    required this.onStartTimeChanged,
+    required this.onEndTimeChanged,
+  });
+
+  final String date;
+  final ValueChanged<String> onDateChanged;
+  final TextEditingController titleController;
+  final TextEditingController lectureNumberController;
+  final TextEditingController descriptionController;
+  final String lectureType;
+  final ValueChanged<String?> onTypeChanged;
+  final TimeOfDay? startTime;
+  final TimeOfDay? endTime;
+  final ValueChanged<TimeOfDay?> onStartTimeChanged;
+  final ValueChanged<TimeOfDay?> onEndTimeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _TrackingGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _TrackingSectionTitle(
+            title: 'تفاصيل الجلسة',
+            icon: Icons.event_note_rounded,
+          ),
+          const SizedBox(height: 18),
+          _TrackingMoeenTextField(
+            controller: titleController,
+            labelText: 'عنوان الجلسة',
+            prefixIcon: const Icon(
+              Icons.title_rounded,
+              color: AppColors.royalBlue,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _TrackingMoeenTextField(
+                  controller: TextEditingController(text: date),
+                  labelText: 'التاريخ',
+                  readOnly: true,
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.tryParse(date) ?? DateTime.now(),
+                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (picked != null) {
+                      onDateChanged(picked.toIso8601String().split('T').first);
+                    }
+                  },
+                  prefixIcon: const Icon(
+                    Icons.calendar_month_rounded,
+                    color: AppColors.royalBlue,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _TrackingMoeenTextField(
+                  controller: lectureNumberController,
+                  labelText: 'رقم المحاضرة',
+                  keyboardType: TextInputType.number,
+                  prefixIcon: const Icon(
+                    Icons.tag_rounded,
+                    color: AppColors.royalBlue,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _TrackingMoeenDropdownField<String>(
+            initialValue: lectureType,
+            labelText: 'نوع الجلسة',
+            prefixIcon: const Icon(
+              Icons.category_rounded,
+              color: AppColors.royalBlue,
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: 'official',
+                child: Text(
+                  'محاضرة رسمية',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              DropdownMenuItem(
+                value: 'special',
+                child: Text(
+                  'محاضرة إضافية',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+            onChanged: onTypeChanged,
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _TrackingTimePickerTile(
+                  label: 'وقت البداية',
+                  value: startTime,
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: startTime ?? TimeOfDay.now(),
+                    );
+                    if (picked != null) onStartTimeChanged(picked);
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _TrackingTimePickerTile(
+                  label: 'وقت النهاية',
+                  value: endTime,
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: endTime ?? TimeOfDay.now(),
+                    );
+                    if (picked != null) onEndTimeChanged(picked);
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _TrackingMoeenTextField(
+            controller: descriptionController,
+            labelText: 'ملاحظات الجلسة',
+            maxLines: 3,
+            alignLabelWithHint: true,
+            prefixIcon: const Icon(
+              Icons.description_rounded,
+              color: AppColors.royalBlue,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrackingMoeenTextField extends StatelessWidget {
+  const _TrackingMoeenTextField({
+    required this.controller,
+    required this.labelText,
+    required this.prefixIcon,
+    this.readOnly = false,
+    this.onTap,
+    this.keyboardType,
+    this.maxLines = 1,
+    this.alignLabelWithHint = false,
+  });
+
+  final TextEditingController controller;
+  final String labelText;
+  final Widget prefixIcon;
+  final bool readOnly;
+  final VoidCallback? onTap;
+  final TextInputType? keyboardType;
+  final int? maxLines;
+  final bool alignLabelWithHint;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
       controller: controller,
       readOnly: readOnly,
       onTap: onTap,
       keyboardType: keyboardType,
-      style: const TextStyle(fontWeight: FontWeight.w700),
+      maxLines: maxLines,
+      style: const TextStyle(
+        fontFamily: 'Cairo',
+        fontWeight: FontWeight.w700,
+        color: AppColors.midnight,
+        fontSize: 14,
+      ),
       decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, color: AppColors.royalBlue)
-            : null,
+        labelText: labelText,
+        alignLabelWithHint: alignLabelWithHint,
+        prefixIcon: prefixIcon,
+        labelStyle: const TextStyle(
+          fontFamily: 'Cairo',
+          color: AppColors.slate500,
+          fontWeight: FontWeight.w600,
+        ),
+        floatingLabelStyle: const TextStyle(
+          fontFamily: 'Cairo',
+          color: AppColors.royalBlue,
+          fontWeight: FontWeight.w800,
+        ),
         filled: true,
         fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.slate200),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.slate200),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.slate200, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.royalBlue, width: 2),
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.slate200, width: 1.5),
         ),
       ),
+    );
+  }
+}
+
+class _TrackingMoeenDropdownField<T> extends StatelessWidget {
+  const _TrackingMoeenDropdownField({
+    required this.initialValue,
+    required this.labelText,
+    required this.prefixIcon,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final T initialValue;
+  final String labelText;
+  final Widget prefixIcon;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<T>(
+      initialValue: initialValue,
+      style: const TextStyle(
+        fontFamily: 'Cairo',
+        fontWeight: FontWeight.w700,
+        color: AppColors.midnight,
+        fontSize: 14,
+      ),
+      decoration: InputDecoration(
+        labelText: labelText,
+        prefixIcon: prefixIcon,
+        labelStyle: const TextStyle(
+          fontFamily: 'Cairo',
+          color: AppColors.slate500,
+          fontWeight: FontWeight.w600,
+        ),
+        floatingLabelStyle: const TextStyle(
+          fontFamily: 'Cairo',
+          color: AppColors.royalBlue,
+          fontWeight: FontWeight.w800,
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.slate200, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.royalBlue, width: 2),
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.slate200, width: 1.5),
+        ),
+      ),
+      items: items,
+      onChanged: onChanged,
+    );
+  }
+}
+
+class _TrackingTimePickerTile extends StatelessWidget {
+  const _TrackingTimePickerTile({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final String label;
+  final TimeOfDay? value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final formatted = value == null ? 'غير محدد' : value!.format(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.slate200, width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.royalBlue.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.access_time_filled_rounded,
+                color: AppColors.royalBlue,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      color: AppColors.slate400,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    formatted,
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      color: value == null
+                          ? AppColors.slate500
+                          : AppColors.midnight,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TrackingAttendanceActionBar extends StatelessWidget {
+  const _TrackingAttendanceActionBar({
+    required this.isEnabled,
+    required this.qrActive,
+    required this.qrStarting,
+    required this.pairingWaiting,
+    required this.onManual,
+    required this.onQr,
+    required this.onPairing,
+  });
+
+  final bool isEnabled;
+  final bool qrActive;
+  final bool qrStarting;
+  final bool pairingWaiting;
+  final VoidCallback onManual;
+  final VoidCallback onQr;
+  final VoidCallback onPairing;
+
+  @override
+  Widget build(BuildContext context) {
+    return _TrackingGlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _TrackingSectionTitle(
+            title: 'طرق الرصد المتاحة',
+            icon: Icons.hub_rounded,
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: isEnabled ? onManual : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.royalBlue,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  icon: const Icon(
+                    Icons.edit_calendar_rounded,
+                    color: Colors.white,
+                  ),
+                  label: const Text(
+                    'رصد يدوي',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: isEnabled && !qrActive && !qrStarting ? onQr : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.teal,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  icon: qrStarting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.qr_code_2_rounded,
+                          color: Colors.white,
+                        ),
+                  label: Text(
+                    qrActive ? 'QR نشط' : 'تحضير QR',
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: isEnabled && !pairingWaiting && !qrActive ? onPairing : null,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              side: BorderSide(
+                color: isEnabled ? AppColors.royalBlue : AppColors.slate300,
+                width: 1.5,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            icon: Icon(
+              Icons.desktop_windows_rounded,
+              color: isEnabled ? AppColors.royalBlue : AppColors.slate400,
+            ),
+            label: Text(
+              pairingWaiting ? 'بانتظار تطبيق العرض...' : 'ربط تطبيق العرض الخارجي',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w800,
+                color: isEnabled ? AppColors.royalBlue : AppColors.slate400,
+              ),
+            ),
+          ),
+          if (!isEnabled)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Text(
+                'ليس لديك صلاحية التحضير لهذه المادة حالياً',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  color: AppColors.danger,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrackingStudentAttendanceCard extends StatelessWidget {
+  const _TrackingStudentAttendanceCard({
+    required this.name,
+    required this.studentNumber,
+    required this.status,
+    required this.onChanged,
+  });
+
+  final String name;
+  final String studentNumber;
+  final String status;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _TrackingGlassCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                        color: AppColors.midnight,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      studentNumber,
+                      style: const TextStyle(
+                        fontFamily: 'Cairo',
+                        color: AppColors.slate500,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _TrackingStatusPill(status: status),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _TrackingStatusToggle(
+                label: 'حاضر',
+                icon: Icons.check_circle_rounded,
+                isActive: status == 'present',
+                activeColor: AppColors.success,
+                onTap: () => onChanged('present'),
+              ),
+              const SizedBox(width: 8),
+              _TrackingStatusToggle(
+                label: 'غائب',
+                icon: Icons.cancel_rounded,
+                isActive: status == 'absent',
+                activeColor: AppColors.danger,
+                onTap: () => onChanged('absent'),
+              ),
+              const SizedBox(width: 8),
+              _TrackingStatusToggle(
+                label: 'متأخر',
+                icon: Icons.watch_later_rounded,
+                isActive: status == 'late',
+                activeColor: AppColors.warning,
+                onTap: () => onChanged('late'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrackingStatusPill extends StatelessWidget {
+  const _TrackingStatusPill({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    Color color = AppColors.success;
+    String label = 'حاضر';
+    if (status == 'absent') {
+      color = AppColors.danger;
+      label = 'غائب';
+    } else if (status == 'late') {
+      color = AppColors.warning;
+      label = 'متأخر';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          fontFamily: 'Cairo',
+        ),
+      ),
+    );
+  }
+}
+
+class _TrackingStatusToggle extends StatelessWidget {
+  const _TrackingStatusToggle({
+    required this.label,
+    required this.icon,
+    required this.isActive,
+    required this.activeColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool isActive;
+  final Color activeColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive ? activeColor : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isActive ? activeColor : AppColors.slate200,
+              width: 1.5,
+            ),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: activeColor.withValues(alpha: 0.24),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: isActive ? Colors.white : AppColors.slate400,
+                size: 18,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  color: isActive ? Colors.white : AppColors.slate600,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TrackingSectionTitle extends StatelessWidget {
+  const _TrackingSectionTitle({
+    required this.title,
+    required this.icon,
+  });
+
+  final String title;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.midnight, size: 22),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.midnight,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'Cairo',
+              height: 1.25,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TrackingGlassCard extends StatelessWidget {
+  const _TrackingGlassCard({required this.child, this.margin, this.padding});
+  final Widget child;
+  final EdgeInsetsGeometry? margin;
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: margin ?? EdgeInsets.zero,
+      padding: padding ?? const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: AppColors.slate100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.035),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 }

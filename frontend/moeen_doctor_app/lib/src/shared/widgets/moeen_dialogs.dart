@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../core/config/app_variant.dart';
 import '../../core/theme/app_colors.dart';
 
 Future<bool> showMoeenConfirmDialog({
@@ -11,15 +12,16 @@ Future<bool> showMoeenConfirmDialog({
   String confirmLabel = 'تأكيد',
   String cancelLabel = 'إلغاء',
   IconData icon = Icons.help_outline_rounded,
-  Color color = AppColors.royalBlue,
+  Color? color,
 }) async {
+  final dialogColor = color ?? StaffBrandColors.primary;
   final result = await showDialog<bool>(
     context: context,
     builder: (context) => _MoeenDialog(
       title: title,
       message: message,
       icon: icon,
-      color: color,
+      color: dialogColor,
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
@@ -27,7 +29,7 @@ Future<bool> showMoeenConfirmDialog({
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, true),
-          style: FilledButton.styleFrom(backgroundColor: color),
+          style: FilledButton.styleFrom(backgroundColor: dialogColor),
           child: Text(confirmLabel),
         ),
       ],
@@ -221,10 +223,10 @@ class _MoeenDialog extends StatelessWidget {
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(30),
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
-            colors: [Colors.white, AppColors.cream],
+            colors: [Colors.white, StaffBrandColors.backgroundAlt],
           ),
         ),
         child: Column(

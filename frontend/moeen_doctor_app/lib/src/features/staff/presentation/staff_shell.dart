@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/app_variant.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/refresh/staff_refresh_coordinator.dart';
 import '../../../core/theme/app_colors.dart';
@@ -63,6 +64,8 @@ class StaffShell extends ConsumerWidget {
     this.floatingActionButton,
     this.onBackPressed,
     this.onBeforeNavigate,
+    this.titleWidget,
+    this.appBarActions,
   });
 
   final String title;
@@ -71,6 +74,8 @@ class StaffShell extends ConsumerWidget {
   final Widget? floatingActionButton;
   final Future<bool> Function()? onBackPressed;
   final Future<bool> Function(String route)? onBeforeNavigate;
+  final Widget? titleWidget;
+  final List<Widget>? appBarActions;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -102,12 +107,14 @@ class StaffShell extends ConsumerWidget {
       },
       child: Scaffold(
         extendBodyBehindAppBar: true,
-        backgroundColor: AppColors.cream,
+        backgroundColor: StaffBrandColors.background,
         appBar: _StaffAppBar(
           title: title,
           session: session,
           onBackPressed: onBackPressed,
           currentRoute: currentRoute,
+          titleWidget: titleWidget,
+          appBarActions: appBarActions,
         ),
         drawer: _StaffDrawer(
           currentRoute: currentRoute,
@@ -126,12 +133,16 @@ class _StaffAppBar extends ConsumerWidget implements PreferredSizeWidget {
     required this.session,
     required this.onBackPressed,
     required this.currentRoute,
+    this.titleWidget,
+    this.appBarActions,
   });
 
   final String title;
   final StaffAuthSession? session;
   final Future<bool> Function()? onBackPressed;
   final String currentRoute;
+  final Widget? titleWidget;
+  final List<Widget>? appBarActions;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 8);
@@ -159,7 +170,7 @@ class _StaffAppBar extends ConsumerWidget implements PreferredSizeWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: AppColors.royalBlue.withValues(alpha: 0.1),
+                color: StaffBrandColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: IconButton(
@@ -179,44 +190,48 @@ class _StaffAppBar extends ConsumerWidget implements PreferredSizeWidget {
                   context.canPop()
                       ? Icons.arrow_back_rounded
                       : Icons.menu_rounded,
-                  color: AppColors.royalBlue,
+                  color: StaffBrandColors.primary,
                 ),
               ),
             ),
           ),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.midnight,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 18,
-                ),
-              ),
-              if (session != null && currentRoute == '/staff/dashboard')
-                Text(
-                  'أهلاً بك، ${session!.name}',
-                  style: const TextStyle(
-                    color: AppColors.slate500,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
+          title:
+              titleWidget ??
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppColors.midnight,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                    ),
                   ),
+                  if (session != null && currentRoute == '/staff/dashboard')
+                    Text(
+                      'أهلاً بك، ${session!.name}',
+                      style: const TextStyle(
+                        color: AppColors.slate500,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+          actions:
+              appBarActions ??
+              [
+                _AppBarNotificationButton(
+                  route: notificationRoute,
+                  count: attentionCounts.notifications,
                 ),
-            ],
-          ),
-          actions: [
-            _AppBarNotificationButton(
-              route: notificationRoute,
-              count: attentionCounts.notifications,
-            ),
-            Padding(
-              padding: const EdgeInsetsDirectional.only(end: 12),
-              child: _StaffBadge(workspace: session?.workspace),
-            ),
-          ],
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 12),
+                  child: _StaffBadge(workspace: session?.workspace),
+                ),
+              ],
         ),
       ),
     );
@@ -268,8 +283,8 @@ class _StaffDrawerState extends ConsumerState<_StaffDrawer> {
                   20,
                   24,
                 ),
-                decoration: const BoxDecoration(
-                  gradient: AppColors.primaryGradient,
+                decoration: BoxDecoration(
+                  gradient: StaffBrandColors.primaryGradient,
                   borderRadius: BorderRadius.only(
                     bottomLeft: Radius.circular(32),
                     bottomRight: Radius.circular(32),
@@ -292,7 +307,8 @@ class _StaffDrawerState extends ConsumerState<_StaffDrawer> {
                           child: const MoeenLogo(compact: true, onDark: true),
                         ),
                         const Spacer(),
-                        _SubscriptionBadge(isSubscribed: isSubscribed),
+                        if (StaffFeatureFlags.showSubscriptionAndBalance)
+                          _SubscriptionBadge(isSubscribed: isSubscribed),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -337,8 +353,8 @@ class _StaffDrawerState extends ConsumerState<_StaffDrawer> {
                             ? Icons.admin_panel_settings_rounded
                             : Icons.school_rounded,
                         color: workspace == StaffWorkspace.doctor
-                            ? AppColors.violet
-                            : AppColors.royalBlue,
+                            ? StaffBrandColors.accent
+                            : StaffBrandColors.primary,
                         onTap: () => _switchWorkspace(
                           workspace == StaffWorkspace.doctor
                               ? StaffWorkspace.administrative
@@ -495,7 +511,7 @@ class _StaffDrawerState extends ConsumerState<_StaffDrawer> {
         message: 'يجب الاشتراك للوصول إلى هذه الصفحة.',
         confirmLabel: 'الاشتراك الآن',
         icon: Icons.lock_rounded,
-        color: AppColors.goldDeep,
+        color: StaffBrandColors.accentDeep,
       );
       if (subscribe && mounted) {
         Navigator.pop(context);
@@ -569,7 +585,7 @@ class _DrawerItem {
 
 List<_DrawerGroup> _groups(StaffWorkspace workspace) {
   if (workspace == StaffWorkspace.administrative) {
-    return const [
+    final groups = const [
       _DrawerGroup('القائمة الرئيسية', [
         _DrawerItem(
           'الرئيسية',
@@ -673,9 +689,10 @@ List<_DrawerGroup> _groups(StaffWorkspace workspace) {
         ),
       ]),
     ];
+    return groups;
   }
 
-  return const [
+  final groups = const [
     _DrawerGroup('القائمة الرئيسية', [
       _DrawerItem(
         'الرئيسية',
@@ -775,6 +792,7 @@ List<_DrawerGroup> _groups(StaffWorkspace workspace) {
       ),
     ]),
   ];
+  return groups;
 }
 
 class _WorkspaceSwitchTile extends StatelessWidget {
@@ -800,7 +818,7 @@ class _WorkspaceSwitchTile extends StatelessWidget {
         gradient: LinearGradient(
           colors: [
             color.withValues(alpha: 0.12),
-            AppColors.gold.withValues(alpha: 0.12),
+            StaffBrandColors.accent.withValues(alpha: 0.12),
           ],
         ),
         borderRadius: BorderRadius.circular(18),
@@ -853,12 +871,12 @@ class _SubscriptionBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: isSubscribed
-            ? AppColors.gold.withValues(alpha: 0.2)
+            ? StaffBrandColors.accent.withValues(alpha: 0.2)
             : Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isSubscribed
-              ? AppColors.gold.withValues(alpha: 0.5)
+              ? StaffBrandColors.accent.withValues(alpha: 0.5)
               : Colors.white.withValues(alpha: 0.2),
         ),
       ),
@@ -869,14 +887,14 @@ class _SubscriptionBadge extends StatelessWidget {
             isSubscribed
                 ? Icons.workspace_premium_rounded
                 : Icons.info_outline_rounded,
-            color: isSubscribed ? AppColors.gold : Colors.white,
+            color: isSubscribed ? StaffBrandColors.accent : Colors.white,
             size: 14,
           ),
           const SizedBox(width: 6),
           Text(
             isSubscribed ? 'مشترك' : 'أساسي',
             style: TextStyle(
-              color: isSubscribed ? AppColors.gold : Colors.white,
+              color: isSubscribed ? StaffBrandColors.accent : Colors.white,
               fontWeight: FontWeight.w900,
               fontSize: 11,
             ),
@@ -930,12 +948,12 @@ class _DrawerTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
         color: selected
-            ? AppColors.royalBlue.withValues(alpha: 0.08)
+            ? StaffBrandColors.primary.withValues(alpha: 0.08)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
         border: selected
-            ? const BorderDirectional(
-                start: BorderSide(color: AppColors.royalBlue, width: 4),
+            ? BorderDirectional(
+                start: BorderSide(color: StaffBrandColors.primary, width: 4),
               )
             : null,
       ),
@@ -950,7 +968,9 @@ class _DrawerTile extends StatelessWidget {
               children: [
                 Icon(
                   item.icon,
-                  color: selected ? AppColors.royalBlue : AppColors.slate500,
+                  color: selected
+                      ? StaffBrandColors.primary
+                      : AppColors.slate500,
                   size: 22,
                 ),
                 const SizedBox(width: 12),
@@ -961,7 +981,7 @@ class _DrawerTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: selected
-                          ? AppColors.royalBlue
+                          ? StaffBrandColors.primary
                           : AppColors.midnight,
                       fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
                       fontSize: 14,
@@ -1092,7 +1112,7 @@ class _StaffBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     if (workspace == null) return const SizedBox.shrink();
     final isAdmin = workspace == StaffWorkspace.administrative;
-    final color = isAdmin ? AppColors.violet : AppColors.royalBlue;
+    final color = isAdmin ? StaffBrandColors.accent : StaffBrandColors.primary;
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),

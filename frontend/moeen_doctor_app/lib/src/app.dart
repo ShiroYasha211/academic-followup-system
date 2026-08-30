@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/config/app_config.dart';
+import 'core/config/app_variant.dart';
 import 'core/notifications/push_notification_service.dart';
 import 'core/refresh/staff_refresh_coordinator.dart';
 import 'core/theme/app_colors.dart';
@@ -77,10 +78,16 @@ class _MoeenStaffAppState extends ConsumerState<MoeenStaffApp>
         .listen((path) => unawaited(_openNotificationPath(path)));
     _notificationRefreshSubscription = StaffPushNotificationService
         .refreshRequests
-        .listen((_) {
+        .listen((data) {
           ref
               .read(staffRefreshCoordinatorProvider.notifier)
               .triggerRefresh(force: true);
+          if (data['type']?.toString() == 'administrative_access' ||
+              data['refresh_session']?.toString() == 'true') {
+            unawaited(
+              ref.read(authControllerProvider.notifier).refreshSession(),
+            );
+          }
         });
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
       _handleConnectivityChange,
@@ -108,6 +115,7 @@ class _MoeenStaffAppState extends ConsumerState<MoeenStaffApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
+    unawaited(ref.read(authControllerProvider.notifier).refreshSession());
     final now = DateTime.now();
     if (_lastResumedAt == null ||
         now.difference(_lastResumedAt!) > const Duration(seconds: 45)) {
@@ -205,7 +213,7 @@ class _MoeenStaffAppState extends ConsumerState<MoeenStaffApp>
 
     final refreshState = ref.watch(staffRefreshCoordinatorProvider);
     return MaterialApp.router(
-      title: 'Moeen Doctor',
+      title: StaffAppBrand.appTitle,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       routerConfig: ref.watch(appRouterProvider),
@@ -232,7 +240,9 @@ class _StaffGlobalConnectivityBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final visible = !state.online || state.refreshing;
     final offline = !state.online;
-    final background = offline ? const Color(0xFF2F2418) : AppColors.primary;
+    final background = offline
+        ? const Color(0xFF2F2418)
+        : StaffBrandColors.primary;
     final icon = offline ? Icons.wifi_off_rounded : Icons.sync_rounded;
     final message = offline
         ? 'لا يوجد اتصال بالإنترنت. يتم عرض البيانات المحفوظة عند توفرها.'

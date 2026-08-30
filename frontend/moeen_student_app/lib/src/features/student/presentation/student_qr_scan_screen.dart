@@ -6,10 +6,12 @@ class StudentQrScanScreen extends ConsumerStatefulWidget {
   static const route = '/student/qr-scan';
 
   @override
-  ConsumerState<StudentQrScanScreen> createState() => _StudentQrScanScreenState();
+  ConsumerState<StudentQrScanScreen> createState() =>
+      _StudentQrScanScreenState();
 }
 
-class _StudentQrScanScreenState extends ConsumerState<StudentQrScanScreen> with SingleTickerProviderStateMixin {
+class _StudentQrScanScreenState extends ConsumerState<StudentQrScanScreen>
+    with SingleTickerProviderStateMixin {
   late final MobileScannerController _scanner;
   late final AnimationController _laserController;
   bool _processing = false;
@@ -34,6 +36,76 @@ class _StudentQrScanScreenState extends ConsumerState<StudentQrScanScreen> with 
 
   @override
   Widget build(BuildContext context) {
+    final subscription = ref.watch(subscriptionControllerProvider).valueOrNull;
+    final isSubscribed = subscription?.isSubscribed == true;
+    final supportSettingsState = ref.watch(studentSupportSettingsProvider);
+    final supportSettings =
+        supportSettingsState.valueOrNull ?? const <String, dynamic>{};
+    final qrScanFreeEnabled = _qrScanBoolSetting(
+      supportSettings['student_qr_scan_free_enabled'],
+      fallback: true,
+    );
+    if (!isSubscribed && supportSettingsState.isLoading) {
+      return const StudentShell(
+        currentIndex: 20,
+        title: 'مسح QR الحضور',
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (!isSubscribed && !qrScanFreeEnabled) {
+      return StudentShell(
+        currentIndex: 20,
+        title: 'مسح QR الحضور',
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 74,
+                  height: 74,
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: const Icon(
+                    Icons.lock_rounded,
+                    color: AppColors.goldDeep,
+                    size: 34,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'هذه الميزة تحتاج اشتراك',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.slate900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'تصوير QR الحضور غير مفتوح مجانًا حاليًا. اشترك للوصول إلى هذه الميزة.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.slate600,
+                    height: 1.6,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: () => context.go(StudentSubscriptionScreen.route),
+                  icon: const Icon(Icons.workspace_premium_rounded),
+                  label: const Text('الاشتراك الآن'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return StudentShell(
       currentIndex: 20,
       title: 'مسح QR الحضور',
@@ -83,7 +155,9 @@ class _StudentQrScanScreenState extends ConsumerState<StudentQrScanScreen> with 
             top: 20,
             right: 20,
             child: _CircleActionButton(
-              icon: _isTorchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+              icon: _isTorchOn
+                  ? Icons.flash_on_rounded
+                  : Icons.flash_off_rounded,
               onTap: () {
                 _scanner.toggleTorch();
                 setState(() => _isTorchOn = !_isTorchOn);
@@ -111,11 +185,18 @@ class _StudentQrScanScreenState extends ConsumerState<StudentQrScanScreen> with 
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                        const CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 3,
+                        ),
                         const SizedBox(height: 20),
                         const Text(
                           'جاري تسجيل الحضور...',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
                         ),
                       ],
                     ),
@@ -133,9 +214,11 @@ class _StudentQrScanScreenState extends ConsumerState<StudentQrScanScreen> with 
     if (token.isEmpty || token.length < 20) return;
     setState(() => _processing = true);
     try {
-      final message = await ref.read(studentContentRepositoryProvider).scanQrAttendance(token);
+      final message = await ref
+          .read(studentContentRepositoryProvider)
+          .scanQrAttendance(token);
       if (!mounted) return;
-      
+
       // Stop scanner in the background to avoid blocking the UI/future execution
       _scanner.stop().catchError((e) {
         debugPrint('Error stopping scanner: $e');
@@ -151,7 +234,9 @@ class _StudentQrScanScreenState extends ConsumerState<StudentQrScanScreen> with 
       if (mounted) context.go(StudentDashboardScreen.route);
     } catch (error) {
       if (!mounted) return;
-      final message = error is ApiException ? error.message : 'حدث خطأ غير متوقع أثناء تسجيل الحضور.';
+      final message = error is ApiException
+          ? error.message
+          : 'حدث خطأ غير متوقع أثناء تسجيل الحضور.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: AppColors.danger),
       );
@@ -161,12 +246,25 @@ class _StudentQrScanScreenState extends ConsumerState<StudentQrScanScreen> with 
   }
 }
 
+bool _qrScanBoolSetting(dynamic value, {bool fallback = false}) {
+  if (value == null) return fallback;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  final normalized = value.toString().trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].contains(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].contains(normalized)) return false;
+  return fallback;
+}
+
 class _ScannerOverlay extends StatelessWidget {
   const _ScannerOverlay();
   @override
   Widget build(BuildContext context) {
     return ColorFiltered(
-      colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.5), BlendMode.srcOut),
+      colorFilter: ColorFilter.mode(
+        Colors.black.withValues(alpha: 0.5),
+        BlendMode.srcOut,
+      ),
       child: Stack(
         children: [
           Container(
@@ -195,10 +293,7 @@ class _FrameCorners extends StatelessWidget {
   const _FrameCorners();
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _FramePainter(),
-      size: Size.infinite,
-    );
+    return CustomPaint(painter: _FramePainter(), size: Size.infinite);
   }
 }
 
@@ -280,7 +375,11 @@ class _LaserLine extends StatelessWidget {
 }
 
 class _CircleActionButton extends StatelessWidget {
-  const _CircleActionButton({required this.icon, required this.onTap, required this.color});
+  const _CircleActionButton({
+    required this.icon,
+    required this.onTap,
+    required this.color,
+  });
   final IconData icon;
   final VoidCallback onTap;
   final Color color;
@@ -324,13 +423,21 @@ class _InstructionCard extends StatelessWidget {
                   color: AppColors.gold.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.qr_code_2_rounded, color: AppColors.gold, size: 20),
+                child: const Icon(
+                  Icons.qr_code_2_rounded,
+                  color: AppColors.gold,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 16),
               const Expanded(
                 child: Text(
                   'ضع الكود داخل المربع للمسح التلقائي',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ],

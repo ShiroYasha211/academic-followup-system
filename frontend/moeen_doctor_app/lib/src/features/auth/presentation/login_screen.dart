@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/app_variant.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/auth_shell.dart';
 import '../../../shared/widgets/auth_status_message.dart';
@@ -96,25 +97,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.08),
+                    color: StaffBrandColors.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.15),
+                      color: StaffBrandColors.primary.withValues(alpha: 0.15),
                     ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.school_rounded,
-                        color: AppColors.royalBlue,
+                        color: StaffBrandColors.primary,
                         size: 16,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         'بوابة عضو هيئة التدريس',
                         style: TextStyle(
-                          color: AppColors.royalBlueDark,
+                          color: StaffBrandColors.primaryDark,
                           fontSize: 11,
                           fontWeight: FontWeight.w900,
                           fontFamily: 'Cairo',
@@ -201,10 +202,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       _passwordController.clear();
                       context.go(RegisterScreen.route);
                     },
-                    child: const Text(
+                    child: Text(
                       'طلب انضمام',
                       style: TextStyle(
-                        color: AppColors.primary,
+                        color: StaffBrandColors.primary,
                         fontWeight: FontWeight.w900,
                       ),
                     ),

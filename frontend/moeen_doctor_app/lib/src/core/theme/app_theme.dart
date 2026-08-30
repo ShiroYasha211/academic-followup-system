@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../config/app_variant.dart';
 import 'app_colors.dart';
 
 abstract final class AppTheme {
   static ThemeData light() {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.primary,
+      seedColor: StaffBrandColors.primary,
       brightness: Brightness.light,
-      primary: AppColors.primary,
-      surface: AppColors.surface,
+      primary: StaffBrandColors.primary,
+      surface: StaffBrandColors.surface,
       error: AppColors.danger,
     );
 
@@ -16,7 +17,7 @@ abstract final class AppTheme {
       useMaterial3: true,
       fontFamily: 'Cairo',
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: AppColors.cream,
+      scaffoldBackgroundColor: StaffBrandColors.background,
       dialogTheme: DialogThemeData(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
@@ -30,65 +31,65 @@ abstract final class AppTheme {
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: AppColors.slate200),
+          borderSide: BorderSide(color: StaffBrandColors.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: AppColors.slate200),
+          borderSide: BorderSide(color: StaffBrandColors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: AppColors.goldDeep, width: 1.5),
+          borderSide: BorderSide(color: StaffBrandColors.primary, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: AppColors.danger),
         ),
-        labelStyle: const TextStyle(
-          color: AppColors.slate500,
+        labelStyle: TextStyle(
+          color: StaffBrandColors.textSecondary,
           fontWeight: FontWeight.w600,
         ),
-        hintStyle: const TextStyle(color: AppColors.slate400),
+        hintStyle: TextStyle(color: StaffBrandColors.textLight),
       ),
-      textTheme: const TextTheme(
+      textTheme: TextTheme(
         headlineLarge: TextStyle(
           fontSize: 32,
           fontWeight: FontWeight.w800,
-          color: AppColors.midnight,
+          color: StaffBrandColors.textPrimary,
           height: 1.2,
         ),
         headlineMedium: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w800,
-          color: AppColors.midnight,
+          color: StaffBrandColors.textPrimary,
           height: 1.25,
         ),
         titleLarge: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w800,
-          color: AppColors.slate900,
+          color: StaffBrandColors.textPrimary,
         ),
         titleMedium: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w700,
-          color: AppColors.slate900,
+          color: StaffBrandColors.textPrimary,
         ),
         bodyLarge: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w500,
-          color: AppColors.slate700,
+          color: StaffBrandColors.textSecondary,
           height: 1.55,
         ),
         bodyMedium: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w500,
-          color: AppColors.slate500,
+          color: StaffBrandColors.textSecondary,
           height: 1.5,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: StaffBrandColors.primary,
           foregroundColor: Colors.white,
           elevation: 0,
           minimumSize: const Size.fromHeight(56),

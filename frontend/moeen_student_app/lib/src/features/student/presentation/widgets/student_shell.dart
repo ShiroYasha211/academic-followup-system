@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/config/app_variant.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/moeen_dialogs.dart';
@@ -19,6 +20,7 @@ import '../../data/student_repositories.dart';
 import '../../logic/student_controllers.dart';
 import '../student_content_screens.dart';
 import '../student_dashboard_screen.dart';
+import '../student_card_generation_screen.dart';
 import '../student_ledger_screen.dart';
 import '../student_placeholder_screen.dart';
 import '../student_subscription_screen.dart';
@@ -148,7 +150,8 @@ class _StudentShellState extends ConsumerState<StudentShell>
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden) {
       final session = ref.read(authControllerProvider).valueOrNull;
-      if (session?.isSecondaryDevice != true) {
+      if (StudentFeatureFlags.showOneLineShot &&
+          session?.isSecondaryDevice != true) {
         unawaited(scheduleStudentFlashcardSmartReviewNotification(ref));
       }
     }
@@ -163,12 +166,22 @@ class _StudentShellState extends ConsumerState<StudentShell>
     ref.invalidate(studentUnreadScreenCountsProvider);
     ref.invalidate(studentUnreadMessagesCountProvider);
     ref.invalidate(studentStarsBalanceProvider);
+    _refreshLiveSettings();
+  }
+
+  void _refreshLiveSettings() {
+    ref.invalidate(studentSupportSettingsProvider);
+    if (StudentFeatureFlags.showCardGeneration) {
+      ref.invalidate(cardGenerationAccessProvider);
+    }
+    unawaited(
+      ref.read(authControllerProvider.notifier).refreshPermissionsNow(),
+    );
   }
 
   Future<void> _maybeShowFlashcardPrompt() async {
+    if (!StudentFeatureFlags.showOneLineShot) return;
     if (!mounted || _flashcardPromptOpen) return;
-    final session = ref.read(authControllerProvider).valueOrNull;
-    if (session?.isSecondaryDevice == true) return;
     final path = GoRouterState.of(context).uri.path;
     if (path == StudentFlashcardsScreen.quickReviewRoute ||
         path.endsWith('/review') ||
@@ -209,7 +222,7 @@ class _StudentShellState extends ConsumerState<StudentShell>
       message: 'هل تريد الخروج من تطبيق معين؟',
       confirmLabel: 'إغلاق',
       icon: Icons.power_settings_new_rounded,
-      color: AppColors.royalBlue,
+      color: StudentBrandColors.primary,
     );
     if (close) await SystemNavigator.pop();
   }
@@ -228,6 +241,7 @@ class _StudentShellState extends ConsumerState<StudentShell>
       context.go(parentRoute);
       return;
     }
+    _refreshLiveSettings();
     _scaffoldKey.currentState?.openDrawer();
   }
 
@@ -252,7 +266,7 @@ class _StudentShellState extends ConsumerState<StudentShell>
       child: Scaffold(
         key: _scaffoldKey,
         extendBodyBehindAppBar: true,
-        backgroundColor: AppColors.cream,
+        backgroundColor: StudentBrandColors.background,
         resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset,
         appBar: _PremiumAppBar(
           title: widget.title,
@@ -269,6 +283,9 @@ class _StudentShellState extends ConsumerState<StudentShell>
             ? null
             : _StudentDrawer(currentIndex: widget.currentIndex),
         drawerEnableOpenDragGesture: !widget.disableDrawer,
+        onDrawerChanged: (isOpened) {
+          if (isOpened) _refreshLiveSettings();
+        },
       ),
     );
   }
@@ -311,14 +328,14 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: AppColors.royalBlue.withValues(alpha: 0.1),
+                color: StudentBrandColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: IconButton(
                 onPressed: onLeadingPressed,
                 icon: Icon(
                   hasBackTarget ? Icons.arrow_back_rounded : Icons.menu_rounded,
-                  color: AppColors.royalBlue,
+                  color: StudentBrandColors.primary,
                   size: 22,
                 ),
                 tooltip: hasBackTarget ? 'رجوع' : 'القائمة',
@@ -364,18 +381,22 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
                         height: 42,
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         decoration: BoxDecoration(
-                          color: AppColors.gold.withValues(alpha: 0.12),
+                          color: StudentBrandColors.accent.withValues(
+                            alpha: 0.12,
+                          ),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: AppColors.gold.withValues(alpha: 0.18),
+                            color: StudentBrandColors.accent.withValues(
+                              alpha: 0.18,
+                            ),
                           ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.stars_rounded,
-                              color: AppColors.goldDeep,
+                              color: StudentBrandColors.accentDeep,
                               size: 19,
                             ),
                             const SizedBox(width: 5),
@@ -383,8 +404,8 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
                               starsBalance > 999
                                   ? '999+'
                                   : starsBalance.toString(),
-                              style: const TextStyle(
-                                color: AppColors.royalBlueDark,
+                              style: TextStyle(
+                                color: StudentBrandColors.primaryDark,
                                 fontWeight: FontWeight.w900,
                                 fontSize: 12,
                               ),
@@ -406,18 +427,22 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
                           width: 42,
                           height: 42,
                           decoration: BoxDecoration(
-                            color: AppColors.gold.withValues(alpha: 0.12),
+                            color: StudentBrandColors.accent.withValues(
+                              alpha: 0.12,
+                            ),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: AppColors.gold.withValues(alpha: 0.18),
+                              color: StudentBrandColors.accent.withValues(
+                                alpha: 0.18,
+                              ),
                             ),
                           ),
                           child: IconButton(
                             onPressed: () =>
                                 context.go(StudentNotificationsScreen.route),
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.notifications_active_rounded,
-                              color: AppColors.goldDeep,
+                              color: StudentBrandColors.accentDeep,
                               size: 21,
                             ),
                             tooltip: 'التنبيهات',
@@ -468,23 +493,28 @@ class _PremiumAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.gold, AppColors.goldDeep],
+                        gradient: LinearGradient(
+                          colors: [
+                            StudentBrandColors.accent,
+                            StudentBrandColors.accentDeep,
+                          ],
                         ),
                         borderRadius: BorderRadius.circular(10),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.gold.withValues(alpha: 0.3),
+                            color: StudentBrandColors.accent.withValues(
+                              alpha: 0.3,
+                            ),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
                         ],
                       ),
                       alignment: Alignment.center,
-                      child: const Text(
+                      child: Text(
                         'مندوب',
                         style: TextStyle(
-                          color: AppColors.royalBlueDark,
+                          color: StudentBrandColors.primaryDark,
                           fontWeight: FontWeight.w900,
                           fontSize: 10,
                         ),
@@ -529,6 +559,16 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
     final unreadMessages =
         ref.watch(studentUnreadMessagesCountProvider).valueOrNull ?? 0;
     final isSecondaryDevice = session?.isSecondaryDevice == true;
+    final supportSettings =
+        ref.watch(studentSupportSettingsProvider).valueOrNull ??
+        const <String, dynamic>{};
+    final qrScanFreeEnabled = _studentBoolSetting(
+      supportSettings['student_qr_scan_free_enabled'],
+      fallback: true,
+    );
+    final canGenerateCards =
+        session?.hasPermissionSlug('generate_cards') == true ||
+        ref.watch(cardGenerationAccessProvider).valueOrNull == true;
 
     final groups = [
       _DrawerGroup('القائمة الرئيسية', [
@@ -544,7 +584,7 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           Icons.qr_code_scanner_rounded,
           20,
           StudentQrScanScreen.route,
-          false,
+          !qrScanFreeEnabled,
           true,
         ),
       ]),
@@ -556,20 +596,30 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           StudentProfileScreen.route,
           false,
         ),
-        _DrawerItem(
-          'الاشتراك والرصيد',
-          Icons.workspace_premium_rounded,
-          1,
-          StudentSubscriptionScreen.route,
-          false,
-        ),
-        _DrawerItem(
-          'السجل المالي',
-          Icons.receipt_long_rounded,
-          2,
-          StudentLedgerScreen.route,
-          false,
-        ),
+        if (StudentFeatureFlags.showSubscriptionAndBalance)
+          _DrawerItem(
+            'الاشتراك والرصيد',
+            Icons.workspace_premium_rounded,
+            1,
+            StudentSubscriptionScreen.route,
+            false,
+          ),
+        if (StudentFeatureFlags.showFinancialLedger)
+          _DrawerItem(
+            'السجل المالي',
+            Icons.receipt_long_rounded,
+            2,
+            StudentLedgerScreen.route,
+            false,
+          ),
+        if (StudentFeatureFlags.showCardGeneration && canGenerateCards)
+          _DrawerItem(
+            'توليد كروت الشحن',
+            Icons.confirmation_number_rounded,
+            37,
+            StudentCardGenerationScreen.route,
+            false,
+          ),
       ]),
       _DrawerGroup('الأدوات الدراسية', [
         _DrawerItem(
@@ -607,14 +657,14 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           StudentResourcesScreen.route,
           true,
         ),
-        _DrawerItem(
-          'One Line Shot',
-          Icons.bolt_rounded,
-          15,
-          StudentFlashcardsScreen.route,
-          true,
-          true,
-        ),
+        if (StudentFeatureFlags.showOneLineShot)
+          _DrawerItem(
+            'One Line Shot',
+            Icons.bolt_rounded,
+            15,
+            StudentFlashcardsScreen.route,
+            true,
+          ),
         _DrawerItem(
           'التكاليف والواجبات',
           Icons.assignment_turned_in_rounded,
@@ -643,7 +693,7 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           StudentLibraryScreen.route,
           true,
         ),
-        if (hasClinical)
+        if (StudentFeatureFlags.showStudentClinical && hasClinical)
           _DrawerItem(
             'القسم العملي والسريري',
             Icons.local_hospital_rounded,
@@ -698,13 +748,14 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           StudentStarsScreen.route,
           true,
         ),
-        _DrawerItem(
-          'مزرعة الأشجار',
-          Icons.park_rounded,
-          35,
-          StudentTreeFarmScreen.route,
-          true,
-        ),
+        if (StudentFeatureFlags.showTreeFarm)
+          _DrawerItem(
+            'مزرعة الأشجار',
+            Icons.park_rounded,
+            35,
+            StudentTreeFarmScreen.route,
+            true,
+          ),
       ]),
       if (session?.isPracticalDelegate == true)
         _DrawerGroup('العملي والسريري', [
@@ -755,7 +806,9 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
                   20,
                   24,
                 ),
-                decoration: BoxDecoration(gradient: AppColors.primaryGradient),
+                decoration: BoxDecoration(
+                  gradient: StudentBrandColors.primaryGradient,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -773,7 +826,8 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
                           child: const MoeenLogo(compact: true, onDark: true),
                         ),
                         const Spacer(),
-                        _SubscriptionBadge(isSubscribed: isSubscribed),
+                        if (StudentFeatureFlags.showSubscriptionAndBalance)
+                          _SubscriptionBadge(isSubscribed: isSubscribed),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -904,7 +958,7 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
         context: context,
         title: 'متاح من الجهاز الأساسي فقط',
         message:
-            'هذه الميزة لا تعمل من الجهاز الفرعي. استخدم الجهاز الأساسي للحضور، الكويزات، وOne Line Shot.',
+            'هذه الميزة لا تعمل من الجهاز الفرعي. استخدم الجهاز الأساسي للحضور والكويزات.',
         icon: Icons.phone_android_rounded,
         color: AppColors.orange,
       );
@@ -933,7 +987,7 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
           message: 'يجب الاشتراك للوصول إلى هذه الصفحة.',
           confirmLabel: 'الاشتراك الآن',
           icon: Icons.lock_rounded,
-          color: AppColors.goldDeep,
+          color: StudentBrandColors.accentDeep,
         );
         if (subscribe && mounted) {
           Navigator.pop(context);
@@ -1040,7 +1094,7 @@ class _WorkspaceSwitchTile extends StatelessWidget {
         gradient: LinearGradient(
           colors: [
             color.withValues(alpha: 0.12),
-            AppColors.gold.withValues(alpha: 0.12),
+            StudentBrandColors.accent.withValues(alpha: 0.12),
           ],
         ),
         borderRadius: BorderRadius.circular(18),
@@ -1092,12 +1146,12 @@ class _SubscriptionBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: isSubscribed
-            ? AppColors.gold.withValues(alpha: 0.2)
+            ? StudentBrandColors.accent.withValues(alpha: 0.2)
             : Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isSubscribed
-              ? AppColors.gold.withValues(alpha: 0.5)
+              ? StudentBrandColors.accent.withValues(alpha: 0.5)
               : Colors.white.withValues(alpha: 0.2),
         ),
       ),
@@ -1108,14 +1162,14 @@ class _SubscriptionBadge extends StatelessWidget {
             isSubscribed
                 ? Icons.workspace_premium_rounded
                 : Icons.info_outline_rounded,
-            color: isSubscribed ? AppColors.gold : Colors.white,
+            color: isSubscribed ? StudentBrandColors.accent : Colors.white,
             size: 14,
           ),
           const SizedBox(width: 6),
           Text(
             isSubscribed ? 'مشترك' : 'أساسي',
             style: TextStyle(
-              color: isSubscribed ? AppColors.gold : Colors.white,
+              color: isSubscribed ? StudentBrandColors.accent : Colors.white,
               fontWeight: FontWeight.w900,
               fontSize: 11,
             ),
@@ -1172,7 +1226,7 @@ class _DrawerTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
         color: selected
-            ? AppColors.royalBlue.withValues(alpha: 0.08)
+            ? StudentBrandColors.primary.withValues(alpha: 0.08)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
       ),
@@ -1181,13 +1235,13 @@ class _DrawerTile extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         leading: Icon(
           item.icon,
-          color: selected ? AppColors.royalBlue : AppColors.slate500,
+          color: selected ? StudentBrandColors.primary : AppColors.slate500,
           size: 22,
         ),
         title: Text(
           _drawerLabel(item),
           style: TextStyle(
-            color: selected ? AppColors.royalBlue : AppColors.midnight,
+            color: selected ? StudentBrandColors.primary : AppColors.midnight,
             fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
             fontSize: 14,
           ),
@@ -1247,6 +1301,16 @@ class _DrawerItem {
   final String route;
   final bool requiresSubscription;
   final bool requiresPrimaryDevice;
+}
+
+bool _studentBoolSetting(dynamic value, {bool fallback = false}) {
+  if (value == null) return fallback;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  final normalized = value.toString().trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].contains(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].contains(normalized)) return false;
+  return fallback;
 }
 
 Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {

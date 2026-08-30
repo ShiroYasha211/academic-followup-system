@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../core/config/app_variant.dart';
 
 class MoeenCard extends StatelessWidget {
   const MoeenCard({
@@ -22,7 +22,7 @@ class MoeenCard extends StatelessWidget {
         border: Border.all(color: Colors.white.withValues(alpha: 0.55)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.midnight.withValues(alpha: 0.18),
+            color: StaffBrandColors.textPrimary.withValues(alpha: 0.12),
             blurRadius: 34,
             offset: const Offset(0, 22),
           ),

@@ -1738,18 +1738,13 @@ extension _DoctorClinicalSectionContent on _DoctorClinicalSectionScreenState {
     }
     return items.map((item) {
       final status = _docText(item['status']);
-      return _ClinicalListCard(
-        title: _docText(_docMap(item['student'])['name'], 'طالب'),
-        subtitle:
-            '${_docText(item['task_type'], 'مهمة')} • ${_docText(_docMap(item['clinical_case'])['patient_name'], 'حالة')}',
-        icon: Icons.assignment_ind_rounded,
-        color: _docStatusColor(status),
-        status: _docText(item['status_label'], status),
+      return _ClinicalAssignmentCard(
+        item: item,
         onTap: () => _showGenericDetails(item),
         onEdit: status == 'submitted_for_review'
             ? () => _reviewAssignment(item)
             : null,
-        editLabel: status == 'submitted_for_review' ? 'مراجعة' : null,
+        editLabel: status == 'submitted_for_review' ? 'مراجعة التكليف' : null,
       );
     }).toList();
   }
@@ -1918,6 +1913,9 @@ extension _DoctorClinicalSectionContent on _DoctorClinicalSectionScreenState {
         onEdit: _showHiddenChecklists ? null : () => _openEdit(item),
         onDelete: _showHiddenChecklists ? null : () => _deleteItem(item),
         onRestore: _showHiddenChecklists ? () => _restoreChecklist(item) : null,
+        onSyncAdminUpdate: _showHiddenChecklists
+            ? null
+            : () => _syncChecklistAdminUpdate(item),
         isHidden: _showHiddenChecklists,
       );
     }).toList();

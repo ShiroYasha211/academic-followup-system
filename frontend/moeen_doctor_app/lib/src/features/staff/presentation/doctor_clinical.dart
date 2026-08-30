@@ -352,6 +352,8 @@ String _notificationTypeLabel(String type) {
       return 'تكليف';
     case 'attendance':
       return 'حضور';
+    case 'attendance_edit_request':
+      return 'طلب تعديل حضور';
     case 'poll':
       return 'استبيان';
     case 'resource':
@@ -371,6 +373,8 @@ Color _notificationTypeColor(String type) {
       return AppColors.teal;
     case 'attendance':
       return AppColors.danger;
+    case 'attendance_edit_request':
+      return AppColors.warning;
     case 'resource':
       return AppColors.royalBlue;
     case 'announcement':
@@ -390,6 +394,8 @@ IconData _notificationTypeIcon(String type) {
       return Icons.poll_rounded;
     case 'attendance':
       return Icons.fact_check_rounded;
+    case 'attendance_edit_request':
+      return Icons.edit_calendar_rounded;
     case 'resource':
       return Icons.folder_rounded;
     case 'announcement':

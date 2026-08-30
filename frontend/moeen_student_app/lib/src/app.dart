@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/notifications/push_notification_service.dart';
+import 'core/config/app_variant.dart';
 import 'core/offline/connectivity_service.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/logic/auth_controller.dart';
+import 'features/auth/data/auth_session.dart';
 import 'features/auth/presentation/login_screen.dart';
+import 'features/student/logic/one_line_notification_scheduler.dart';
 import 'features/student/logic/student_controllers.dart';
 import 'features/student/presentation/student_content_screens.dart';
 import 'features/student/presentation/widgets/student_shell.dart';
@@ -25,15 +28,18 @@ class MoeenStudentApp extends ConsumerStatefulWidget {
   ConsumerState<MoeenStudentApp> createState() => _MoeenStudentAppState();
 }
 
-class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp> {
+class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp>
+    with WidgetsBindingObserver {
   StreamSubscription<String>? _notificationNavigationSubscription;
   StreamSubscription<Map<String, dynamic>>? _notificationRefreshSubscription;
   ProviderSubscription<AsyncValue<bool>>? _onlineStatusSubscription;
+  ProviderSubscription<AsyncValue<AuthSession?>>? _authSubscription;
   bool _dialogShowing = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final pendingPath = PushNotificationService.takePendingNavigationPath();
       if (pendingPath != null) {
@@ -49,6 +55,14 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp> {
             ref.invalidate(studentUnreadScreenCountsProvider);
             ref.invalidate(studentUnreadMessagesCountProvider);
           });
+      _authSubscription = ref.listenManual<AsyncValue<AuthSession?>>(
+        authControllerProvider,
+        (previous, next) {
+          if (StudentFeatureFlags.showOneLineShot && next.valueOrNull != null) {
+            unawaited(_syncOneLineNotifications());
+          }
+        },
+      );
       _onlineStatusSubscription = ref.listenManual<AsyncValue<bool>>(
         onlineStatusProvider,
         (previous, next) {
@@ -61,9 +75,32 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp> {
           ref.invalidate(studentUnreadNotificationsCountProvider);
           ref.invalidate(studentUnreadScreenCountsProvider);
           ref.invalidate(studentUnreadMessagesCountProvider);
+          if (StudentFeatureFlags.showOneLineShot) {
+            unawaited(_syncOneLineNotifications());
+          }
         },
       );
+      if (StudentFeatureFlags.showOneLineShot) {
+        unawaited(_syncOneLineNotifications());
+      }
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (StudentFeatureFlags.showOneLineShot) {
+        unawaited(_syncOneLineNotifications());
+      }
+    }
+  }
+
+  Future<void> _syncOneLineNotifications({bool force = false}) async {
+    try {
+      final session = await ref.read(authControllerProvider.future);
+      if (session == null || session.isDelegate) return;
+      await ref.read(oneLineNotificationSchedulerProvider).sync(force: force);
+    } catch (_) {}
   }
 
   Future<void> _openNotificationPath(String path) async {
@@ -93,8 +130,10 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_notificationNavigationSubscription?.cancel());
     unawaited(_notificationRefreshSubscription?.cancel());
+    _authSubscription?.close();
     _onlineStatusSubscription?.close();
     super.dispose();
   }
@@ -160,7 +199,7 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp> {
     final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(
-      title: 'Moeen Student',
+      title: StudentAppBrand.appTitle,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       routerConfig: router,

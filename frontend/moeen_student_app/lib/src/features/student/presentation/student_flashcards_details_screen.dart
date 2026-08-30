@@ -325,6 +325,65 @@ class _StudentFlashcardDetailsScreenState
                     ),
                   ],
                 ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showFlashcardImport(
+                          context: context,
+                          ref: ref,
+                          packId: widget.packId,
+                          packColor: packColor,
+                          onDone: () {
+                            ref.invalidate(
+                              _flashcardDetailsProvider(widget.packId),
+                            );
+                            ref.invalidate(_flashcardsProvider);
+                            ref.invalidate(_flashcardDailyQueueProvider);
+                            ref.invalidate(_flashcardUpcomingProvider);
+                          },
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: packColor,
+                          side: BorderSide(
+                            color: packColor.withValues(alpha: 0.35),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                        ),
+                        icon: const Icon(Icons.upload_file_rounded),
+                        label: const Text(
+                          'استيراد من Excel / CSV',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Tooltip(
+                      message: 'تنزيل قالب الاستيراد',
+                      child: IconButton.outlined(
+                        onPressed: () => _downloadFlashcardImportTemplate(
+                          context: context,
+                          ref: ref,
+                        ),
+                        style: IconButton.styleFrom(
+                          foregroundColor: packColor,
+                          side: BorderSide(
+                            color: packColor.withValues(alpha: 0.35),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          padding: const EdgeInsets.all(13),
+                        ),
+                        icon: const Icon(Icons.download_rounded),
+                      ),
+                    ),
+                  ],
+                ),
               ],
               const SizedBox(height: 16),
               if (children.isNotEmpty) ...[

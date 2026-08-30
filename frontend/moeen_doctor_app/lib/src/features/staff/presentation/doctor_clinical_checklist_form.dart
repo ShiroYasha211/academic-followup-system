@@ -31,6 +31,7 @@ class _DoctorChecklistFormScreenState
   String _skillType = 'history_taking';
   String _timerType = 'fixed';
   bool _practiceAllowed = true;
+  bool _trackAdminUpdates = true;
   bool _submitting = false;
   bool _loaded = false;
   bool _isStandard = false;
@@ -71,6 +72,11 @@ class _DoctorChecklistFormScreenState
     _practiceAllowed = raw == null
         ? true
         : _docBool(item['is_practice_allowed']);
+    _trackAdminUpdates = raw == null
+        ? true
+        : item.containsKey('tracks_admin_updates')
+            ? _docBool(item['tracks_admin_updates'])
+            : true;
     _isStandard =
         _docBool(item['is_standard']) ||
         (_isEditing && _docText(item['doctor_id']).isEmpty);
@@ -427,6 +433,26 @@ class _DoctorChecklistFormScreenState
               style: TextStyle(fontFamily: 'Cairo', height: 1.35),
             ),
           ),
+          if (_isStandard) ...[
+            const Divider(height: 18),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              value: _trackAdminUpdates,
+              onChanged: (value) =>
+                  setState(() => _trackAdminUpdates = value),
+              title: const Text(
+                'تلقي تحديثات الأدمن لهذه القائمة',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              subtitle: const Text(
+                'عند تفعيلها سيظهر لك تنبيه إذا نشر الأدمن نسخة أحدث من القائمة الأصلية. عند تعطيلها ستبقى نسختك مستقلة ولن تظهر تنبيهات التحديث.',
+                style: TextStyle(fontFamily: 'Cairo', height: 1.35),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -713,6 +739,7 @@ class _DoctorChecklistFormScreenState
             ? int.tryParse(_minutes.text.trim())
             : null,
         'is_practice_allowed': _practiceAllowed,
+        if (_isStandard) 'tracks_admin_updates': _trackAdminUpdates,
         'items': _items.map((item) => item.toPayload()).toList(),
       };
 

@@ -52,6 +52,17 @@ class _StudentFlashcardsScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(_flashcardsProvider);
     final queueState = ref.watch(_flashcardDailyQueueProvider);
+    final oneLineState = ref.watch(_flashcardOneLineNotificationsProvider);
+    ref.listen<AsyncValue<Map<String, dynamic>>>(
+      _flashcardOneLineNotificationsProvider,
+      (previous, next) {
+        next.whenData((data) {
+          unawaited(
+            ref.read(oneLineNotificationSchedulerProvider).sync(data: data),
+          );
+        });
+      },
+    );
     return StudentShell(
       currentIndex: 15,
       title: 'One Line Shot',
@@ -67,6 +78,7 @@ class _StudentFlashcardsScreenState
         onRetry: () {
           ref.invalidate(_flashcardsProvider);
           ref.invalidate(_flashcardDailyQueueProvider);
+          ref.invalidate(_flashcardOneLineNotificationsProvider);
         },
         builder: (data) {
           final stats = asMap(data['stats']);
@@ -81,6 +93,7 @@ class _StudentFlashcardsScreenState
             onRefresh: () async {
               ref.invalidate(_flashcardsProvider);
               ref.invalidate(_flashcardDailyQueueProvider);
+              ref.invalidate(_flashcardOneLineNotificationsProvider);
             },
             child: ListView(
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 90),
@@ -164,6 +177,27 @@ class _StudentFlashcardsScreenState
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            oneLineState.when(
+                              data: (oneLineData) =>
+                                  _OneLineShotNotificationPanel(
+                                    notificationData: oneLineData,
+                                  ),
+                              loading: () =>
+                                  const _OneLineShotNotificationPanel(
+                                    notificationData: {},
+                                    loading: true,
+                                  ),
+                              error: (_, _) => _OneLineShotNotificationPanel(
+                                notificationData: {
+                                  'items': _oneLineShotNotificationItems(
+                                    queueData,
+                                  ),
+                                  'settings': asMap(queueData['settings']),
+                                },
+                                offline: true,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
                             _FlashcardsTodaySection(
                               queue: allQueue,
                               availableQueue: availableQueue,
@@ -291,6 +325,7 @@ class _StudentFlashcardsScreenState
     if (!mounted || synced == 0) return;
     ref.invalidate(_flashcardsProvider);
     ref.invalidate(_flashcardDailyQueueProvider);
+    ref.invalidate(_flashcardOneLineNotificationsProvider);
   }
 
   Future<void> _showCreatePack(BuildContext context, WidgetRef ref) =>

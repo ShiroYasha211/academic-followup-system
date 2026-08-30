@@ -29,8 +29,10 @@ import '../../../shared/widgets/moeen_dialogs.dart';
 import '../../auth/logic/auth_controller.dart';
 import '../data/flashcard_local_store.dart';
 import '../data/student_repositories.dart';
+import '../logic/one_line_notification_scheduler.dart';
 import '../data/tree_farm_local_store.dart';
 import '../logic/student_controllers.dart';
+import 'student_subscription_screen.dart';
 import 'widgets/student_shell.dart';
 import 'widgets/student_widgets.dart';
 
@@ -62,6 +64,7 @@ part 'student_flashcards_dashboard_widgets.dart';
 part 'student_flashcards_ui_widgets.dart';
 part 'student_flashcards_details_screen.dart';
 part 'student_flashcards_details_widgets.dart';
+part 'student_flashcards_import.dart';
 part 'student_flashcards_review.dart';
 part 'student_flashcards_store.dart';
 part 'student_flashcards_forms.dart';
@@ -164,6 +167,12 @@ final _treeFarmProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
   ref,
 ) {
   return ref.watch(studentContentRepositoryProvider).treeFarm();
+});
+
+final _publicFarmProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
+  ref,
+) {
+  return ref.watch(studentContentRepositoryProvider).publicTreeFarm();
 });
 
 final _notificationsProvider = FutureProvider.autoDispose
@@ -279,6 +288,23 @@ final _flashcardDailyQueueProvider =
       } on ApiException catch (error) {
         if (!error.isOffline) rethrow;
         final cached = await store.loadDailyQueue();
+        if (cached != null) return cached;
+        rethrow;
+      }
+    });
+
+final _flashcardOneLineNotificationsProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+      final store = ref.watch(flashcardLocalStoreProvider);
+      try {
+        final data = await ref
+            .watch(studentContentRepositoryProvider)
+            .flashcardOneLineNotifications();
+        await store.cacheOneLineNotifications(data);
+        return data;
+      } on ApiException catch (error) {
+        if (!error.isOffline) rethrow;
+        final cached = await store.loadOneLineNotifications();
         if (cached != null) return cached;
         rethrow;
       }

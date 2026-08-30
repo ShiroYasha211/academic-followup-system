@@ -7,6 +7,7 @@ class _ClinicalChecklistCard extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.onRestore,
+    this.onSyncAdminUpdate,
     this.isHidden = false,
   });
 
@@ -15,6 +16,7 @@ class _ClinicalChecklistCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onRestore;
+  final VoidCallback? onSyncAdminUpdate;
   final bool isHidden;
 
   @override
@@ -26,6 +28,7 @@ class _ClinicalChecklistCard extends StatelessWidget {
     final timeLimit = _docInt(item['time_limit_minutes']);
     final isPractice = _docBool(item['is_practice_allowed']);
     final isStandard = _docBool(item['is_standard']);
+    final hasAdminUpdate = _docBool(item['has_admin_update']);
 
     String skillLabel = 'مهارات أخرى';
     IconData skillIcon = Icons.fact_check_rounded;
@@ -207,9 +210,46 @@ class _ClinicalChecklistCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  if (hasAdminUpdate && onSyncAdminUpdate != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.22),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.system_update_alt_rounded,
+                            color: AppColors.warning,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'يوجد تحديث جديد من الأدمن لهذه القائمة',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.midnight,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   if (isHidden && onRestore != null)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+                    Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 12,
+                      runSpacing: 10,
                       children: [
                         _buildActionButton(
                           icon: Icons.visibility_rounded,
@@ -217,7 +257,6 @@ class _ClinicalChecklistCard extends StatelessWidget {
                           color: AppColors.royalBlue,
                           onTap: onTap,
                         ),
-                        const SizedBox(width: 12),
                         _buildActionButton(
                           icon: Icons.restore_rounded,
                           label: 'استرجاع',
@@ -227,8 +266,10 @@ class _ClinicalChecklistCard extends StatelessWidget {
                       ],
                     )
                   else
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+                    Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 12,
+                      runSpacing: 10,
                       children: [
                         _buildActionButton(
                           icon: Icons.visibility_rounded,
@@ -236,7 +277,6 @@ class _ClinicalChecklistCard extends StatelessWidget {
                           color: AppColors.royalBlue,
                           onTap: onTap,
                         ),
-                        const SizedBox(width: 12),
                         _buildActionButton(
                           icon: onRestore != null
                               ? Icons.restore_rounded
@@ -247,8 +287,15 @@ class _ClinicalChecklistCard extends StatelessWidget {
                               : AppColors.success,
                           onTap: onEdit ?? onRestore ?? onTap,
                         ),
+                        if (hasAdminUpdate && onSyncAdminUpdate != null) ...[
+                          _buildActionButton(
+                            icon: Icons.system_update_alt_rounded,
+                            label: 'تحديث من الأدمن',
+                            color: AppColors.warning,
+                            onTap: onSyncAdminUpdate!,
+                          ),
+                        ],
                         if (onDelete != null) ...[
-                          const SizedBox(width: 12),
                           _buildActionButton(
                             icon: Icons.delete_rounded,
                             label: isStandard ? 'إخفاء القائمة' : 'حذف',

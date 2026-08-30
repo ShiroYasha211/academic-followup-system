@@ -235,8 +235,132 @@ Future<void> _run(
     if (context.mounted)
       _toast(context, result?.toString() ?? 'تم تنفيذ العملية.');
   } catch (error) {
-    if (context.mounted) _showError(context, error);
+    if (!context.mounted) return;
+    if (error is ApiException &&
+        await _maybeRequestAttendanceEdit(context, error)) {
+      return;
+    }
+    _showError(context, error);
   }
+}
+
+Future<bool> _maybeRequestAttendanceEdit(
+  BuildContext context,
+  ApiException error,
+) async {
+  if (error.statusCode != 403 ||
+      !error.message.contains('تعديل سجل الحضور مغلق')) {
+    return false;
+  }
+
+  final scope = _attendanceEditScope(error.errors);
+  final reasonController = TextEditingController();
+  var submitting = false;
+
+  final sent = await showDialog<bool>(
+    context: context,
+    barrierDismissible: !submitting,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setDialogState) {
+        Future<void> submit() async {
+          final reason = reasonController.text.trim();
+          if (reason.length < 5 || submitting) return;
+          setDialogState(() => submitting = true);
+          try {
+            final message = await ProviderScope.containerOf(dialogContext)
+                .read(delegateRepositoryProvider)
+                .requestAttendanceEdit({...scope, 'reason': reason});
+            if (!dialogContext.mounted) return;
+            Navigator.pop(dialogContext, true);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(message),
+                backgroundColor: AppColors.success,
+              ),
+            );
+          } on ApiException catch (requestError) {
+            if (!dialogContext.mounted) return;
+            setDialogState(() => submitting = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(requestError.message),
+                backgroundColor: AppColors.danger,
+              ),
+            );
+          }
+        }
+
+        return AlertDialog(
+          title: const Text('تعديل الحضور مغلق'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(error.message),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                minLines: 3,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  labelText: 'سبب طلب فتح التعديل',
+                  hintText: 'اكتب سبب التعديل المطلوب...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: submitting
+                  ? null
+                  : () => Navigator.pop(dialogContext, false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: submitting ? null : submit,
+              child: submitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('إرسال الطلب'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+
+  reasonController.dispose();
+  return sent == true;
+}
+
+Map<String, dynamic> _attendanceEditScope(Object? errors) {
+  if (errors is Map<String, dynamic>) {
+    return {
+      if (errors['attendance_id'] != null)
+        'attendance_id': errors['attendance_id'],
+      if (errors['subject_id'] != null) 'subject_id': errors['subject_id'],
+      if (errors['lecture_id'] != null) 'lecture_id': errors['lecture_id'],
+      if (errors['qr_attendance_session_id'] != null)
+        'qr_attendance_session_id': errors['qr_attendance_session_id'],
+      if (errors['date'] != null) 'date': errors['date'],
+    };
+  }
+  if (errors is Map) {
+    return {
+      if (errors['attendance_id'] != null)
+        'attendance_id': errors['attendance_id'],
+      if (errors['subject_id'] != null) 'subject_id': errors['subject_id'],
+      if (errors['lecture_id'] != null) 'lecture_id': errors['lecture_id'],
+      if (errors['qr_attendance_session_id'] != null)
+        'qr_attendance_session_id': errors['qr_attendance_session_id'],
+      if (errors['date'] != null) 'date': errors['date'],
+    };
+  }
+  return const {};
 }
 
 // Chat widgets

@@ -13,13 +13,18 @@ class FlashcardLocalStore {
 
   Future<FlashcardLocalState> load() async {
     final file = await _file();
-    if (!await file.exists()) return const FlashcardLocalState();
+    if (!await file.exists()) {
+      return _withPersistedOneLineSchedule(const FlashcardLocalState());
+    }
     try {
       final decoded = jsonDecode(await file.readAsString());
-      if (decoded is! Map<String, dynamic>) return const FlashcardLocalState();
-      return FlashcardLocalState.fromJson(decoded);
+      if (decoded is! Map<String, dynamic>) {
+        return _withPersistedOneLineSchedule(const FlashcardLocalState());
+      }
+      final state = FlashcardLocalState.fromJson(decoded);
+      return _withPersistedOneLineSchedule(state);
     } catch (_) {
-      return const FlashcardLocalState();
+      return _withPersistedOneLineSchedule(const FlashcardLocalState());
     }
   }
 
@@ -197,6 +202,38 @@ class FlashcardLocalStore {
     return _markOffline(data);
   }
 
+  Future<void> cacheOneLineNotifications(Map<String, dynamic> data) async {
+    final state = await load();
+    await save(state.copyWith(oneLineNotifications: _offlineSnapshot(data)));
+  }
+
+  Future<Map<String, dynamic>?> loadOneLineNotifications() async {
+    final data = (await load()).oneLineNotifications;
+    if (data == null) return null;
+    return _markOffline(data);
+  }
+
+  Future<void> saveOneLineScheduleState({
+    required String date,
+    required String signature,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    await _saveOneLineScheduleSnapshot(
+      date: date,
+      signature: signature,
+      items: items,
+    );
+    final state = await load();
+    await save(
+      state.copyWith(
+        oneLineScheduleDate: date,
+        oneLineScheduleSignature: signature,
+        oneLineScheduleSyncedAt: DateTime.now().toUtc().toIso8601String(),
+        oneLineScheduledItems: items,
+      ),
+    );
+  }
+
   Future<void> cacheUpcoming(Map<String, dynamic> data) async {
     final state = await load();
     await save(state.copyWith(upcoming: _offlineSnapshot(data)));
@@ -292,6 +329,52 @@ class FlashcardLocalStore {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/moeen_flashcards/state.json');
   }
+
+  Future<File> _oneLineScheduleFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/moeen_flashcards/one_line_schedule.json');
+  }
+
+  Future<void> _saveOneLineScheduleSnapshot({
+    required String date,
+    required String signature,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final file = await _oneLineScheduleFile();
+    await file.parent.create(recursive: true);
+    await file.writeAsString(
+      jsonEncode({
+        'date': date,
+        'signature': signature,
+        'synced_at': DateTime.now().toUtc().toIso8601String(),
+        'items': items,
+      }),
+      flush: true,
+    );
+  }
+
+  Future<FlashcardLocalState> _withPersistedOneLineSchedule(
+    FlashcardLocalState state,
+  ) async {
+    final file = await _oneLineScheduleFile();
+    if (!await file.exists()) return state;
+    try {
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! Map<String, dynamic>) return state;
+      final date = decoded['date']?.toString();
+      final signature = decoded['signature']?.toString();
+      final items = _mapList(decoded['items']);
+      if (date == null || signature == null) return state;
+      return state.copyWith(
+        oneLineScheduleDate: date,
+        oneLineScheduleSignature: signature,
+        oneLineScheduleSyncedAt: decoded['synced_at']?.toString(),
+        oneLineScheduledItems: items,
+      );
+    } catch (_) {
+      return state;
+    }
+  }
 }
 
 class FlashcardLocalState {
@@ -299,11 +382,16 @@ class FlashcardLocalState {
     this.pendingProgress = const [],
     this.home,
     this.dailyQueue,
+    this.oneLineNotifications,
     this.upcoming,
     this.history,
     this.difficulty,
     this.analytics,
     this.settings,
+    this.oneLineScheduleDate,
+    this.oneLineScheduleSignature,
+    this.oneLineScheduleSyncedAt,
+    this.oneLineScheduledItems = const [],
     this.packDetails = const {},
     this.packReviews = const {},
     this.smartReviewEnabled = true,
@@ -323,11 +411,16 @@ class FlashcardLocalState {
   final List<Map<String, dynamic>> pendingProgress;
   final Map<String, dynamic>? home;
   final Map<String, dynamic>? dailyQueue;
+  final Map<String, dynamic>? oneLineNotifications;
   final Map<String, dynamic>? upcoming;
   final Map<String, dynamic>? history;
   final Map<String, dynamic>? difficulty;
   final Map<String, dynamic>? analytics;
   final Map<String, dynamic>? settings;
+  final String? oneLineScheduleDate;
+  final String? oneLineScheduleSignature;
+  final String? oneLineScheduleSyncedAt;
+  final List<Map<String, dynamic>> oneLineScheduledItems;
   final Map<String, Map<String, dynamic>> packDetails;
   final Map<String, Map<String, dynamic>> packReviews;
   final bool smartReviewEnabled;
@@ -348,11 +441,16 @@ class FlashcardLocalState {
       pendingProgress: _mapList(json['pending_progress']),
       home: _mapOrNull(json['home']),
       dailyQueue: _mapOrNull(json['daily_queue']),
+      oneLineNotifications: _mapOrNull(json['one_line_notifications']),
       upcoming: _mapOrNull(json['upcoming']),
       history: _mapOrNull(json['history']),
       difficulty: _mapOrNull(json['difficulty']),
       analytics: _mapOrNull(json['analytics']),
       settings: _mapOrNull(json['settings']),
+      oneLineScheduleDate: json['one_line_schedule_date']?.toString(),
+      oneLineScheduleSignature: json['one_line_schedule_signature']?.toString(),
+      oneLineScheduleSyncedAt: json['one_line_schedule_synced_at']?.toString(),
+      oneLineScheduledItems: _mapList(json['one_line_scheduled_items']),
       packDetails: _nestedMap(json['pack_details']),
       packReviews: _nestedMap(json['pack_reviews']),
       smartReviewEnabled: json['smart_review_enabled'] != false,
@@ -382,11 +480,16 @@ class FlashcardLocalState {
     List<Map<String, dynamic>>? pendingProgress,
     Map<String, dynamic>? home,
     Map<String, dynamic>? dailyQueue,
+    Map<String, dynamic>? oneLineNotifications,
     Map<String, dynamic>? upcoming,
     Map<String, dynamic>? history,
     Map<String, dynamic>? difficulty,
     Map<String, dynamic>? analytics,
     Map<String, dynamic>? settings,
+    String? oneLineScheduleDate,
+    String? oneLineScheduleSignature,
+    String? oneLineScheduleSyncedAt,
+    List<Map<String, dynamic>>? oneLineScheduledItems,
     Map<String, Map<String, dynamic>>? packDetails,
     Map<String, Map<String, dynamic>>? packReviews,
     bool? smartReviewEnabled,
@@ -409,11 +512,19 @@ class FlashcardLocalState {
       pendingProgress: pendingProgress ?? this.pendingProgress,
       home: home ?? this.home,
       dailyQueue: dailyQueue ?? this.dailyQueue,
+      oneLineNotifications: oneLineNotifications ?? this.oneLineNotifications,
       upcoming: upcoming ?? this.upcoming,
       history: history ?? this.history,
       difficulty: difficulty ?? this.difficulty,
       analytics: analytics ?? this.analytics,
       settings: settings ?? this.settings,
+      oneLineScheduleDate: oneLineScheduleDate ?? this.oneLineScheduleDate,
+      oneLineScheduleSignature:
+          oneLineScheduleSignature ?? this.oneLineScheduleSignature,
+      oneLineScheduleSyncedAt:
+          oneLineScheduleSyncedAt ?? this.oneLineScheduleSyncedAt,
+      oneLineScheduledItems:
+          oneLineScheduledItems ?? this.oneLineScheduledItems,
       packDetails: packDetails ?? this.packDetails,
       packReviews: packReviews ?? this.packReviews,
       smartReviewEnabled: smartReviewEnabled ?? this.smartReviewEnabled,
@@ -449,11 +560,20 @@ class FlashcardLocalState {
       'pending_progress': pendingProgress,
       if (home != null) 'home': home,
       if (dailyQueue != null) 'daily_queue': dailyQueue,
+      if (oneLineNotifications != null)
+        'one_line_notifications': oneLineNotifications,
       if (upcoming != null) 'upcoming': upcoming,
       if (history != null) 'history': history,
       if (difficulty != null) 'difficulty': difficulty,
       if (analytics != null) 'analytics': analytics,
       if (settings != null) 'settings': settings,
+      if (oneLineScheduleDate != null)
+        'one_line_schedule_date': oneLineScheduleDate,
+      if (oneLineScheduleSignature != null)
+        'one_line_schedule_signature': oneLineScheduleSignature,
+      if (oneLineScheduleSyncedAt != null)
+        'one_line_schedule_synced_at': oneLineScheduleSyncedAt,
+      'one_line_scheduled_items': oneLineScheduledItems,
       'pack_details': packDetails,
       'pack_reviews': packReviews,
       'smart_review_enabled': smartReviewEnabled,

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../core/config/app_variant.dart';
 
 class StatusMessage extends StatelessWidget {
   const StatusMessage({
@@ -24,7 +24,7 @@ class StatusMessage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 54, color: AppColors.royalBlue),
+            Icon(icon, size: 54, color: StaffBrandColors.primary),
             const SizedBox(height: 14),
             Text(title, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),

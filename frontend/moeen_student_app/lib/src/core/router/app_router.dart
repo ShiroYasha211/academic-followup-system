@@ -13,6 +13,7 @@ import '../../features/home/presentation/home_placeholder_screen.dart';
 import '../../features/practical_delegate/presentation/practical_delegate_screens.dart'
     hide asMap;
 import '../../features/student/presentation/student_dashboard_screen.dart';
+import '../../features/student/presentation/student_card_generation_screen.dart';
 import '../../features/student/presentation/student_content_screens.dart'
     hide asMap;
 import '../../features/student/presentation/student_ledger_screen.dart';
@@ -78,6 +79,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const StudentLedgerScreen(),
       ),
       GoRoute(
+        path: StudentCardGenerationScreen.route,
+        builder: (context, state) => const StudentCardGenerationScreen(),
+      ),
+      GoRoute(
         path: StudentSupportScreen.route,
         builder: (context, state) => const StudentSupportScreen(),
       ),
@@ -124,6 +129,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: StudentQuizzesScreen.route,
         builder: (context, state) => const StudentQuizzesScreen(),
+      ),
+      GoRoute(
+        path: '/student/quizzes/:id/prepare',
+        builder: (context, state) => StudentQuizPrepareScreen(
+          quizId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+          quizData: state.extra as Map<String, dynamic>?,
+        ),
       ),
       GoRoute(
         path: '/student/quizzes/:id/take',
@@ -466,7 +478,5 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 bool _requiresPrimaryStudentDevice(String path) {
   return path == StudentQrScanScreen.route ||
       path == StudentQuizzesScreen.route ||
-      path.startsWith('/student/quizzes/') ||
-      path == StudentFlashcardsScreen.route ||
-      path.startsWith('/student/flashcards');
+      path.startsWith('/student/quizzes/');
 }

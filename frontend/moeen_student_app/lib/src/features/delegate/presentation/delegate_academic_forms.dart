@@ -151,10 +151,16 @@ Future<void> _scheduleSheet(
 
   var subjectId = number(item, 'subject_id').toInt();
   var doctorId = number(item, 'doctor_id').toInt();
-  var day = number(item, 'day', fallback: 1).toInt();
-  final start = TextEditingController(text: text(item, 'start_time'));
-  final end = TextEditingController(text: text(item, 'end_time'));
-  final hall = TextEditingController(text: text(item, 'hall'));
+  var day = number(item, 'day_of_week', fallback: 1).toInt();
+  final initialStart = text(item, 'start_time');
+  final initialEnd = text(item, 'end_time');
+  final start = TextEditingController(
+    text: initialStart.isEmpty ? '' : timeOnly24h(initialStart),
+  );
+  final end = TextEditingController(
+    text: initialEnd.isEmpty ? '' : timeOnly24h(initialEnd),
+  );
+  final hall = TextEditingController(text: text(item, 'hall_name'));
 
   await _formSheet(
     context,
@@ -223,8 +229,9 @@ Future<void> _scheduleSheet(
                   labelText: 'بداية المحاضرة',
                   prefixIcon: Icon(Icons.schedule_rounded),
                 ),
-                validator: (v) =>
-                    (v == null || v.isEmpty) ? 'يرجى اختيار وقت البدء' : null,
+                validator: (v) => timeMinutes(v ?? '') == null
+                    ? 'يرجى اختيار وقت بدء صحيح'
+                    : null,
               ),
             ),
             const SizedBox(width: 12),
@@ -246,9 +253,17 @@ Future<void> _scheduleSheet(
                   labelText: 'نهاية المحاضرة',
                   prefixIcon: Icon(Icons.update_rounded),
                 ),
-                validator: (v) => (v == null || v.isEmpty)
-                    ? 'يرجى اختيار وقت الانتهاء'
-                    : null,
+                validator: (v) {
+                  final startMinutes = timeMinutes(start.text);
+                  final endMinutes = timeMinutes(v ?? '');
+                  if (endMinutes == null) {
+                    return 'يرجى اختيار وقت انتهاء صحيح';
+                  }
+                  if (startMinutes != null && endMinutes <= startMinutes) {
+                    return 'يجب أن يكون وقت الانتهاء بعد وقت البدء';
+                  }
+                  return null;
+                },
               ),
             ),
           ],
@@ -264,17 +279,35 @@ Future<void> _scheduleSheet(
             (v == null || v.isEmpty) ? 'يرجى إدخال اسم القاعة' : null,
       ),
     ],
-    onSave: () => repo.saveSchedule(
-      id: item == null ? null : number(item, 'id').toInt(),
-      data: {
-        'subject_id': subjectId,
-        'doctor_id': doctorId == 0 ? null : doctorId,
-        'day': day,
-        'start_time': start.text.trim(),
-        'end_time': end.text.trim(),
-        'hall': hall.text.trim(),
-      },
-    ),
+    onSave: () {
+      Map<String, dynamic>? selectedSubject;
+      for (final subject in subjects) {
+        final subjectMap = asMap(subject);
+        if (number(subjectMap, 'id').toInt() == subjectId) {
+          selectedSubject = subjectMap;
+          break;
+        }
+      }
+      final subjectDoctorId = number(
+        selectedSubject,
+        'doctor_id',
+        fallback: number(asMap(selectedSubject?['doctor']), 'id'),
+      ).toInt();
+
+      return repo.saveSchedule(
+        id: item == null ? null : number(item, 'id').toInt(),
+        data: {
+          'subject_id': subjectId,
+          'doctor_id': doctorId == 0
+              ? (subjectDoctorId == 0 ? null : subjectDoctorId)
+              : doctorId,
+          'day_of_week': day,
+          'start_time': timeOnly24h(start.text.trim()),
+          'end_time': timeOnly24h(end.text.trim()),
+          'hall_name': hall.text.trim(),
+        },
+      );
+    },
     after: () => ref.invalidate(_delegateSchedulesProvider),
   );
 }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/app_variant.dart';
 import '../../../core/network/device_not_authorized_exception.dart';
 import '../../../core/notifications/push_notification_service.dart';
 import '../../../core/router/landing_route.dart';
@@ -153,10 +154,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   TextButton(
                     onPressed: () => context.push(RegisterScreen.route),
-                    child: const Text(
+                    child: Text(
                       'إنشاء حساب',
                       style: TextStyle(
-                        color: AppColors.primary,
+                        color: StudentBrandColors.primary,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -167,7 +168,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Center(
                 child: TextButton.icon(
                   onPressed: () => _showSupportDialog(context, ref),
-                  icon: const Icon(Icons.help_outline_rounded, size: 18, color: AppColors.slate400),
+                  icon: const Icon(
+                    Icons.help_outline_rounded,
+                    size: 18,
+                    color: AppColors.slate400,
+                  ),
                   label: const Text(
                     'تواجه مشكلة في تسجيل الدخول؟ تواصل مع الدعم',
                     style: TextStyle(
@@ -218,13 +223,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                AppColors.primary.withValues(alpha: 0.05),
-                                AppColors.primary.withValues(alpha: 0.01),
+                                StudentBrandColors.primary.withValues(
+                                  alpha: 0.05,
+                                ),
+                                StudentBrandColors.primary.withValues(
+                                  alpha: 0.01,
+                                ),
                               ],
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                             ),
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(36)),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(36),
+                            ),
                           ),
                           padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
                           child: Column(
@@ -250,16 +261,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         decoration: BoxDecoration(
                                           color: Colors.white,
                                           shape: BoxShape.circle,
-                                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.15), width: 2),
+                                          border: Border.all(
+                                            color: StudentBrandColors.primary
+                                                .withValues(alpha: 0.15),
+                                            width: 2,
+                                          ),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: AppColors.primary.withValues(alpha: 0.08),
+                                              color: StudentBrandColors.primary
+                                                  .withValues(alpha: 0.08),
                                               blurRadius: 10,
                                               offset: const Offset(0, 4),
                                             ),
                                           ],
                                         ),
-                                        child: const Icon(Icons.support_agent_rounded, color: AppColors.primary, size: 30),
+                                        child: Icon(
+                                          Icons.support_agent_rounded,
+                                          color: StudentBrandColors.primary,
+                                          size: 30,
+                                        ),
                                       ),
                                       Container(
                                         width: 14,
@@ -267,10 +287,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         decoration: BoxDecoration(
                                           color: AppColors.success,
                                           shape: BoxShape.circle,
-                                          border: Border.all(color: Colors.white, width: 2),
+                                          border: Border.all(
+                                            color: Colors.white,
+                                            width: 2,
+                                          ),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: AppColors.success.withValues(alpha: 0.4),
+                                              color: AppColors.success
+                                                  .withValues(alpha: 0.4),
                                               blurRadius: 6,
                                               spreadRadius: 1,
                                             ),
@@ -282,18 +306,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: AppColors.success.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(12),
+                                            color: AppColors.success.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
                                           child: const Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Icon(Icons.circle, color: AppColors.success, size: 6),
+                                              Icon(
+                                                Icons.circle,
+                                                color: AppColors.success,
+                                                size: 6,
+                                              ),
                                               SizedBox(width: 6),
                                               Text(
                                                 'الدعم متاح ومتصل الآن',
@@ -338,10 +374,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           padding: const EdgeInsets.all(24),
                           child: settingsAsync.when(
                             data: (data) {
-                              final phone = data['support_phone']?.toString() ?? '+967 777 000 111';
-                              final whatsapp = data['support_whatsapp']?.toString() ?? '+967 777 000 222';
-                              final email = data['support_email']?.toString() ?? 'support@moeen.tech';
-                              final workHours = data['support_work_hours']?.toString() ?? 'السبت - الخميس | 8:00 ص - 2:00 م';
+                              final phone =
+                                  data['support_phone']?.toString() ??
+                                  '+967 777 000 111';
+                              final whatsapp =
+                                  data['support_whatsapp']?.toString() ??
+                                  '+967 777 000 222';
+                              final email =
+                                  data['support_email']?.toString() ??
+                                  'support@moeen.tech';
+                              final workHours =
+                                  data['support_work_hours']?.toString() ??
+                                  'السبت - الخميس | 8:00 ص - 2:00 م';
                               final notice = data['support_notice']?.toString();
 
                               return Column(
@@ -353,21 +397,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     color: const Color(0xFF25D366),
                                     title: 'واتساب الدعم',
                                     value: whatsapp,
-                                    subtitle: 'للاستفسارات العاجلة والمشاكل التقنية',
+                                    subtitle:
+                                        'للاستفسارات العاجلة والمشاكل التقنية',
                                     actionLabel: 'مراسلة',
-                                    onTap: () => _launchWhatsApp(context, whatsapp),
-                                    onCopy: () => _copyText(context, whatsapp, 'رقم الواتساب'),
+                                    onTap: () =>
+                                        _launchWhatsApp(context, whatsapp),
+                                    onCopy: () => _copyText(
+                                      context,
+                                      whatsapp,
+                                      'رقم الواتساب',
+                                    ),
                                   ),
                                   _buildSupportCard(
                                     context: context,
-                                    iconWidget: const Icon(Icons.phone_in_talk_rounded, color: AppColors.primary, size: 22),
-                                    color: AppColors.primary,
+                                    iconWidget: Icon(
+                                      Icons.phone_in_talk_rounded,
+                                      color: StudentBrandColors.primary,
+                                      size: 22,
+                                    ),
+                                    color: StudentBrandColors.primary,
                                     title: 'الهاتف المباشر',
                                     value: phone,
-                                    subtitle: 'للاتصال والتواصل الهاتفي المباشر',
+                                    subtitle:
+                                        'للاتصال والتواصل الهاتفي المباشر',
                                     actionLabel: 'اتصال',
-                                    onTap: () => _launchURL(context, 'tel:${phone.replaceAll(RegExp(r'[\s]'), '')}'),
-                                    onCopy: () => _copyText(context, phone, 'رقم الهاتف'),
+                                    onTap: () => _launchURL(
+                                      context,
+                                      'tel:${phone.replaceAll(RegExp(r'[\s]'), '')}',
+                                    ),
+                                    onCopy: () =>
+                                        _copyText(context, phone, 'رقم الهاتف'),
                                   ),
                                   _buildSupportCard(
                                     context: context,
@@ -375,18 +434,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     color: const Color(0xFFEA4335),
                                     title: 'البريد الإلكتروني',
                                     value: email,
-                                    subtitle: 'للمراسلات الرسمية وتفعيل الحسابات',
+                                    subtitle:
+                                        'للمراسلات الرسمية وتفعيل الحسابات',
                                     actionLabel: 'راسلنا',
                                     onTap: () => _launchEmail(context, email),
-                                    onCopy: () => _copyText(context, email, 'البريد الإلكتروني'),
+                                    onCopy: () => _copyText(
+                                      context,
+                                      email,
+                                      'البريد الإلكتروني',
+                                    ),
                                   ),
                                   const SizedBox(height: 16),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: AppColors.ghostWhite,
                                       borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: AppColors.slate100),
+                                      border: Border.all(
+                                        color: AppColors.slate100,
+                                      ),
                                     ),
                                     child: Row(
                                       children: [
@@ -396,12 +465,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                             color: AppColors.slate100,
                                             shape: BoxShape.circle,
                                           ),
-                                          child: const Icon(Icons.access_time_rounded, size: 16, color: AppColors.slate600),
+                                          child: const Icon(
+                                            Icons.access_time_rounded,
+                                            size: 16,
+                                            color: AppColors.slate600,
+                                          ),
                                         ),
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               const Text(
                                                 'ساعات العمل والدعم الفني',
@@ -426,23 +500,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       ],
                                     ),
                                   ),
-                                  if (notice != null && notice.trim().isNotEmpty) ...[
+                                  if (notice != null &&
+                                      notice.trim().isNotEmpty) ...[
                                     const SizedBox(height: 12),
                                     Container(
                                       padding: const EdgeInsets.all(16),
                                       decoration: BoxDecoration(
-                                        color: AppColors.cream,
+                                        color: StudentBrandColors.background,
                                         borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.15), width: 1.5),
+                                        border: Border.all(
+                                          color: StudentBrandColors.primary
+                                              .withValues(alpha: 0.15),
+                                          width: 1.5,
+                                        ),
                                       ),
                                       child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          const Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 20),
+                                          Icon(
+                                            Icons.info_outline_rounded,
+                                            color: StudentBrandColors.primary,
+                                            size: 20,
+                                          ),
                                           const SizedBox(width: 12),
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 const Text(
                                                   'توجيهات الدعم الفني:',
@@ -472,30 +557,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ],
                               );
                             },
-                            loading: () => const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 48),
+                            loading: () => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 48),
                               child: Center(
-                                child: CircularProgressIndicator(color: AppColors.primary),
+                                child: CircularProgressIndicator(
+                                  color: StudentBrandColors.primary,
+                                ),
                               ),
                             ),
                             error: (error, stack) => Padding(
                               padding: const EdgeInsets.symmetric(vertical: 24),
                               child: Column(
                                 children: [
-                                  const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 48),
+                                  const Icon(
+                                    Icons.error_outline_rounded,
+                                    color: AppColors.danger,
+                                    size: 48,
+                                  ),
                                   const SizedBox(height: 12),
                                   const Text(
                                     'خطأ في تحميل قنوات الاتصال بالدعم الفني',
-                                    style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.midnight),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.midnight,
+                                    ),
                                   ),
                                   const SizedBox(height: 16),
                                   ElevatedButton(
-                                    onPressed: () => ref.invalidate(publicSupportSettingsProvider),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.primary,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    onPressed: () => ref.invalidate(
+                                      publicSupportSettingsProvider,
                                     ),
-                                    child: const Text('إعادة المحاولة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          StudentBrandColors.primary,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'إعادة المحاولة',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -515,7 +620,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 borderRadius: BorderRadius.circular(20),
                               ),
                             ),
-                            child: const Text('إغلاق', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                            child: const Text(
+                              'إغلاق',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -618,7 +729,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.copy_all_rounded, color: AppColors.slate400, size: 18),
+                        icon: const Icon(
+                          Icons.copy_all_rounded,
+                          color: AppColors.slate400,
+                          size: 18,
+                        ),
                         onPressed: onCopy,
                         style: IconButton.styleFrom(
                           backgroundColor: AppColors.slate50,
@@ -651,7 +766,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             content: const Text('تعذر فتح التطبيق الخاص بهذا الرابط.'),
             backgroundColor: AppColors.warning,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             margin: const EdgeInsets.all(18),
           ),
         );
@@ -663,7 +780,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final clean = number.replaceAll(RegExp(r'[+\s\-]'), '');
     final appUri = Uri.parse('whatsapp://send?phone=$clean');
     final webUri = Uri.parse('https://wa.me/$clean');
-    
+
     if (await canLaunchUrl(appUri)) {
       await launchUrl(appUri, mode: LaunchMode.externalApplication);
     } else if (await canLaunchUrl(webUri)) {
@@ -672,10 +789,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('تعذر فتح تطبيق واتساب. يرجى التأكد من تثبيته.'),
+            content: const Text(
+              'تعذر فتح تطبيق واتساب. يرجى التأكد من تثبيته.',
+            ),
             backgroundColor: AppColors.warning,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             margin: const EdgeInsets.all(18),
           ),
         );
@@ -694,7 +815,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             content: const Text('تعذر فتح تطبيق البريد الإلكتروني.'),
             backgroundColor: AppColors.warning,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             margin: const EdgeInsets.all(18),
           ),
         );
@@ -702,14 +825,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  Future<void> _copyText(BuildContext context, String text, String label) async {
+  Future<void> _copyText(
+    BuildContext context,
+    String text,
+    String label,
+  ) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+            const Icon(
+              Icons.check_circle_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
             const SizedBox(width: 12),
             Text('تم نسخ $label بنجاح'),
           ],
@@ -733,9 +864,7 @@ class WhatsAppIcon extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(
-        painter: _WhatsAppPainter(),
-      ),
+      child: CustomPaint(painter: _WhatsAppPainter()),
     );
   }
 }
@@ -746,8 +875,12 @@ class _WhatsAppPainter extends CustomPainter {
     final paintGreen = Paint()
       ..color = const Color(0xFF25D366)
       ..style = PaintingStyle.fill;
-    
-    canvas.drawCircle(Offset(size.width / 2, size.height / 2), size.width / 2, paintGreen);
+
+    canvas.drawCircle(
+      Offset(size.width / 2, size.height / 2),
+      size.width / 2,
+      paintGreen,
+    );
 
     final paintWhite = Paint()
       ..color = Colors.white
@@ -766,10 +899,7 @@ class _WhatsAppPainter extends CustomPainter {
       center.dx + radius * -0.866,
       center.dy + radius * 0.5,
     );
-    final tailTip = Offset(
-      center.dx - radius * 1.1,
-      center.dy + radius * 1.1,
-    );
+    final tailTip = Offset(center.dx - radius * 1.1, center.dy + radius * 1.1);
 
     final tailPath = Path()
       ..moveTo(tailRoot1.dx, tailRoot1.dy)
@@ -791,12 +921,12 @@ class _WhatsAppPainter extends CustomPainter {
       ),
     );
     textPainter.layout();
-    
+
     final textOffset = Offset(
       (size.width - textPainter.width) / 2 - (size.width * 0.02),
       (size.height - textPainter.height) / 2 - (size.width * 0.02),
     );
-    
+
     canvas.save();
     canvas.translate(size.width / 2, size.height / 2);
     canvas.rotate(-0.15);
@@ -818,9 +948,7 @@ class GmailIcon extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(
-        painter: _GmailPainter(),
-      ),
+      child: CustomPaint(painter: _GmailPainter()),
     );
   }
 }
@@ -836,7 +964,7 @@ class _GmailPainter extends CustomPainter {
     final paintWhite = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
-    
+
     final rect = RRect.fromRectAndRadius(
       Rect.fromLTWH(w * 0.1, h * 0.25, w * 0.8, h * 0.5),
       Radius.circular(w * 0.08),
@@ -858,24 +986,24 @@ class _GmailPainter extends CustomPainter {
       ..lineTo(w * 0.88, h * 0.7);
 
     canvas.drawPath(path, paintRed);
-    
+
     final paintShade = Paint()
       ..color = const Color(0xFFF5F5F5)
       ..style = PaintingStyle.fill;
-    
+
     final foldTriangle = Path()
       ..moveTo(w * 0.15, h * 0.3)
       ..lineTo(w * 0.5, h * 0.52)
       ..lineTo(w * 0.85, h * 0.3)
       ..close();
-    
+
     canvas.drawPath(foldTriangle, paintShade);
 
     final topFold = Path()
       ..moveTo(w * 0.12, h * 0.28)
       ..lineTo(w * 0.5, h * 0.52)
       ..lineTo(w * 0.88, h * 0.28);
-      
+
     canvas.drawPath(topFold, paintRed);
   }
 

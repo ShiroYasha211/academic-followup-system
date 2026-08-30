@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../core/config/app_variant.dart';
 
 abstract final class MoeenBrandAssets {
-  static const full = 'assets/brand/logo.jpeg';
-  static const mark = 'assets/brand/logo.jpeg';
-  static const icon = 'assets/brand/logo.jpeg';
+  static String get full => StaffAppBrand.logoAsset;
+  static String get mark => StaffAppBrand.logoAsset;
+  static String get icon => StaffAppBrand.logoAsset;
 }
 
 class MoeenLogo extends StatelessWidget {
@@ -45,7 +45,7 @@ class MoeenLogo extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.contain,
-          errorBuilder: (_, _, _) => _FallbackLogo(size: size),
+          errorBuilder: (_, _, _) => _DashboardLogoMark(size: size),
         ),
       ),
     );
@@ -53,8 +53,9 @@ class MoeenLogo extends StatelessWidget {
     if (compact) {
       return Row(
         mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment:
-            centered ? MainAxisAlignment.center : MainAxisAlignment.start,
+        mainAxisAlignment: centered
+            ? MainAxisAlignment.center
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           logoWidget,
@@ -64,9 +65,9 @@ class MoeenLogo extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'معين',
+                StaffAppBrand.displayName,
                 style: TextStyle(
-                  color: onDark ? Colors.white : AppColors.royalBlueDark,
+                  color: onDark ? Colors.white : StaffBrandColors.primaryDark,
                   fontWeight: FontWeight.w900,
                   fontSize: 15.5,
                   fontFamily: 'Cairo',
@@ -75,11 +76,11 @@ class MoeenLogo extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'المنصة التعليمية',
+                StaffAppBrand.compactTagline,
                 style: TextStyle(
                   color: onDark
                       ? Colors.white.withValues(alpha: 0.7)
-                      : AppColors.slate500,
+                      : StaffBrandColors.textSecondary,
                   fontWeight: FontWeight.w700,
                   fontSize: 9.5,
                   fontFamily: 'Cairo',
@@ -94,15 +95,16 @@ class MoeenLogo extends StatelessWidget {
 
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment:
-          centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: centered
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         logoWidget,
         const SizedBox(height: 14),
         Text(
-          'معين',
+          StaffAppBrand.displayName,
           style: TextStyle(
-            color: onDark ? Colors.white : AppColors.royalBlueDark,
+            color: onDark ? Colors.white : StaffBrandColors.primaryDark,
             fontWeight: FontWeight.w900,
             fontSize: 22,
             fontFamily: 'Cairo',
@@ -111,12 +113,12 @@ class MoeenLogo extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'منصتك التعليمية في مكان واحد',
+          StaffAppBrand.tagline,
           textAlign: centered ? TextAlign.center : TextAlign.start,
           style: TextStyle(
             color: onDark
                 ? Colors.white.withValues(alpha: 0.82)
-                : AppColors.slate700,
+                : StaffBrandColors.textSecondary,
             fontWeight: FontWeight.w800,
             fontSize: 12,
             fontFamily: 'Cairo',
@@ -128,8 +130,9 @@ class MoeenLogo extends StatelessWidget {
   }
 }
 
-class _FallbackLogo extends StatelessWidget {
-  const _FallbackLogo({required this.size});
+class _DashboardLogoMark extends StatelessWidget {
+  const _DashboardLogoMark({required this.size});
+
   final double size;
 
   @override
@@ -137,13 +140,11 @@ class _FallbackLogo extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: const BoxDecoration(
-        gradient: AppColors.goldGradient,
-      ),
+      decoration: BoxDecoration(gradient: StaffBrandColors.accentGradient),
       child: Center(
         child: Icon(
-          Icons.favorite_rounded,
-          color: AppColors.royalBlue,
+          Icons.school_rounded,
+          color: Colors.white,
           size: size * 0.55,
         ),
       ),

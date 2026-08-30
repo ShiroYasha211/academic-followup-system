@@ -21,13 +21,17 @@ final staffAccountRepositoryProvider = Provider<StaffAccountRepository>((ref) {
 
 final staffDashboardProvider = FutureProvider.autoDispose
     .family<StaffDashboardData, StaffWorkspace>((ref, workspace) {
-      ref.watch(staffRefreshCoordinatorProvider.select((state) => state.version));
+      ref.watch(
+        staffRefreshCoordinatorProvider.select((state) => state.version),
+      );
       return _dashboardWithOfflineFallback(ref, workspace);
     });
 
 final staffProfileProvider = FutureProvider.autoDispose
     .family<StaffProfile, StaffWorkspace>((ref, workspace) {
-      ref.watch(staffRefreshCoordinatorProvider.select((state) => state.version));
+      ref.watch(
+        staffRefreshCoordinatorProvider.select((state) => state.version),
+      );
       return ref.watch(staffAccountRepositoryProvider).profile(workspace);
     });
 
@@ -160,6 +164,7 @@ class StaffAdministrativeSettingsController
     required int excusesDeadlineDays,
     required String excuseReceiver,
     required int qrRotationSeconds,
+    required int doctorInitialStarBalance,
   }) async {
     final message = await _guard(
       () => ref
@@ -169,6 +174,7 @@ class StaffAdministrativeSettingsController
             excusesDeadlineDays: excusesDeadlineDays,
             excuseReceiver: excuseReceiver,
             qrRotationSeconds: qrRotationSeconds,
+            doctorInitialStarBalance: doctorInitialStarBalance,
           ),
     );
     state = const AsyncLoading();

@@ -195,20 +195,22 @@ class StudentNotificationsScreen extends ConsumerWidget {
 
 String? _routeForNotification(Map<String, dynamic> item) {
   final data = asMap(item['data']);
-  final target = (text(data, 'target_screen').isNotEmpty
-          ? text(data, 'target_screen')
-          : text(data, 'screen'))
-      .trim();
+  final target =
+      (text(data, 'target_screen').isNotEmpty
+              ? text(data, 'target_screen')
+              : text(data, 'screen'))
+          .trim();
   final type = text(item, 'type');
   final key = target.isNotEmpty ? target : type;
 
   final scheduleItemId = text(data, 'schedule_item_id').isNotEmpty
       ? text(data, 'schedule_item_id')
       : (text(data, 'study_item_id').isNotEmpty
-          ? text(data, 'study_item_id')
-          : text(data, 'item_id'));
+            ? text(data, 'study_item_id')
+            : text(data, 'item_id'));
 
-  if ((key == 'study_session' || key == 'study_reminder') && scheduleItemId.isNotEmpty) {
+  if ((key == 'study_session' || key == 'study_reminder') &&
+      scheduleItemId.isNotEmpty) {
     return '/student/study-center/$scheduleItemId/session';
   }
 
@@ -230,13 +232,17 @@ String? _routeForNotification(Map<String, dynamic> item) {
   }
 
   final packId = text(data, 'pack_id');
-  if ((key == 'flashcard_assignment' || key == 'flashcard_review' || key == 'flashcards') && packId.isNotEmpty) {
+  if ((key == 'flashcard_assignment' ||
+          key == 'flashcard_review' ||
+          key == 'flashcards') &&
+      packId.isNotEmpty) {
     return '/student/flashcards/$packId';
   }
 
   final subjectId = text(data, 'subject_id');
   if (subjectId.isNotEmpty) {
     if (key == 'attendance' ||
+        key == 'attendance_confirmation' ||
         key == 'absence_warning' ||
         key == 'lecture_report' ||
         key == 'excuse') {
@@ -245,18 +251,27 @@ String? _routeForNotification(Map<String, dynamic> item) {
   }
 
   return switch (key) {
-    'study_center' || 'study' || 'study_reminder' => StudentStudyCenterScreen.route,
+    'study_center' ||
+    'study' ||
+    'study_reminder' => StudentStudyCenterScreen.route,
     'quizzes' || 'quiz' => StudentQuizzesScreen.route,
     'assignments' || 'assignment' => StudentAssignmentsScreen.route,
     'schedule' || 'schedules' => StudentScheduleScreen.route,
     'reminders' || 'reminder' => StudentRemindersScreen.route,
     'resources' || 'resource' => StudentResourcesScreen.route,
     'library' => StudentLibraryScreen.route,
-    'authorized_grades' || 'grade_delegation' => StudentAuthorizedGradesScreen.route,
+    'authorized_grades' ||
+    'grade_delegation' => StudentAuthorizedGradesScreen.route,
     'stars' || 'star' || 'tree_farm' => StudentStarsScreen.route,
-    'inquiries' || 'inquiry' || 'doctor_inquiry' => StudentInquiriesScreen.route,
+    'inquiries' ||
+    'inquiry' ||
+    'doctor_inquiry' => StudentInquiriesScreen.route,
     'messages' || 'message' => StudentMessagesScreen.route,
-    'news' || 'news_hub' || 'announcement' || 'alert' || 'absence_warning' => StudentNewsScreen.route,
+    'news' ||
+    'news_hub' ||
+    'announcement' ||
+    'alert' ||
+    'absence_warning' => StudentNewsScreen.route,
     'rare_case' || 'rare_cases' => StudentClinicalRareCasesScreen.route,
     'clinical_assignment' => StudentClinicalAssignmentsScreen.route,
     'clinical' => StudentClinicalScreen.route,
@@ -397,17 +412,32 @@ class _NotificationCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (subjectName.isNotEmpty)
-              _NotificationInfoRow(label: 'المادة', value: subjectName, icon: Icons.book_rounded),
+              _NotificationInfoRow(
+                label: 'المادة',
+                value: subjectName,
+                icon: Icons.book_rounded,
+              ),
             if (dueDate.isNotEmpty)
-              _NotificationInfoRow(label: 'تاريخ التسليم', value: dateOnly(dueDate), icon: Icons.event_rounded),
+              _NotificationInfoRow(
+                label: 'تاريخ التسليم',
+                value: dateOnly(dueDate),
+                icon: Icons.event_rounded,
+              ),
           ],
         ),
       );
-    } else if (type == 'attendance' || type == 'absence_warning' || type == 'lecture_report') {
+    } else if (type == 'attendance' ||
+        type == 'attendance_confirmation' ||
+        type == 'absence_warning' ||
+        type == 'lecture_report') {
       final subjectName = text(data, 'subject_name');
       final date = text(data, 'date');
       final count = text(data, 'absence_count');
-      ctaLabel = type == 'lecture_report' ? 'سجل المحاضرات 🗓️' : 'تفاصيل الغياب 🥀';
+      ctaLabel = type == 'lecture_report'
+          ? 'سجل المحاضرات 🗓️'
+          : type == 'attendance_confirmation'
+          ? 'تفاصيل الحضور'
+          : 'تفاصيل الغياب 🥀';
 
       detailsWidget = Container(
         margin: const EdgeInsets.only(top: 8),
@@ -421,11 +451,23 @@ class _NotificationCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (subjectName.isNotEmpty)
-              _NotificationInfoRow(label: 'المادة', value: subjectName, icon: Icons.school_rounded),
+              _NotificationInfoRow(
+                label: 'المادة',
+                value: subjectName,
+                icon: Icons.school_rounded,
+              ),
             if (date.isNotEmpty)
-              _NotificationInfoRow(label: 'التاريخ', value: dateOnly(date), icon: Icons.calendar_today_rounded),
+              _NotificationInfoRow(
+                label: 'التاريخ',
+                value: dateOnly(date),
+                icon: Icons.calendar_today_rounded,
+              ),
             if (count.isNotEmpty)
-              _NotificationInfoRow(label: 'عدد مرات الغياب', value: count, icon: Icons.warning_rounded),
+              _NotificationInfoRow(
+                label: 'عدد مرات الغياب',
+                value: count,
+                icon: Icons.warning_rounded,
+              ),
           ],
         ),
       );
@@ -435,8 +477,12 @@ class _NotificationCard extends StatelessWidget {
       final status = text(data, 'status');
       ctaLabel = 'عرض رصيد النجوم ⭐';
 
-      String statusText = status == 'approved' ? 'مقبول 🎉' : (status == 'rejected' ? 'مرفوض ❌' : 'قيد الانتظار ⏳');
-      Color statusColor = status == 'approved' ? AppColors.success : (status == 'rejected' ? AppColors.danger : AppColors.warning);
+      String statusText = status == 'approved'
+          ? 'مقبول 🎉'
+          : (status == 'rejected' ? 'مرفوض ❌' : 'قيد الانتظار ⏳');
+      Color statusColor = status == 'approved'
+          ? AppColors.success
+          : (status == 'rejected' ? AppColors.danger : AppColors.warning);
 
       detailsWidget = Container(
         margin: const EdgeInsets.only(top: 8),
@@ -598,10 +644,15 @@ class _NotificationCard extends StatelessWidget {
                                 visualDensity: VisualDensity.compact,
                                 foregroundColor: color,
                               ),
-                              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                              icon: const Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 16,
+                              ),
                               label: Text(
                                 ctaLabel,
-                                style: const TextStyle(fontWeight: FontWeight.w900),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
                             )
                           else
@@ -824,4 +875,3 @@ class _NotificationInfoRow extends StatelessWidget {
     );
   }
 }
-

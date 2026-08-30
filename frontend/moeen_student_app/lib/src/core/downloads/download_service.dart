@@ -261,6 +261,55 @@ class DownloadService {
     }
   }
 
+  static Future<String?> saveBytesToMoeenFolder({
+    required List<int> bytes,
+    required String fileName,
+    required String section,
+    bool openAfterSave = false,
+  }) async {
+    if (bytes.isEmpty) {
+      throw const ApiException('الملف المستلم فارغ.');
+    }
+
+    await initialize();
+    final safeName = _safeFileName(fileName);
+    final id = Random().nextInt(2147480000);
+
+    try {
+      final dir = await _moeenSectionDirectory(section);
+      final file = await _uniqueFile(dir, safeName);
+
+      _activeDownloads.add(id);
+      _eventController.add(
+        DownloadEvent(type: DownloadEventType.started, fileName: safeName),
+      );
+      await _showProgress(id, safeName, null);
+      await file.writeAsBytes(bytes, flush: true);
+
+      _activeDownloads.remove(id);
+      await _showCompleted(id, safeName);
+      _eventController.add(
+        DownloadEvent(type: DownloadEventType.completed, fileName: safeName),
+      );
+
+      if (openAfterSave) {
+        try {
+          await OpenFilex.open(file.path);
+        } catch (_) {
+          // Saving succeeded; a compatible viewer may not be installed.
+        }
+      }
+      return file.path;
+    } catch (_) {
+      _activeDownloads.remove(id);
+      await _showFailed(id, safeName);
+      _eventController.add(
+        DownloadEvent(type: DownloadEventType.failed, fileName: safeName),
+      );
+      throw const ApiException('تعذر حفظ الملف في مجلد تحميلات معين.');
+    }
+  }
+
   static Future<String?> findMoeenFile({
     required String fileName,
     required String section,

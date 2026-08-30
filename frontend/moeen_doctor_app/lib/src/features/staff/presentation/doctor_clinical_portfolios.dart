@@ -110,7 +110,7 @@ class _DoctorClinicalPortfolioDetailsScreenState
 
           final partialLogs = logs.where((l) {
             final s = _docText(_docMap(l)['status'], 'pending');
-            return s == 'pending' || s == 'submitted_for_review';
+            return s == 'pending' || s == 'submitted_for_review' || s == 'partially_confirmed';
           }).toList();
 
           final rejectedLogs = logs.where((l) {
@@ -1145,7 +1145,18 @@ class _TimelineEntry extends StatelessWidget {
                                 activity['body_system'],
                                 '-',
                               );
-                              final chipColor = _activityColor(typeLabel);
+                              final reviewStatus = _docText(activity['review_status'], 'approved');
+                              final statusSuffix = switch (reviewStatus) {
+                                'rejected' => ' (مرفوض)',
+                                'pending' => ' (معلق)',
+                                _ => '',
+                              };
+                              final baseColor = _activityColor(typeLabel);
+                              final chipColor = switch (reviewStatus) {
+                                'rejected' => AppColors.danger,
+                                'pending' => AppColors.warning,
+                                _ => baseColor,
+                              };
                               return Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 9,
@@ -1159,7 +1170,7 @@ class _TimelineEntry extends StatelessWidget {
                                   ),
                                 ),
                                 child: Text(
-                                  '$typeLabel: $bodySystem',
+                                  '$typeLabel: $bodySystem$statusSuffix',
                                   style: TextStyle(
                                     fontFamily: 'Cairo',
                                     fontWeight: FontWeight.w700,

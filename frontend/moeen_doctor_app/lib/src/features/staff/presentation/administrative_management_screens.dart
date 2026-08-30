@@ -704,6 +704,7 @@ class _AdministrativeManagementScreenState
         return _DoctorCard(
           item: item,
           onDetails: () => _showDoctorDetails(item),
+          onManageStars: () => _openDoctorStarWallet(item),
           onEdit: () => _openForm(item: item),
           onDelete: () => _confirmDelete(item),
         );
@@ -733,7 +734,28 @@ class _AdministrativeManagementScreenState
       title: 'تفاصيل الدكتور',
       icon: Icons.school_rounded,
       color: AppColors.royalBlue,
-      child: _DoctorDetailsSheet(item: item),
+      child: _DoctorDetailsSheet(
+        item: item,
+        onManageStars: () {
+          Navigator.of(context).pop();
+          _openDoctorStarWallet(item);
+        },
+      ),
+    );
+  }
+
+  Future<void> _openDoctorStarWallet(Map<String, dynamic> item) {
+    return showMoeenBottomSheet<void>(
+      context: context,
+      title: 'إدارة رصيد منح النجوم',
+      icon: Icons.stars_rounded,
+      color: AppColors.goldDeep,
+      fullScreen: true,
+      child: _DoctorStarWalletSheet(
+        doctor: item,
+        repository: ref.read(_adminRepositoryProvider),
+        onUpdated: _load,
+      ),
     );
   }
 
@@ -3014,12 +3036,14 @@ class _DoctorCard extends StatelessWidget {
   const _DoctorCard({
     required this.item,
     required this.onDetails,
+    required this.onManageStars,
     required this.onEdit,
     required this.onDelete,
   });
 
   final Map<String, dynamic> item;
   final VoidCallback onDetails;
+  final VoidCallback onManageStars;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -3028,6 +3052,8 @@ class _DoctorCard extends StatelessWidget {
     final name = (item['name'] ?? '').toString();
     final email = (item['email'] ?? '').toString();
     final subjects = _list(item['subjects']);
+    final wallet = _map(item['doctor_star_wallet'] ?? item['doctorStarWallet']);
+    final walletBalance = _int(wallet['balance']);
 
     return InkWell(
       onTap: onDetails,
@@ -3110,11 +3136,34 @@ class _DoctorCard extends StatelessWidget {
                     onSelected: (value) {
                       if (value == 'edit') {
                         onEdit();
+                      } else if (value == 'stars') {
+                        onManageStars();
                       } else if (value == 'delete') {
                         onDelete();
                       }
                     },
                     itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'stars',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.stars_rounded,
+                              size: 18,
+                              color: AppColors.goldDeep,
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              'إدارة رصيد النجوم',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const PopupMenuItem(
                         value: 'edit',
                         child: Row(
@@ -3169,6 +3218,11 @@ class _DoctorCard extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
+                  _buildDoctorPill(
+                    '$walletBalance نجمة متاحة',
+                    AppColors.goldDeep,
+                    icon: Icons.account_balance_wallet_rounded,
+                  ),
                   if (subjects.isEmpty)
                     _buildDoctorPill(
                       'لا يوجد مواد مسندة بعد',
@@ -3987,9 +4041,10 @@ class _StudentDetailsSheet extends StatelessWidget {
 }
 
 class _DoctorDetailsSheet extends StatelessWidget {
-  const _DoctorDetailsSheet({required this.item});
+  const _DoctorDetailsSheet({required this.item, required this.onManageStars});
 
   final Map<String, dynamic> item;
+  final VoidCallback onManageStars;
 
   String _initials(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));
@@ -4003,6 +4058,8 @@ class _DoctorDetailsSheet extends StatelessWidget {
     final name = (item['name'] ?? '-').toString();
     final email = (item['email'] ?? '').toString();
     final subjects = _list(item['subjects']);
+    final wallet = _map(item['doctor_star_wallet'] ?? item['doctorStarWallet']);
+    final walletBalance = _int(wallet['balance']);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4136,6 +4193,11 @@ class _DoctorDetailsSheet extends StatelessWidget {
                                   ? AppColors.slate400
                                   : AppColors.violet,
                             ),
+                            _SheetBadge(
+                              label: '$walletBalance نجمة متاحة',
+                              icon: Icons.stars_rounded,
+                              color: AppColors.goldDeep,
+                            ),
                           ],
                         ),
                       ],
@@ -4243,7 +4305,436 @@ class _DoctorDetailsSheet extends StatelessWidget {
                   );
                 }).toList(),
         ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: onManageStars,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.goldDeep,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 15),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          icon: const Icon(Icons.account_balance_wallet_rounded),
+          label: const Text(
+            'إدارة رصيد منح النجوم',
+            style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w900),
+          ),
+        ),
       ],
+    );
+  }
+}
+
+class _DoctorStarWalletSheet extends StatefulWidget {
+  const _DoctorStarWalletSheet({
+    required this.doctor,
+    required this.repository,
+    required this.onUpdated,
+  });
+
+  final Map<String, dynamic> doctor;
+  final StaffRepository repository;
+  final Future<void> Function() onUpdated;
+
+  @override
+  State<_DoctorStarWalletSheet> createState() => _DoctorStarWalletSheetState();
+}
+
+class _DoctorStarWalletSheetState extends State<_DoctorStarWalletSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _amount = TextEditingController();
+  final _reason = TextEditingController();
+  Map<String, dynamic>? _data;
+  Object? _error;
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    _reason.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+    try {
+      final response = await widget.repository.get(
+        '/administrative/doctors/${widget.doctor['id']}/star-wallet',
+      );
+      if (!mounted) return;
+      setState(() => _data = _map(response['data']));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      final response = await widget.repository.post(
+        '/administrative/doctors/${widget.doctor['id']}/star-wallet/top-up',
+        {
+          'amount': int.parse(_amount.text.trim()),
+          'reason': _reason.text.trim(),
+        },
+      );
+      _amount.clear();
+      _reason.clear();
+      await _load();
+      await widget.onUpdated();
+      if (!mounted) return;
+      await showMoeenInfoDialog(
+        context: context,
+        title: 'تمت إضافة الرصيد',
+        message: (response['message'] ?? 'تم تحديث رصيد الدكتور بنجاح.')
+            .toString(),
+        icon: Icons.check_circle_rounded,
+        color: AppColors.success,
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      await showMoeenInfoDialog(
+        context: context,
+        title: 'تعذرت إضافة الرصيد',
+        message: error.message,
+        icon: Icons.error_rounded,
+        color: AppColors.danger,
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const SizedBox(
+        height: 280,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null) {
+      return SizedBox(
+        height: 280,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: AppColors.danger,
+                size: 36,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'تعذر تحميل محفظة النجوم.',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _load,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final wallet = _map(_data?['wallet']);
+    final transactions = _list(_data?['transactions']);
+    final doctorName = (widget.doctor['name'] ?? 'الدكتور').toString();
+
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D1B3E),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  doctorName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Cairo',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _DoctorWalletMetric(
+                        label: 'المتاح',
+                        value: _int(wallet['balance']),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _DoctorWalletMetric(
+                        label: 'المخصص',
+                        value: _int(wallet['total_allocated']),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _DoctorWalletMetric(
+                        label: 'الممنوح',
+                        value: _int(wallet['total_spent']),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: _cardDecoration(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'إضافة رصيد جديد',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.midnight,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _amount,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'عدد النجوم',
+                    prefixIcon: Icon(Icons.stars_rounded),
+                  ),
+                  validator: (value) {
+                    final amount = int.tryParse((value ?? '').trim());
+                    if (amount == null || amount < 1) {
+                      return 'أدخل عددًا صحيحًا أكبر من صفر.';
+                    }
+                    if (amount > 1000000) {
+                      return 'الحد الأعلى للعملية 1000000 نجمة.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _reason,
+                  maxLength: 255,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'سبب إضافة الرصيد',
+                    prefixIcon: Icon(Icons.edit_note_rounded),
+                    alignLabelWithHint: true,
+                  ),
+                  validator: (value) => (value ?? '').trim().isEmpty
+                      ? 'سبب الإضافة مطلوب لأغراض التدقيق.'
+                      : null,
+                ),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed: _saving ? null : _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.goldDeep,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.add_rounded),
+                  label: const Text(
+                    'إضافة الرصيد',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'آخر حركات الرصيد',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              color: AppColors.midnight,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (transactions.isEmpty)
+            const _AdminEmptyDetailsNote(
+              icon: Icons.receipt_long_rounded,
+              message: 'لا توجد حركات مسجلة بعد.',
+            )
+          else
+            ...transactions.map((transaction) {
+              final amount = _int(transaction['amount']);
+              final performer = _map(transaction['performer']);
+              final createdAt = (transaction['created_at'] ?? '').toString();
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.slate100),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color:
+                            (amount >= 0
+                                    ? AppColors.success
+                                    : AppColors.goldDeep)
+                                .withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        amount >= 0
+                            ? Icons.add_rounded
+                            : Icons.arrow_outward_rounded,
+                        color: amount >= 0
+                            ? AppColors.success
+                            : AppColors.goldDeep,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            (transaction['description'] ?? 'حركة رصيد')
+                                .toString(),
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            [
+                              if ((performer['name'] ?? '')
+                                  .toString()
+                                  .isNotEmpty)
+                                performer['name'],
+                              if (createdAt.length >= 10)
+                                createdAt.substring(0, 10),
+                            ].join(' • '),
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 10.5,
+                              color: AppColors.slate500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '${amount >= 0 ? '+' : ''}$amount',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        color: amount >= 0
+                            ? AppColors.success
+                            : AppColors.danger,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+}
+
+class _DoctorWalletMetric extends StatelessWidget {
+  const _DoctorWalletMetric({required this.label, required this.value});
+
+  final String label;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          Text(
+            '$value',
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'Cairo',
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontFamily: 'Cairo',
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -501,7 +501,14 @@ class _AttendanceSessionCard extends ConsumerWidget {
     try { dateObj = DateTime.tryParse(dateRaw); } catch (_) {}
 
     final isUnofficial = boolValue(session, 'is_unofficial');
-    final displayName = text(session, 'display_name');
+
+    // Extract subject name and lecture title for Doctor-app parity
+    final subject = asMap(session['subject']);
+    final lecture = asMap(session['lecture']);
+    final subjectName = text(subject, 'name', fallback: text(session, 'display_name'));
+    final lectureTitle = text(lecture, 'title', fallback: 'محاضرة');
+    final totalRecords = number(session, 'total_records').toInt();
+    final dateLabel = dateObj != null ? intl.DateFormat('yMMMMEEEEd', 'ar').format(dateObj) : dateRaw;
 
     return InkWell(
       onTap: () => _showAttendanceReportSheet(context, ref, session),
@@ -535,11 +542,14 @@ class _AttendanceSessionCard extends ConsumerWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          displayName,
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                          subjectName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: AppColors.midnight),
                         ),
                       ),
-                      if (isUnofficial)
+                      if (isUnofficial) ...[
+                        const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
@@ -553,13 +563,18 @@ class _AttendanceSessionCard extends ConsumerWidget {
                               color: Colors.orange.shade800,
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
+                              fontFamily: 'Cairo',
                             ),
                           ),
                         ),
+                      ],
                     ],
                   ),
+                  const SizedBox(height: 4),
                   Text(
-                    '${dateObj != null ? intl.DateFormat('yMMMMEEEEd', 'ar').format(dateObj) : dateRaw} | ${value(session, 'total_records')} طالب',
+                    '$lectureTitle | $dateLabel | $totalRecords طالب',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.slate500,
                       fontSize: 11,
@@ -568,6 +583,30 @@ class _AttendanceSessionCard extends ConsumerWidget {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: () async {
+                final editSubject = subject.isEmpty
+                    ? {'id': 0, 'name': text(session, 'display_name')}
+                    : subject;
+                final lId = number(session, 'lecture_id').toInt();
+                final lectureId = lId > 0 ? lId : number(lecture, 'id').toInt();
+
+                await _attendanceSheet(
+                  context,
+                  ref,
+                  editSubject,
+                  date: dateRaw,
+                  lectureId: lectureId > 0 ? lectureId : null,
+                );
+              },
+              icon: const Icon(
+                Icons.edit_rounded,
+                color: AppColors.royalBlue,
+                size: 20,
+              ),
+              tooltip: 'تعديل السجل',
             ),
             const Icon(Icons.chevron_left_rounded, color: AppColors.slate300),
           ],

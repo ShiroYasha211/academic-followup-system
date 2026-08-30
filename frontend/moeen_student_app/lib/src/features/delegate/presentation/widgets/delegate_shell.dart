@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/config/app_variant.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/moeen_dialogs.dart';
@@ -90,13 +91,13 @@ class DelegateShell extends ConsumerWidget {
           message: 'هل تريد الخروج من تطبيق معين؟',
           confirmLabel: 'إغلاق',
           icon: Icons.power_settings_new_rounded,
-          color: AppColors.royalBlue,
+          color: StudentBrandColors.primary,
         );
         if (close) await SystemNavigator.pop();
       },
       child: Scaffold(
         extendBodyBehindAppBar: true,
-        backgroundColor: AppColors.cream,
+        backgroundColor: StudentBrandColors.background,
         appBar: _DelegateAppBar(
           title: title,
           session: session,
@@ -147,7 +148,7 @@ class _DelegateAppBar extends StatelessWidget implements PreferredSizeWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: AppColors.royalBlue.withValues(alpha: 0.1),
+                color: StudentBrandColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: IconButton(
@@ -165,7 +166,7 @@ class _DelegateAppBar extends StatelessWidget implements PreferredSizeWidget {
                   context.canPop()
                       ? Icons.arrow_back_rounded
                       : Icons.menu_rounded,
-                  color: AppColors.royalBlue,
+                  color: StudentBrandColors.primary,
                 ),
               ),
             ),
@@ -217,16 +218,16 @@ class _DelegateBadge extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 14),
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.gold, AppColors.goldDeep],
+        gradient: LinearGradient(
+          colors: [StudentBrandColors.accent, StudentBrandColors.accentDeep],
         ),
         borderRadius: BorderRadius.circular(10),
       ),
       alignment: Alignment.center,
-      child: const Text(
+      child: Text(
         'مندوب',
         style: TextStyle(
-          color: AppColors.royalBlueDark,
+          color: StudentBrandColors.primaryDark,
           fontWeight: FontWeight.w900,
           fontSize: 10,
         ),
@@ -271,7 +272,9 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
                   20,
                   24,
                 ),
-                decoration: BoxDecoration(gradient: AppColors.primaryGradient),
+                decoration: BoxDecoration(
+                  gradient: StudentBrandColors.primaryGradient,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -289,7 +292,9 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
                           child: const MoeenLogo(compact: true, onDark: true),
                         ),
                         const Spacer(),
-                        _SubscriptionBadge(isSubscribed: isSubscribed),
+                        if (StudentFeatureFlags
+                            .showDelegateSubscriptionAndBalance)
+                          _SubscriptionBadge(isSubscribed: isSubscribed),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -325,7 +330,7 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
                         label: 'الانتقال إلى حساب الطالب',
                         subtitle: 'عرض المقررات والدرجات ومركز الدراسة',
                         icon: Icons.school_rounded,
-                        color: AppColors.royalBlue,
+                        color: StudentBrandColors.primary,
                         onTap: () => _switchToStudent(context, ref),
                       ),
                       const SizedBox(height: 10),
@@ -426,20 +431,22 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
           DelegateRoutes.profile,
           false,
         ),
-        _DrawerItem(
-          'الاشتراك والرصيد',
-          Icons.workspace_premium_rounded,
-          18,
-          DelegateRoutes.subscription,
-          false,
-        ),
-        _DrawerItem(
-          'كشف الحساب',
-          Icons.receipt_long_rounded,
-          19,
-          DelegateRoutes.ledger,
-          false,
-        ),
+        if (StudentFeatureFlags.showDelegateSubscriptionAndBalance)
+          _DrawerItem(
+            'الاشتراك والرصيد',
+            Icons.workspace_premium_rounded,
+            18,
+            DelegateRoutes.subscription,
+            false,
+          ),
+        if (StudentFeatureFlags.showDelegateLedger)
+          _DrawerItem(
+            'كشف الحساب',
+            Icons.receipt_long_rounded,
+            19,
+            DelegateRoutes.ledger,
+            false,
+          ),
       ]),
       _DrawerGroup('إدارة الدفعة والمهام', [
         _DrawerItem(
@@ -594,7 +601,7 @@ class _DelegateDrawerState extends ConsumerState<_DelegateDrawer> {
           message: 'يجب الاشتراك للوصول إلى هذه الصفحة.',
           confirmLabel: 'الاشتراك الآن',
           icon: Icons.lock_rounded,
-          color: AppColors.goldDeep,
+          color: StudentBrandColors.accentDeep,
         );
         if (subscribe && mounted) {
           Navigator.pop(context);
@@ -649,7 +656,7 @@ class _WorkspaceSwitchTile extends StatelessWidget {
         gradient: LinearGradient(
           colors: [
             color.withValues(alpha: 0.12),
-            AppColors.gold.withValues(alpha: 0.12),
+            StudentBrandColors.accent.withValues(alpha: 0.12),
           ],
         ),
         borderRadius: BorderRadius.circular(18),
@@ -702,14 +709,14 @@ class _SubscriptionBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: isSubscribed
-            ? AppColors.gold.withValues(alpha: 0.22)
+            ? StudentBrandColors.accent.withValues(alpha: 0.22)
             : Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         isSubscribed ? 'مفعل' : 'أساسي',
         style: TextStyle(
-          color: isSubscribed ? AppColors.gold : Colors.white,
+          color: isSubscribed ? StudentBrandColors.accent : Colors.white,
           fontWeight: FontWeight.w900,
           fontSize: 11,
         ),
@@ -759,7 +766,7 @@ class _DrawerTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
         color: selected
-            ? AppColors.royalBlue.withValues(alpha: 0.08)
+            ? StudentBrandColors.primary.withValues(alpha: 0.08)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
       ),
@@ -768,12 +775,12 @@ class _DrawerTile extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         leading: Icon(
           item.icon,
-          color: selected ? AppColors.royalBlue : AppColors.slate500,
+          color: selected ? StudentBrandColors.primary : AppColors.slate500,
         ),
         title: Text(
           item.label,
           style: TextStyle(
-            color: selected ? AppColors.royalBlue : AppColors.midnight,
+            color: selected ? StudentBrandColors.primary : AppColors.midnight,
             fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
             fontSize: 14,
           ),

@@ -1,4 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../features/auth/data/auth_session.dart';
 
@@ -45,6 +46,17 @@ class SessionStorage {
   }
 
   Future<AuthSession?> read() async {
+    try {
+      return await _read();
+    } catch (error, stackTrace) {
+      debugPrint('Failed to read saved auth session: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      await _clearSessionKeysSafely();
+      return null;
+    }
+  }
+
+  Future<AuthSession?> _read() async {
     final token = await _storage.read(key: _tokenKey);
     final workspace = await _storage.read(key: _workspaceKey);
     final role = await _storage.read(key: _roleKey);
@@ -96,5 +108,14 @@ class SessionStorage {
       _storage.delete(key: _deviceTypeKey),
       _storage.delete(key: _isPrimaryDeviceKey),
     ]);
+  }
+
+  Future<void> _clearSessionKeysSafely() async {
+    try {
+      await clear();
+    } catch (error, stackTrace) {
+      debugPrint('Failed to clear corrupted auth session: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 }

@@ -9,6 +9,7 @@ import '../../../core/network/authenticated_api_client.dart';
 import '../../../core/offline/offline_cache_service.dart';
 import '../../../core/providers.dart';
 import 'models/financial_ledger.dart';
+import 'models/card_generation_models.dart';
 import 'models/student_dashboard.dart';
 import 'models/subscription_models.dart';
 
@@ -35,6 +36,12 @@ final ledgerRepositoryProvider = Provider<LedgerRepository>((ref) {
   );
 });
 
+final cardGenerationRepositoryProvider = Provider<CardGenerationRepository>((
+  ref,
+) {
+  return CardGenerationRepository(ref.watch(authenticatedApiClientProvider));
+});
+
 final studentContentRepositoryProvider = Provider<StudentContentRepository>((
   ref,
 ) {
@@ -44,9 +51,10 @@ final studentContentRepositoryProvider = Provider<StudentContentRepository>((
   );
 });
 
-final studentSupportSettingsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
-  return ref.watch(studentContentRepositoryProvider).fetchSupportSettings();
-});
+final studentSupportSettingsProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+      return ref.watch(studentContentRepositoryProvider).fetchSupportSettings();
+    });
 
 class StudentDashboardRepository {
   const StudentDashboardRepository(this._api, this._cache);
@@ -127,6 +135,28 @@ class LedgerRepository {
 
   Future<List<int>> exportPdf() {
     return _api.getBytes('/student/ledger/export');
+  }
+}
+
+class CardGenerationRepository {
+  const CardGenerationRepository(this._api);
+
+  final ApiClient _api;
+
+  Future<CardGenerationOverview> fetch({int page = 1}) async {
+    final response = await _api.get(
+      '/student/cards-generate',
+      queryParameters: {'page': page},
+    );
+    return CardGenerationOverview.fromJson(_data(response));
+  }
+
+  Future<String> generate({required int count, required double amount}) async {
+    final response = await _api.post(
+      '/student/cards-generate',
+      data: {'count': count, 'amount': amount},
+    );
+    return (response['message'] ?? 'تم توليد الكروت بنجاح.').toString();
   }
 }
 
@@ -377,11 +407,13 @@ class StudentContentRepository {
     );
   }
 
-  Future<Map<String, dynamic>> stars() async {
+  Future<Map<String, dynamic>> stars({int page = 1}) async {
     return _cachedMap(
       cache: _cache,
-      key: 'student.stars',
-      load: () async => _data(await _api.get('/student/stars')),
+      key: 'student.stars.$page',
+      load: () async => _data(
+        await _api.get('/student/stars', queryParameters: {'page': page}),
+      ),
     );
   }
 
@@ -414,6 +446,15 @@ class StudentContentRepository {
       cache: _cache,
       key: 'student.tree_farm',
       load: () async => _flexData(await _api.get('/student/tree-farm')),
+    );
+  }
+
+  Future<Map<String, dynamic>> publicTreeFarm() async {
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.tree_farm.public',
+      load: () async =>
+          _flexData(await _api.get('/student/tree-farm/public-farm')),
     );
   }
 
@@ -562,9 +603,7 @@ class StudentContentRepository {
     return (response['message'] ?? 'تم تسجيل التصويت بنجاح.').toString();
   }
 
-  Future<String> retractVoteNotification({
-    required int notificationId,
-  }) async {
+  Future<String> retractVoteNotification({required int notificationId}) async {
     final response = await _api.delete(
       '/student/notifications/$notificationId/vote',
     );
@@ -740,6 +779,15 @@ class StudentContentRepository {
     );
   }
 
+  Future<Map<String, dynamic>> flashcardOneLineNotifications() async {
+    return _cachedMap(
+      cache: _cache,
+      key: 'student.flashcard_one_line_notifications',
+      load: () async =>
+          _data(await _api.get('/student/flashcards/one-line-notifications')),
+    );
+  }
+
   Future<Map<String, dynamic>> flashcardStore({
     String? search,
     String? displayMode,
@@ -784,6 +832,39 @@ class StudentContentRepository {
       data: data,
     );
     return (response['message'] ?? 'تمت إضافة البطاقة بنجاح.').toString();
+  }
+
+  Future<Map<String, dynamic>> previewFlashcardImport({
+    required int packId,
+    required String filePath,
+    required String fileName,
+  }) async {
+    final form = FormData.fromMap({
+      'file': await MultipartFile.fromFile(filePath, filename: fileName),
+    });
+    final response = await _api.post(
+      '/student/flashcards/$packId/import-preview',
+      data: form,
+    );
+    return _data(response);
+  }
+
+  Future<List<int>> downloadFlashcardImportTemplate() {
+    return _api.getBytes('/student/flashcards/import-template');
+  }
+
+  Future<Map<String, dynamic>> confirmFlashcardImport({
+    required int packId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final response = await _api.post(
+      '/student/flashcards/$packId/import-confirm',
+      data: payload,
+    );
+    return {
+      ..._data(response),
+      'message': (response['message'] ?? 'تم استيراد الملف بنجاح.').toString(),
+    };
   }
 
   Future<String> deleteFlashcardItem(int itemId) async {
@@ -847,8 +928,10 @@ class StudentContentRepository {
     return (response['message'] ?? 'تم تحديث الحزمة بنجاح.').toString();
   }
 
-  Future<Map<String, dynamic>> updateFlashcardSettings(Map<String, dynamic> data) async {
-    final response = await _api.post('/student/flashcards/settings', data: data);
+  Future<Map<String, dynamic>> updateFlashcardSettings(
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _api.put('/student/flashcards/settings', data: data);
     return _data(response);
   }
 
@@ -862,7 +945,7 @@ class StudentContentRepository {
     String? subjectName,
   }) async {
     final response = await _api.post(
-      '/student/tree-farm/sessions',
+      '/student/tree-farm/log',
       data: {
         'farm_scope': farmScope,
         'focused_seconds': focusedSeconds,
@@ -940,6 +1023,12 @@ class StudentContentRepository {
       '/student/qr-attendance/scan',
       data: {'token': token},
     );
+    if (response['confirmed'] == false) {
+      throw ApiException(
+        (response['message'] ?? 'لم يتم تأكيد حضورك. حاول مسح الكود مرة أخرى.')
+            .toString(),
+      );
+    }
     return (response['message'] ?? 'تم تسجيل الحضور بنجاح.').toString();
   }
 
@@ -1204,7 +1293,8 @@ class StudentContentRepository {
         'reason': reason,
       },
     );
-    return (response['message'] ?? 'تم تقديم طلب استخدام جهاز فرعي بنجاح.').toString();
+    return (response['message'] ?? 'تم تقديم طلب استخدام جهاز فرعي بنجاح.')
+        .toString();
   }
 
   Future<Map<String, dynamic>> fetchSupportSettings() async {

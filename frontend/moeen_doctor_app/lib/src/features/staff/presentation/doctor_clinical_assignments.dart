@@ -256,9 +256,8 @@ class _AssignmentCasePreview extends StatelessWidget {
   }
 }
 
-/*
-class ClinicalAssignmentCard extends StatelessWidget {
-  const ClinicalAssignmentCard({
+class _ClinicalAssignmentCard extends StatelessWidget {
+  const _ClinicalAssignmentCard({
     required this.item,
     required this.onTap,
     this.onEdit,
@@ -563,8 +562,8 @@ class ClinicalAssignmentCard extends StatelessWidget {
   }
 }
 
-class ClinicalAssignmentDetails extends StatelessWidget {
-  const ClinicalAssignmentDetails({required this.item, this.onReview});
+class _ClinicalAssignmentDetails extends StatelessWidget {
+  const _ClinicalAssignmentDetails({required this.item, this.onReview});
 
   final _Json item;
   final VoidCallback? onReview;
@@ -1201,7 +1200,6 @@ String _assignmentAttemptStatusLabel(String status) {
     _ => 'بانتظار المراجعة',
   };
 }
-*/
 
 // ---------------------------------------------------------------------------
 // Assignment Attachment Preview – image preview with zoom, or file tile
@@ -2147,18 +2145,62 @@ extension _DoctorClinicalAssignmentActions
       return result;
     }
 
-    final results = await Future.wait([
-      ref
-          .read(staffRepositoryProvider)
-          .get(
-            '/doctor/clinical/cases',
-            query: const {'per_page': 200, 'include_assignment_summary': 1},
+    // إظهار حوار التحميل السريع لمنع تجميد الواجهة
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
           ),
-      ref
-          .read(staffRepositoryProvider)
-          .get('/doctor/clinical/evaluations/start-data'),
-    ]);
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(strokeWidth: 3),
+              SizedBox(width: 16),
+              Text(
+                'جاري تحميل البيانات...',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.midnight,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    List<dynamic> results;
+    try {
+      results = await Future.wait([
+        ref
+            .read(staffRepositoryProvider)
+            .get(
+              '/doctor/clinical/cases',
+              query: const {'per_page': 200, 'include_assignment_summary': 1},
+            ),
+        ref
+            .read(staffRepositoryProvider)
+            .get('/doctor/clinical/evaluations/start-data'),
+      ]);
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // إغلاق حوار التحميل
+        await _docErrorDialog(context, e);
+      }
+      return;
+    }
+
     if (!mounted) return;
+    Navigator.pop(context); // إغلاق حوار التحميل
+
     final cases = _clinicalPagedItems(results[0]);
     final startData = _docMap(_docData(results[1]));
     final students = _docList(startData['students']);

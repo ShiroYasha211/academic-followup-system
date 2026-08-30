@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/app_variant.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/moeen_dialogs.dart';
 import '../../auth/logic/auth_controller.dart';
 import '../data/models/student_dashboard.dart';
+import '../data/student_repositories.dart';
 import '../logic/student_controllers.dart';
 import 'student_content_screens.dart';
 import 'student_support_screen.dart';
+import 'student_subscription_screen.dart';
 import 'widgets/student_shell.dart';
 import 'widgets/student_widgets.dart';
 
@@ -35,7 +38,7 @@ class StudentDashboardScreen extends ConsumerWidget {
           onRefresh: () async =>
               ref.invalidate(studentDashboardControllerProvider),
           displacement: 20,
-          color: AppColors.primary,
+          color: StudentBrandColors.primary,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 32),
@@ -81,63 +84,126 @@ class _WelcomeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bannerColors = [
+      AppColors.royalBlue,
+      AppColors.royalBlueDark,
+      const Color(0xFF1E3A8A),
+    ];
+    final bannerBaseColor = AppColors.royalBlue;
+    final badgeIconColor = AppColors.gold;
+
     return Container(
-      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AppColors.royalBlue,
-            AppColors.royalBlueDark,
-            const Color(0xFF1E3A8A),
-          ],
+          colors: bannerColors,
         ),
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: AppColors.royalBlue.withValues(alpha: 0.3),
+            color: bannerBaseColor.withValues(alpha: 0.3),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),
         ],
       ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            left: -20,
-            bottom: -30,
-            child: Icon(
-              Icons.auto_awesome_rounded,
-              size: 140,
-              color: Colors.white.withValues(alpha: 0.05),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: Stack(
+          children: [
+            Positioned(
+              left: -40,
+              top: -40,
+              child: Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.03),
+                ),
+              ),
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+            Positioned(
+              right: -20,
+              bottom: -50,
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: bannerBaseColor.withValues(alpha: 0.15),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${_getGreeting()}،',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${_getGreeting()}،',
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                color: Color(0xFF94A3B8),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              studentName,
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          studentName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.stars_rounded,
+                          color: badgeIconColor,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'أنت تبلي بلاءً حسناً اليوم! حافظ على نشاطك.',
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ],
@@ -145,89 +211,103 @@ class _WelcomeBanner extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.05),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.stars_rounded,
-                      color: AppColors.gold,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'أنت تبلي بلاءً حسناً اليوم! حافظ على نشاطك.',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _QuickQrAttendanceCard extends StatelessWidget {
+class _QuickQrAttendanceCard extends ConsumerWidget {
   const _QuickQrAttendanceCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final subscription = ref.watch(subscriptionControllerProvider).valueOrNull;
+    final supportSettings =
+        ref.watch(studentSupportSettingsProvider).valueOrNull ??
+        const <String, dynamic>{};
+    final qrScanFreeEnabled = _studentDashboardBoolSetting(
+      supportSettings['student_qr_scan_free_enabled'],
+      fallback: true,
+    );
+    final canOpen = qrScanFreeEnabled || subscription?.isSubscribed == true;
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F766E).withValues(alpha: 0.15),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: const Color(0xFF0D9488).withValues(alpha: 0.25),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
+        border: Border.all(
+          color: const Color(0xFF2DD4BF).withValues(alpha: 0.3),
+          width: 1.5,
+        ),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(26),
         child: Material(
-          color: const Color(0xFF0F766E),
+          color: Colors.transparent,
           child: InkWell(
-            onTap: () => context.go(StudentQrScanScreen.route),
+            onTap: () async {
+              if (canOpen) {
+                context.go(StudentQrScanScreen.route);
+                return;
+              }
+              final subscribe = await showMoeenConfirmDialog(
+                context: context,
+                title: 'هذه الميزة تحتاج اشتراك',
+                message:
+                    'تصوير QR الحضور غير مفتوح مجانًا حاليًا. اشترك للوصول إلى هذه الميزة.',
+                confirmLabel: 'الاشتراك الآن',
+                icon: Icons.lock_rounded,
+                color: StudentBrandColors.accentDeep,
+              );
+              if (subscribe && context.mounted) {
+                context.go(StudentSubscriptionScreen.route);
+              }
+            },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              decoration: BoxDecoration(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [const Color(0xFF0F766E), const Color(0xFF14B8A6)],
+                  colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
                 ),
               ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: const Icon(
-                      Icons.qr_code_scanner_rounded,
-                      color: Color(0xFF0F766E),
-                      size: 28,
-                    ),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.qr_code_scanner_rounded,
+                          color: Color(0xFF0F766E),
+                          size: 24,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -237,32 +317,53 @@ class _QuickQrAttendanceCard extends StatelessWidget {
                         const Text(
                           'تسجيل حضور سريع',
                           style: TextStyle(
+                            fontFamily: 'Cairo',
                             color: Colors.white,
-                            fontSize: 17,
+                            fontSize: 16,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
                         Text(
                           'اضغط لمسح رمز الـ QR في القاعة',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Cairo',
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.chevron_left_rounded,
-                      color: Colors.white,
-                    ),
+                  Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.chevron_left_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                      Positioned(
+                        top: -2,
+                        right: -2,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -274,6 +375,16 @@ class _QuickQrAttendanceCard extends StatelessWidget {
   }
 }
 
+bool _studentDashboardBoolSetting(dynamic value, {bool fallback = false}) {
+  if (value == null) return fallback;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  final normalized = value.toString().trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].contains(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].contains(normalized)) return false;
+  return fallback;
+}
+
 class _StatsGrid extends StatelessWidget {
   const _StatsGrid({required this.overview});
 
@@ -281,115 +392,110 @@ class _StatsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stats = [
-      _StatData(
-        'المواد المسجلة',
-        overview.registeredSubjectsCount.toString(),
-        Icons.auto_stories_rounded,
-        AppColors.royalBlue,
-      ),
-      _StatData(
-        'التكليفات النشطة',
-        overview.activeAssignmentsCount.toString(),
-        Icons.task_alt_rounded,
-        AppColors.success,
-      ),
-      _StatData(
-        'أيام الغياب',
-        overview.totalAbsencesDays.toString(),
-        Icons.event_busy_rounded,
-        AppColors.danger,
-      ),
-      _StatData(
-        'المسار السريري',
-        overview.hasClinical ? 'مفعل' : 'مغلق',
-        Icons.medical_information_rounded,
-        AppColors.info,
-      ),
-    ];
+    final registered = _StatData(
+      'المقررات المسجلة',
+      overview.registeredSubjectsCount.toString(),
+      Icons.auto_stories_rounded,
+      StudentBrandColors.primary,
+    );
+    final assignments = _StatData(
+      'التكليفات النشطة',
+      overview.activeAssignmentsCount.toString(),
+      Icons.task_alt_rounded,
+      AppColors.success,
+    );
+    final absences = _StatData(
+      'أيام الغياب',
+      overview.totalAbsencesDays.toString(),
+      Icons.event_busy_rounded,
+      AppColors.danger,
+    );
+    final clinical = _StatData(
+      'المسار السريري',
+      overview.hasClinical ? 'مفعل' : 'مغلق',
+      Icons.medical_information_rounded,
+      AppColors.info,
+    );
 
-    return GridView.builder(
-      itemCount: stats.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 1.1,
-      ),
-      itemBuilder: (context, index) {
-        final stat = stats[index];
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.slate100),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 15,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: Stack(
+    Widget buildBentoCard(_StatData stat, {required double flex}) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.015),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Positioned(
-                  right: -10,
-                  top: -10,
-                  child: Icon(
-                    stat.icon,
-                    size: 60,
-                    color: stat.color.withValues(alpha: 0.05),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: stat.color.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(stat.icon, color: stat.color, size: 20),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  stat.value,
+                  style: TextStyle(
+                    color: AppColors.midnight,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: 'Cairo',
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: stat.color.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(stat.icon, color: stat.color, size: 20),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            stat.value,
-                            style: TextStyle(
-                              color: AppColors.midnight,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                          Text(
-                            stat.label,
-                            style: const TextStyle(
-                              color: AppColors.slate500,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                Text(
+                  stat.label,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    color: AppColors.slate500,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(flex: 3, child: buildBentoCard(registered, flex: 3)),
+            const SizedBox(width: 14),
+            Expanded(flex: 2, child: buildBentoCard(assignments, flex: 2)),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(flex: 2, child: buildBentoCard(absences, flex: 2)),
+            const SizedBox(width: 14),
+            Expanded(flex: 3, child: buildBentoCard(clinical, flex: 3)),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -403,133 +509,176 @@ class _NextExamCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF991B1B), // dark red
+            Color(0xFFDC2626), // red-600
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.danger.withValues(alpha: 0.2),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
+            color: const Color(0xFFDC2626).withValues(alpha: 0.25),
+            blurRadius: 25,
+            offset: const Offset(0, 10),
           ),
         ],
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.15),
+          width: 1.5,
+        ),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(32),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [const Color(0xFF991B1B), AppColors.danger],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      child: Stack(
+        children: [
+          Positioned(
+            left: -30,
+            top: -30,
+            child: Icon(
+              Icons.alarm_rounded,
+              size: 130,
+              color: Colors.white.withValues(alpha: 0.05),
             ),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
+          Padding(
+            padding: const EdgeInsets.all(22),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.1),
+                          ),
+                        ),
+                        child: const Text(
+                          '🚨 الاختبار القادم',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Text(
-                        'الاختبار القادم',
-                        style: TextStyle(
+                      const SizedBox(height: 12),
+                      Text(
+                        exam.subjectName,
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
                           color: Colors.white,
-                          fontSize: 10,
+                          fontSize: 20,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      exam.subjectName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 6,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                color: Colors.white.withValues(alpha: 0.7),
+                                size: 13,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                exam.examDate,
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.location_on_rounded,
+                                color: Colors.white.withValues(alpha: 0.7),
+                                size: 13,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                exam.location ?? 'القاعة الكبرى',
+                                style: TextStyle(
+                                  fontFamily: 'Cairo',
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_today_rounded,
-                          color: Colors.white.withValues(alpha: 0.7),
-                          size: 14,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          exam.examDate,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Icon(
-                          Icons.location_on_rounded,
-                          color: Colors.white.withValues(alpha: 0.7),
-                          size: 14,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          exam.location ?? 'القاعة الكبرى',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 16,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    ],
                   ),
                 ),
-                child: Column(
-                  children: [
-                    Text(
-                      exam.isToday ? 'اليوم' : exam.daysRemaining.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                      ),
+                const SizedBox(width: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.15),
                     ),
-                    Text(
-                      exam.isToday ? 'استعد' : 'أيام',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        exam.isToday ? 'اليوم' : exam.daysRemaining.toString(),
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          height: 1.1,
+                        ),
+                      ),
+                      Text(
+                        exam.isToday ? 'استعد' : 'أيام متبقية',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -555,6 +704,7 @@ class _AlertsSection extends StatelessWidget {
           child: Text(
             'تنبيهات هامة',
             style: TextStyle(
+              fontFamily: 'Cairo',
               fontSize: 18,
               fontWeight: FontWeight.w900,
               color: AppColors.midnight,
@@ -633,6 +783,7 @@ class _AlertTile extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
+                    fontFamily: 'Cairo',
                     color: color,
                     fontWeight: FontWeight.w900,
                     fontSize: 15,
@@ -642,6 +793,7 @@ class _AlertTile extends StatelessWidget {
                 Text(
                   message,
                   style: TextStyle(
+                    fontFamily: 'Cairo',
                     color: AppColors.slate600,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -669,6 +821,7 @@ class _AlertTile extends StatelessWidget {
                       label: Text(
                         actionLabel!,
                         style: const TextStyle(
+                          fontFamily: 'Cairo',
                           fontSize: 12,
                           fontWeight: FontWeight.w900,
                         ),
@@ -693,13 +846,7 @@ class _QuickActions extends StatelessWidget {
         'المقررات',
         Icons.auto_stories_rounded,
         StudentSubjectsScreen.route,
-        AppColors.royalBlue,
-      ),
-      _ActionData(
-        'الحضور',
-        Icons.fact_check_rounded,
-        'attendance',
-        AppColors.success,
+        StudentBrandColors.primary,
       ),
       _ActionData(
         'الأخبار',
@@ -729,6 +876,7 @@ class _QuickActions extends StatelessWidget {
           child: Text(
             'اختصارات سريعة',
             style: TextStyle(
+              fontFamily: 'Cairo',
               fontSize: 18,
               fontWeight: FontWeight.w900,
               color: AppColors.midnight,
@@ -742,45 +890,66 @@ class _QuickActions extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 0.9,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: 0.95,
           ),
           itemBuilder: (context, index) {
             final action = actions[index];
-            return Material(
-              color: Colors.transparent,
-              child: InkWell(
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
-                onTap: () => context.go(action.key),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: AppColors.slate100),
+                border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.012),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: action.color.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(24),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(24),
+                  onTap: () => context.go(action.key),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 8,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: action.color.withValues(alpha: 0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            action.icon,
+                            color: action.color,
+                            size: 24,
+                          ),
                         ),
-                        child: Icon(action.icon, color: action.color, size: 24),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        action.label,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 11,
-                          color: AppColors.midnight,
+                        const SizedBox(height: 10),
+                        Text(
+                          action.label,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                            color: AppColors.midnight,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -806,7 +975,7 @@ class _FeedSection extends StatelessWidget {
         _FeedCategory(
           title: 'التذكيرات',
           icon: Icons.notifications_active_rounded,
-          color: AppColors.royalBlue,
+          color: StudentBrandColors.primary,
           items: feed.reminders.map((e) => (e.title, e.description)).toList(),
         ),
       ],
@@ -838,6 +1007,7 @@ class _AnnouncementsPreview extends StatelessWidget {
                 child: Text(
                   'آخر الإعلانات',
                   style: TextStyle(
+                    fontFamily: 'Cairo',
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                     color: AppColors.midnight,
@@ -847,7 +1017,13 @@ class _AnnouncementsPreview extends StatelessWidget {
               TextButton.icon(
                 onPressed: () => context.go(StudentNewsScreen.route),
                 icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                label: const Text('رؤية المزيد'),
+                label: const Text(
+                  'رؤية المزيد',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
             ],
           ),
@@ -869,58 +1045,158 @@ class _DashboardAnnouncementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dateStr = item.createdAt.isNotEmpty ? dateOnly(item.createdAt) : '';
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.orange.withValues(alpha: 0.12)),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: AppColors.midnight.withValues(alpha: 0.03),
-            blurRadius: 14,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.015),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: ListTile(
-        onTap: () => _showDashboardAnnouncementDetails(context, item),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        leading: Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: AppColors.orange.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(Icons.campaign_rounded, color: AppColors.orange),
-        ),
-        title: Text(
-          item.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: AppColors.midnight,
-            fontWeight: FontWeight.w900,
-            fontSize: 14,
-          ),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            item.content,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.slate500,
-              fontWeight: FontWeight.w600,
-              height: 1.35,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _showDashboardAnnouncementDetails(context, item),
+            child: Container(
+              decoration: BoxDecoration(
+                border: BorderDirectional(
+                  start: BorderSide(
+                    color: AppColors.orange.withValues(alpha: 0.8),
+                    width: 4.5,
+                  ),
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 18, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.orange.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.campaign_rounded,
+                              color: AppColors.orange,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'إعلان إداري',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                color: AppColors.orange,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (dateStr.isNotEmpty)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.schedule_rounded,
+                              color: AppColors.slate400,
+                              size: 13,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              dateStr,
+                              style: const TextStyle(
+                                fontFamily: 'Cairo',
+                                color: AppColors.slate500,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      color: AppColors.midnight,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    item.content,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      color: AppColors.slate600,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      height: 1.55,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(height: 1, color: const Color(0xFFF1F5F9)),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'عرض تفاصيل الإعلان كاملة',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          color: StudentBrandColors.primary,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: StudentBrandColors.primary.withValues(
+                            alpha: 0.08,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.arrow_back_rounded,
+                          color: StudentBrandColors.primary,
+                          size: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        trailing: const Icon(
-          Icons.chevron_left_rounded,
-          color: AppColors.slate400,
         ),
       ),
     );
@@ -942,6 +1218,7 @@ void _showDashboardAnnouncementDetails(
         Text(
           item.content,
           style: const TextStyle(
+            fontFamily: 'Cairo',
             color: AppColors.slate700,
             height: 1.6,
             fontWeight: FontWeight.w600,
@@ -952,6 +1229,7 @@ void _showDashboardAnnouncementDetails(
           Text(
             item.createdAt,
             style: const TextStyle(
+              fontFamily: 'Cairo',
               color: AppColors.slate400,
               fontWeight: FontWeight.w700,
               fontSize: 12,
@@ -990,6 +1268,7 @@ class _FeedCategory extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
+                  fontFamily: 'Cairo',
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
                   color: AppColors.midnight,
@@ -1005,15 +1284,22 @@ class _FeedCategory extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: AppColors.slate100),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.015),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: ListView.separated(
               itemCount: items.length,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               separatorBuilder: (context, index) => Divider(
-                color: AppColors.slate100,
+                color: const Color(0xFFF1F5F9),
                 height: 1,
                 indent: 20,
                 endIndent: 20,
@@ -1023,11 +1309,12 @@ class _FeedCategory extends StatelessWidget {
                 return ListTile(
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 20,
-                    vertical: 8,
+                    vertical: 12,
                   ),
                   title: Text(
                     item.$1,
                     style: const TextStyle(
+                      fontFamily: 'Cairo',
                       fontWeight: FontWeight.w900,
                       fontSize: 14,
                       color: AppColors.midnight,
@@ -1040,8 +1327,10 @@ class _FeedCategory extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
+                        fontFamily: 'Cairo',
                         fontSize: 12,
                         color: AppColors.slate500,
+                        fontWeight: FontWeight.w600,
                         height: 1.4,
                       ),
                     ),

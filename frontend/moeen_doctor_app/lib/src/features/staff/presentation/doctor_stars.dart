@@ -17,6 +17,7 @@ class _DoctorStarsScreenV3State extends ConsumerState<DoctorStarsScreen> {
   int? _majorId;
   int? _levelId;
   bool _filtersExpanded = false;
+  int _walletBalance = 0;
   final Set<int> _selected = {};
   Map<int, String> _visibleStudentNames = {};
   late Future<Map<String, dynamic>> _future = _fetch();
@@ -38,16 +39,18 @@ class _DoctorStarsScreenV3State extends ConsumerState<DoctorStarsScreen> {
   }
 
   Future<Map<String, dynamic>> _fetch() {
-    return ref.read(staffRepositoryProvider).get(
-      '/doctor/stars',
-      query: {
-        if (_subjectId != null) 'subject_id': _subjectId,
-        if (_majorId != null) 'major_id': _majorId,
-        if (_levelId != null) 'level_id': _levelId,
-        if (_search.text.trim().isNotEmpty) 'search': _search.text.trim(),
-        'per_page': 100,
-      },
-    );
+    return ref
+        .read(staffRepositoryProvider)
+        .get(
+          '/doctor/stars',
+          query: {
+            if (_subjectId != null) 'subject_id': _subjectId,
+            if (_majorId != null) 'major_id': _majorId,
+            if (_levelId != null) 'level_id': _levelId,
+            if (_search.text.trim().isNotEmpty) 'search': _search.text.trim(),
+            'per_page': 100,
+          },
+        );
   }
 
   void _reload() => setState(() {
@@ -75,6 +78,26 @@ class _DoctorStarsScreenV3State extends ConsumerState<DoctorStarsScreen> {
       );
       return;
     }
+    if (_selected.isEmpty) {
+      _docSnack(
+        context,
+        'اختر طالبًا واحدًا على الأقل.',
+        color: AppColors.warning,
+      );
+      return;
+    }
+    final totalCost = _selected.length * parsed;
+    if (totalCost > _walletBalance) {
+      await showMoeenInfoDialog(
+        context: context,
+        title: 'رصيد المنح غير كافٍ',
+        message:
+            'المطلوب $totalCost نجمة، بينما الرصيد المتاح $_walletBalance نجمة.',
+        icon: Icons.account_balance_wallet_rounded,
+        color: AppColors.danger,
+      );
+      return;
+    }
     final selectedNames = _selected
         .map((id) => _visibleStudentNames[id])
         .whereType<String>()
@@ -84,6 +107,7 @@ class _DoctorStarsScreenV3State extends ConsumerState<DoctorStarsScreen> {
     final confirmationMessage = [
       'سيتم منح ${_selected.length} طالب/طلاب عدد $parsed نجمة لكل طالب.',
       'إجمالي النجوم: ${_selected.length * parsed}',
+      'الرصيد المتبقي بعد المنح: ${_walletBalance - totalCost}',
       if (selectedNames.isNotEmpty) 'الطلاب: ${selectedNames.join('، ')}',
       if (_selected.length > selectedNames.length)
         'و ${_selected.length - selectedNames.length} طالب آخر.',
@@ -142,6 +166,8 @@ class _DoctorStarsScreenV3State extends ConsumerState<DoctorStarsScreen> {
           final majors = _docList(data['majors']);
           final levels = _docList(data['levels']);
           final page = _docMap(data['students']);
+          final wallet = _docMap(data['wallet']);
+          _walletBalance = _docInt(wallet['balance']);
           final students = _docList(page['data']);
           final total = _docInt(page['total'], students.length);
           _visibleStudentNames = {
@@ -172,6 +198,7 @@ class _DoctorStarsScreenV3State extends ConsumerState<DoctorStarsScreen> {
                       totalStudents: total,
                       selectedCount: _selected.length,
                       totalStars: totalStars,
+                      walletBalance: _walletBalance,
                     ),
                     const SizedBox(height: 16),
                     _StarSearchPanelV3(
@@ -185,9 +212,8 @@ class _DoctorStarsScreenV3State extends ConsumerState<DoctorStarsScreen> {
                       expanded: _filtersExpanded,
                       hasFilters: hasFilters,
                       onSearch: _reload,
-                      onToggleExpanded: () => setState(
-                        () => _filtersExpanded = !_filtersExpanded,
-                      ),
+                      onToggleExpanded: () =>
+                          setState(() => _filtersExpanded = !_filtersExpanded),
                       onClearFilters: _clearStarFilters,
                       onSubjectChanged: (value) {
                         setState(() {
@@ -232,10 +258,10 @@ class _DoctorStarsScreenV3State extends ConsumerState<DoctorStarsScreen> {
                       onSelectVisible: students.isEmpty
                           ? null
                           : () => setState(() {
-                                _selected
-                                  ..clear()
-                                  ..addAll(students.map((s) => _docInt(s['id'])));
-                              }),
+                              _selected
+                                ..clear()
+                                ..addAll(students.map((s) => _docInt(s['id'])));
+                            }),
                       onClear: _selected.isEmpty
                           ? null
                           : () => setState(_selected.clear),
@@ -272,6 +298,7 @@ class _DoctorStarsScreenV3State extends ConsumerState<DoctorStarsScreen> {
                     selectedCount: _selected.length,
                     amount: selectedAmount,
                     totalStars: totalStars,
+                    walletBalance: _walletBalance,
                     onGrant: _grantStars,
                     onClear: () => setState(_selected.clear),
                   ),
@@ -289,11 +316,13 @@ class _StarGrantHeroV3 extends StatelessWidget {
     required this.totalStudents,
     required this.selectedCount,
     required this.totalStars,
+    required this.walletBalance,
   });
 
   final int totalStudents;
   final int selectedCount;
   final int totalStars;
+  final int walletBalance;
 
   @override
   Widget build(BuildContext context) {
@@ -381,6 +410,50 @@ class _StarGrantHeroV3 extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 22),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 11,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: AppColors.gold,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 9),
+                    const Expanded(
+                      child: Text(
+                        'رصيد المنح المتاح',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '$walletBalance نجمة',
+                      style: const TextStyle(
+                        color: AppColors.gold,
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -447,11 +520,7 @@ class _StarHeroMetricV3 extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                icon,
-                size: 14,
-                color: activeColor ?? Colors.white70,
-              ),
+              Icon(icon, size: 14, color: activeColor ?? Colors.white70),
               const SizedBox(width: 5),
               Expanded(
                 child: Text(
@@ -560,10 +629,16 @@ class _StarSearchPanelV3 extends StatelessWidget {
                 fontSize: 13,
                 fontFamily: 'Cairo',
               ),
-              prefixIcon: const Icon(Icons.search_rounded, color: AppColors.royalBlue),
+              prefixIcon: const Icon(
+                Icons.search_rounded,
+                color: AppColors.royalBlue,
+              ),
               filled: true,
               fillColor: AppColors.slate50,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
@@ -574,11 +649,17 @@ class _StarSearchPanelV3 extends StatelessWidget {
                         search.clear();
                         onSearch();
                       },
-                      icon: const Icon(Icons.clear_rounded, color: AppColors.slate500),
+                      icon: const Icon(
+                        Icons.clear_rounded,
+                        color: AppColors.slate500,
+                      ),
                     )
                   : IconButton(
                       onPressed: onSearch,
-                      icon: const Icon(Icons.arrow_forward_rounded, color: AppColors.royalBlue),
+                      icon: const Icon(
+                        Icons.arrow_forward_rounded,
+                        color: AppColors.royalBlue,
+                      ),
                     ),
             ),
           ),
@@ -607,15 +688,21 @@ class _StarSearchPanelV3 extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          expanded ? Icons.tune_rounded : Icons.filter_alt_outlined,
+                          expanded
+                              ? Icons.tune_rounded
+                              : Icons.filter_alt_outlined,
                           size: 18,
                           color: expanded ? Colors.white : AppColors.royalBlue,
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          expanded ? 'إخفاء الفلاتر المتقدمة' : 'فلترة مخصصة للطلاب',
+                          expanded
+                              ? 'إخفاء الفلاتر المتقدمة'
+                              : 'فلترة مخصصة للطلاب',
                           style: TextStyle(
-                            color: expanded ? Colors.white : AppColors.royalBlue,
+                            color: expanded
+                                ? Colors.white
+                                : AppColors.royalBlue,
                             fontWeight: FontWeight.w800,
                             fontSize: 13,
                             fontFamily: 'Cairo',
@@ -626,13 +713,17 @@ class _StarSearchPanelV3 extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(5),
                             decoration: BoxDecoration(
-                              color: expanded ? Colors.white : AppColors.royalBlue,
+                              color: expanded
+                                  ? Colors.white
+                                  : AppColors.royalBlue,
                               shape: BoxShape.circle,
                             ),
                             child: Text(
                               '$activeFilterCount',
                               style: TextStyle(
-                                color: expanded ? AppColors.royalBlue : Colors.white,
+                                color: expanded
+                                    ? AppColors.royalBlue
+                                    : Colors.white,
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -735,7 +826,10 @@ class _StarSearchPanelV3 extends StatelessWidget {
         ),
         filled: true,
         fillColor: AppColors.slate50,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.slate200),
@@ -837,7 +931,10 @@ class _StarGrantSetupV3 extends StatelessWidget {
                 borderRadius: BorderRadius.circular(18),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: isSelected ? AppColors.goldDeep : Colors.white,
                     borderRadius: BorderRadius.circular(18),
@@ -892,8 +989,14 @@ class _StarGrantSetupV3 extends StatelessWidget {
                       fontFamily: 'Cairo',
                       fontWeight: FontWeight.bold,
                     ),
-                    prefixIcon: const Icon(Icons.stars_rounded, color: AppColors.goldDeep),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                    prefixIcon: const Icon(
+                      Icons.stars_rounded,
+                      color: AppColors.goldDeep,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 12,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: const BorderSide(color: AppColors.slate200),
@@ -922,8 +1025,14 @@ class _StarGrantSetupV3 extends StatelessWidget {
                       fontFamily: 'Cairo',
                       fontWeight: FontWeight.bold,
                     ),
-                    prefixIcon: const Icon(Icons.notes_rounded, color: AppColors.slate400),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    prefixIcon: const Icon(
+                      Icons.notes_rounded,
+                      color: AppColors.slate400,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: const BorderSide(color: AppColors.slate200),
@@ -946,7 +1055,10 @@ class _StarGrantSetupV3 extends StatelessWidget {
                 onTap: () => onQuickReason(reason),
                 borderRadius: BorderRadius.circular(14),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -1238,6 +1350,7 @@ class _StarBottomGrantBarV3 extends StatelessWidget {
     required this.selectedCount,
     required this.amount,
     required this.totalStars,
+    required this.walletBalance,
     required this.onGrant,
     required this.onClear,
   });
@@ -1245,11 +1358,17 @@ class _StarBottomGrantBarV3 extends StatelessWidget {
   final int selectedCount;
   final int amount;
   final int totalStars;
+  final int walletBalance;
   final VoidCallback onGrant;
   final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
+    final canGrant =
+        selectedCount > 0 &&
+        amount > 0 &&
+        totalStars > 0 &&
+        totalStars <= walletBalance;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -1273,10 +1392,7 @@ class _StarBottomGrantBarV3 extends StatelessWidget {
               color: AppColors.goldDeep.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(
-              Icons.stars_rounded,
-              color: AppColors.goldDeep,
-            ),
+            child: const Icon(Icons.stars_rounded, color: AppColors.goldDeep),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -1305,6 +1421,22 @@ class _StarBottomGrantBarV3 extends StatelessWidget {
                     fontFamily: 'Cairo',
                   ),
                 ),
+                const SizedBox(height: 2),
+                Text(
+                  totalStars > walletBalance
+                      ? 'الرصيد غير كافٍ، المتاح $walletBalance'
+                      : 'المتبقي بعد المنح: ${walletBalance - totalStars}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: totalStars > walletBalance
+                        ? AppColors.danger
+                        : AppColors.success,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
               ],
             ),
           ),
@@ -1323,16 +1455,17 @@ class _StarBottomGrantBarV3 extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           InkWell(
-            onTap: onGrant,
+            onTap: canGrant ? onGrant : null,
             borderRadius: BorderRadius.circular(16),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
               decoration: BoxDecoration(
-                color: AppColors.goldDeep,
+                color: canGrant ? AppColors.goldDeep : AppColors.slate300,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.goldDeep.withValues(alpha: 0.22),
+                    color: (canGrant ? AppColors.goldDeep : AppColors.slate300)
+                        .withValues(alpha: 0.22),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),

@@ -15,7 +15,9 @@ class DelegateNewsScreen extends ConsumerWidget {
         state: state,
         onRetry: () => ref.invalidate(_delegateNewsProvider),
         builder: (data) {
-          final items = asList(asMap(data['data']).isNotEmpty ? data['data'] : data);
+          final items = asList(
+            asMap(data['data']).isNotEmpty ? data['data'] : data,
+          );
 
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(_delegateNewsProvider),
@@ -34,12 +36,15 @@ class DelegateNewsScreen extends ConsumerWidget {
                       ? const SliverFillRemaining(
                           hasScrollBody: false,
                           child: Center(
-                            child: _EmptyState('لا توجد أخبار أو تعميمات حالياً.'),
+                            child: _EmptyState(
+                              'لا توجد أخبار أو تعميمات حالياً.',
+                            ),
                           ),
                         )
                       : SliverList.builder(
                           itemCount: items.length,
-                          itemBuilder: (context, index) => _NewsCard(item: items[index]),
+                          itemBuilder: (context, index) =>
+                              _NewsCard(item: items[index]),
                         ),
                 ),
               ],
@@ -77,7 +82,8 @@ class DelegateNotificationsScreen extends ConsumerWidget {
           final grouped = _groupNotifications(items);
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(_delegateNotificationsProvider),
+            onRefresh: () async =>
+                ref.invalidate(_delegateNotificationsProvider),
             child: CustomScrollView(
               slivers: [
                 SliverPadding(
@@ -265,10 +271,7 @@ class _NotificationsHeader extends StatelessWidget {
 }
 
 class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({
-    required this.item,
-    required this.onRead,
-  });
+  const _NotificationCard({required this.item, required this.onRead});
 
   final Map<String, dynamic> item;
   final VoidCallback onRead;
@@ -412,30 +415,33 @@ class _NotificationCard extends StatelessWidget {
   }
 
   Color _notificationColor(String type) => switch (type) {
-        'exam' => AppColors.danger,
-        'assignment' => AppColors.orange,
-        'poll' => AppColors.violet,
-        'attendance' => AppColors.warning,
-        'announcement' => AppColors.royalBlue,
-        _ => AppColors.royalBlue,
-      };
+    'exam' => AppColors.danger,
+    'assignment' => AppColors.orange,
+    'poll' => AppColors.violet,
+    'attendance' => AppColors.warning,
+    'attendance_edit_request' => AppColors.warning,
+    'announcement' => AppColors.royalBlue,
+    _ => AppColors.royalBlue,
+  };
 
   IconData _notificationIcon(String type) => switch (type) {
-        'exam' => Icons.event_note_rounded,
-        'assignment' => Icons.assignment_rounded,
-        'poll' => Icons.poll_rounded,
-        'attendance' => Icons.person_off_rounded,
-        _ => Icons.notifications_rounded,
-      };
+    'exam' => Icons.event_note_rounded,
+    'assignment' => Icons.assignment_rounded,
+    'poll' => Icons.poll_rounded,
+    'attendance' => Icons.person_off_rounded,
+    'attendance_edit_request' => Icons.edit_calendar_rounded,
+    _ => Icons.notifications_rounded,
+  };
 
   String _notificationTypeLabel(String type) => switch (type) {
-        'exam' => 'اختبار جديد',
-        'assignment' => 'تكليف دراسي',
-        'poll' => 'استطلاع رأي',
-        'attendance' => 'غياب / حضور',
-        'announcement' => 'تعميم رسمي',
-        _ => 'تنبيه نظام',
-      };
+    'exam' => 'اختبار جديد',
+    'assignment' => 'تكليف دراسي',
+    'poll' => 'استطلاع رأي',
+    'attendance' => 'غياب / حضور',
+    'attendance_edit_request' => 'طلب تعديل حضور',
+    'announcement' => 'تعميم رسمي',
+    _ => 'تنبيه نظام',
+  };
 }
 
 class _NewsHero extends StatelessWidget {
@@ -453,10 +459,7 @@ class _NewsHero extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AppColors.orange,
-            AppColors.goldDeep,
-          ],
+          colors: [AppColors.orange, AppColors.goldDeep],
         ),
         boxShadow: [
           BoxShadow(

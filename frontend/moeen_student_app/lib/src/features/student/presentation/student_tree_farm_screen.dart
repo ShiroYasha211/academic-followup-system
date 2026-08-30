@@ -19,13 +19,16 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
   DateTime? _pausedAt;
 
   // حالة إعداد الجلسة الجديدة
-  int _selectedTab = 0; // 0: التركيز، 1: غابتي، 2: المتجر، 3: الإعدادات
+  int _selectedTab =
+      0; // 0: التركيز، 1: غابتي، 2: المتجر، 3: الإعدادات، 4: المزرعة العامة
   int _forestSubTab = 0; // 0: تخطيط الغابة، 1: إحصائيات المواد
   String _selectedPlantCode = 'red_flower';
   int _minutes = 15;
   bool _isFreeTime = false;
+  String _farmScope = 'private'; // 'private' | 'public'
   int? _selectedSubjectId;
   String? _selectedSubjectName;
+  bool _profileIsPublic = false;
 
   // حالة أصوات الخلفية المهدئة للتركيز
   AudioPlayer? _ambientAudioPlayer;
@@ -45,9 +48,14 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
         final session = _activeSession;
         if (session != null && session['is_free_time'] != true) {
           final planned = _asInt(session['planned_seconds']);
-          final startedAt = DateTime.tryParse(session['started_at']?.toString() ?? '');
+          final startedAt = DateTime.tryParse(
+            session['started_at']?.toString() ?? '',
+          );
           if (startedAt != null) {
-            final elapsed = DateTime.now().toUtc().difference(startedAt.toUtc()).inSeconds;
+            final elapsed = DateTime.now()
+                .toUtc()
+                .difference(startedAt.toUtc())
+                .inSeconds;
             if (elapsed >= planned) {
               _finishSession(interrupted: false);
               return;
@@ -76,12 +84,24 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       if (_pausedAt == null && _hasActiveSession) {
-        _pausedAt = DateTime.now().toUtc();
-        // جدولة إشعار تحذيري واحد يظهر بعد 10 ثوانٍ مع عداد تنازلي نشط مدته 30 ثانية
-        unawaited(PushNotificationService.scheduleFocusWarningNotification(
-          delay: const Duration(seconds: 10),
-          countdownDuration: const Duration(seconds: 30),
-        ));
+        unawaited(() async {
+          // التحقق مما إذا كان الخروج للخلفية بسبب قفل الشاشة أو انطفائها
+          final isLockedOrOff = await _isScreenLockedOrOff();
+          if (isLockedOrOff) {
+            // شاشة مغلقة أو هاتف مقفل، لا نعتبرها مقاطعة ولا نرسل تحذيرات
+            return;
+          }
+
+          // المستخدم غادر التطبيق لفتح تطبيق آخر (الشاشة مضيئة ومفتوحة)
+          _pausedAt = DateTime.now().toUtc();
+          // جدولة إشعار تحذيري فوري يظهر خلال ثانية واحدة مع عداد تنازلي نشط مدته 30 ثانية
+          unawaited(
+            PushNotificationService.scheduleFocusWarningNotification(
+              delay: const Duration(seconds: 1),
+              countdownDuration: const Duration(seconds: 30),
+            ),
+          );
+        }());
       }
       return;
     }
@@ -95,22 +115,42 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       if (pausedAt != null &&
           _hasActiveSession &&
           DateTime.now().toUtc().difference(pausedAt) >
-              const Duration(seconds: 40)) { // 10 ثوانٍ انتظار + 30 ثانية عداد تنازلي = 40 ثانية إجمالاً
-        unawaited(_finishSession(interrupted: true));
-        _showMessage('للأسف! لقد قضيت وقتاً طويلاً خارج التطبيق وجفت شجرتك 🥀');
+              const Duration(seconds: 40)) {
+        // 40 ثانية إجمالاً كعقوبة بقاء خارج التطبيق
+        unawaited(() async {
+          final plant = await _finishSession(interrupted: true);
+          if (plant != null && plant['plant_code'] != 'burned_tree') {
+            _showMessage(
+              'تم إنهاء الجلسة بسبب مغادرة التطبيق، وحصلت على النبتة التي وصلت إليها 🌱',
+            );
+          } else {
+            _showMessage(
+              'للأسف! لقد قضيت وقتاً طويلاً خارج التطبيق وجفت شجرتك 🥀',
+            );
+          }
+        }());
       }
       unawaited(_trySyncPending());
+    }
+  }
+
+  Future<bool> _isScreenLockedOrOff() async {
+    try {
+      const channel = MethodChannel('moeen/security');
+      return await channel.invokeMethod<bool>('isScreenLockedOrOff') ?? false;
+    } catch (_) {
+      return false;
     }
   }
 
   Future<void> _loadLocal() async {
     _local = await ref.read(treeFarmLocalStoreProvider).load();
     if (mounted) setState(() {});
-    
+
     if (_hasActiveSession) {
       await _finishSession(interrupted: true);
     }
-    
+
     unawaited(_trySyncPending());
   }
 
@@ -120,19 +160,83 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
     if (mounted) setState(() {});
   }
 
+  void _refreshFarmProviders() {
+    ref.invalidate(_treeFarmProvider);
+    ref.invalidate(_publicFarmProvider);
+  }
+
+  List<Map<String, dynamic>> _withoutPendingPlant(String? clientUuid) {
+    if (clientUuid == null || clientUuid.isEmpty) {
+      return _local.pendingPlants;
+    }
+    return _local.pendingPlants
+        .where((plant) => plant['client_uuid']?.toString() != clientUuid)
+        .toList();
+  }
+
   Future<void> _trySyncPending() async {
-    if (_local.pendingThoughts.isEmpty) return;
     final online = await ref.read(connectivityServiceProvider).isOnline();
     if (!online) return;
-    try {
-      for (final thought in _local.pendingThoughts) {
-        await ref.read(studentContentRepositoryProvider).storeTreeFarmThought(
-              body: thought['body']?.toString() ?? '',
-              clientUuid: thought['client_uuid']?.toString(),
-            );
-      }
-      await _saveLocal(_local.copyWith(pendingThoughts: const []));
-    } catch (_) {}
+
+    // 1. مزامنة الأفكار المعلقة
+    if (_local.pendingThoughts.isNotEmpty) {
+      try {
+        for (final thought in _local.pendingThoughts) {
+          await ref
+              .read(studentContentRepositoryProvider)
+              .storeTreeFarmThought(
+                body: thought['body']?.toString() ?? '',
+                clientUuid: thought['client_uuid']?.toString(),
+              );
+        }
+        await _saveLocal(_local.copyWith(pendingThoughts: const []));
+      } catch (_) {}
+    }
+
+    // 2. مزامنة الأشجار المعلقة
+    if (_local.pendingPlants.isNotEmpty) {
+      try {
+        final remainingPlants = List<Map<String, dynamic>>.from(
+          _local.pendingPlants,
+        );
+        var hasChanges = false;
+        for (final plant in _local.pendingPlants) {
+          final startedAtStr = plant['started_at']?.toString();
+          final endedAtStr = plant['ended_at']?.toString();
+          final focusedSecs = _asInt(plant['focused_seconds']);
+          if (startedAtStr != null && endedAtStr != null && focusedSecs > 0) {
+            try {
+              await ref
+                  .read(studentContentRepositoryProvider)
+                  .logTreeFarmSession(
+                    farmScope: plant['farm_scope']?.toString() ?? 'private',
+                    focusedSeconds: focusedSecs,
+                    startedAt: startedAtStr,
+                    endedAt: endedAtStr,
+                    clientUuid:
+                        plant['client_uuid']?.toString() ?? _clientUuid(),
+                    subjectId: _asInt(plant['subject_id']) > 0
+                        ? _asInt(plant['subject_id'])
+                        : null,
+                    subjectName: plant['subject_name']?.toString(),
+                  );
+              remainingPlants.remove(plant);
+              hasChanges = true;
+            } catch (_) {
+              break; // انقطع الاتصال أو فشل الإرسال، نتوقف ونحتفظ بالباقي
+            }
+          } else {
+            // بيانات غير صالحة للمزامنة، نزيلها لتفادي التكرار
+            remainingPlants.remove(plant);
+            hasChanges = true;
+          }
+        }
+        if (hasChanges) {
+          await _saveLocal(_local.copyWith(pendingPlants: remainingPlants));
+          _refreshFarmProviders();
+        }
+      } catch (_) {}
+    }
   }
 
   Future<void> _sendHeartbeat() async {
@@ -199,9 +303,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
     );
   }
 
-  Future<void> _finishSession({bool interrupted = false}) async {
+  Future<Map<String, dynamic>?> _finishSession({
+    bool interrupted = false,
+  }) async {
     final session = _activeSession;
-    if (session == null || _busy) return;
+    if (session == null || _busy) return null;
     setState(() => _busy = true);
 
     // إيقاف أي أصوات خلفية مهدئة عند إنهاء الجلسة
@@ -210,6 +316,7 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       _activeAmbientSound = null;
     }
 
+    Map<String, dynamic>? plant;
     try {
       final endedAt = DateTime.now().toUtc();
       final startedAt = DateTime.tryParse(
@@ -222,21 +329,21 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       finished['status'] = interrupted ? 'interrupted' : 'completed';
 
       final focusedSecs = _focusedSeconds(finished);
-      final plant = _pendingPlantFor(finished);
+      plant = _pendingPlantFor(finished);
 
       // حفظ تفاصيل الشجرة محلياً للمطابقة التاريخية أوفلاين
       List<Map<String, dynamic>> updatedHistory = _local.localHistoryMetadata;
       if (plant != null) {
         final newMetadata = {
           'plant_code': plant['plant_code']?.toString(),
-          'planted_at': plant['planted_at'] ?? DateTime.now().toUtc().toIso8601String(),
+          'planted_at':
+              plant['planted_at'] ?? DateTime.now().toUtc().toIso8601String(),
           'subject_name': finished['subject_name']?.toString(),
-          'thoughts': finished['thoughts'] != null ? List<String>.from(finished['thoughts']) : <String>[],
+          'thoughts': finished['thoughts'] != null
+              ? List<String>.from(finished['thoughts'])
+              : <String>[],
         };
-        updatedHistory = [
-          ..._local.localHistoryMetadata,
-          newMetadata,
-        ];
+        updatedHistory = [..._local.localHistoryMetadata, newMetadata];
       }
 
       // 2. مسح الجلسة النشطة وإضافة الشجرة محلياً مؤقتاً
@@ -245,7 +352,15 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
           clearActiveSession: true,
           pendingPlants: [
             ..._local.pendingPlants,
-            if (plant != null) plant,
+            if (plant != null) ...[
+              {
+                ...plant,
+                'started_at': startedAt?.toIso8601String(),
+                'ended_at': endedAt.toIso8601String(),
+                'focused_seconds': focusedSecs,
+                'client_uuid': session['client_uuid'] ?? _clientUuid(),
+              },
+            ],
           ],
           localHistoryMetadata: updatedHistory,
         ),
@@ -253,19 +368,30 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
 
       // 3. عرض النتيجة للمستخدم فوراً
       _showSessionResult(plant, focusedSecs);
+      if (plant != null &&
+          plant['plant_code'] != 'burned_tree' &&
+          session['farm_scope']?.toString() == 'public' &&
+          !_profileIsPublic) {
+        _showMessage(
+          'تم تسجيل الزراعة العامة، لكنها لن تظهر للطلاب حتى تفعل الظهور العام من إعدادات المزرعة.',
+        );
+      }
 
       // 4. إرسال السجل للسيرفر في الخلفية
       if (startedAt != null) {
-        unawaited(_logToServer(
-          session: session,
-          focusedSeconds: focusedSecs,
-          startedAt: startedAt,
-          endedAt: endedAt,
-        ));
+        unawaited(
+          _logToServer(
+            session: session,
+            focusedSeconds: focusedSecs,
+            startedAt: startedAt,
+            endedAt: endedAt,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+    return plant;
   }
 
   Future<void> _logToServer({
@@ -275,7 +401,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
     required DateTime endedAt,
   }) async {
     try {
-      await ref.read(studentContentRepositoryProvider).logTreeFarmSession(
+      await ref
+          .read(studentContentRepositoryProvider)
+          .logTreeFarmSession(
             farmScope: session['farm_scope']?.toString() ?? 'private',
             focusedSeconds: focusedSeconds,
             startedAt: startedAt.toIso8601String(),
@@ -287,10 +415,16 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
             subjectName: session['subject_name']?.toString(),
           );
 
-      ref.invalidate(_treeFarmProvider);
+      _refreshFarmProviders();
 
       // مسح الأشجار المحلية المؤقتة بعد المزامنة
-      await _saveLocal(_local.copyWith(pendingPlants: const []));
+      await _saveLocal(
+        _local.copyWith(
+          pendingPlants: _withoutPendingPlant(
+            session['client_uuid']?.toString(),
+          ),
+        ),
+      );
     } catch (_) {
       // فشل الإرسال -> تبقى محلياً
     }
@@ -302,21 +436,26 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
 
     if (plant != null && !isBurned) {
       unawaited(SystemSound.play(SystemSoundType.alert));
-      
+
       // إرسال إشعار محلي بصوت النغمة الافتراضية
-      unawaited(PushNotificationService.showLocalNotification(
-        title: '🌱 أحسنت! زرعت شجرة جديدة بنجاح',
-        body: 'لقد نجحت في التركيز لمدة ${focusedSeconds ~/ 60} دقيقة وحصلت على +${_asInt(plant['coins_awarded'])} عملة! 🌟',
-      ));
+      unawaited(
+        PushNotificationService.showLocalNotification(
+          title: '🌱 أحسنت! زرعت شجرة جديدة بنجاح',
+          body:
+              'لقد نجحت في التركيز لمدة ${focusedSeconds ~/ 60} دقيقة وحصلت على +${_asInt(plant['coins_awarded'])} عملة! 🌟',
+        ),
+      );
 
       // اهتزاز متتابع متدرج (قوي ثم متوسط ثم خفيف)
-      unawaited(Future.microtask(() async {
-        await HapticFeedback.heavyImpact();
-        await Future.delayed(const Duration(milliseconds: 150));
-        await HapticFeedback.mediumImpact();
-        await Future.delayed(const Duration(milliseconds: 150));
-        await HapticFeedback.lightImpact();
-      }));
+      unawaited(
+        Future.microtask(() async {
+          await HapticFeedback.heavyImpact();
+          await Future.delayed(const Duration(milliseconds: 150));
+          await HapticFeedback.mediumImpact();
+          await Future.delayed(const Duration(milliseconds: 150));
+          await HapticFeedback.lightImpact();
+        }),
+      );
     } else if (isBurned) {
       unawaited(HapticFeedback.vibrate());
     }
@@ -352,7 +491,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 20,
-                  color: isBurned ? const Color(0xffb91c1c) : const Color(0xff1b4332),
+                  color: isBurned
+                      ? const Color(0xffb91c1c)
+                      : const Color(0xff1b4332),
                 ),
               ),
               const SizedBox(height: 6),
@@ -360,11 +501,18 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 const Text(
                   'لم تتمكن من إكمال وقت التركيز المخطط له بسبب مقاطعة الجلسة أو قصر الوقت.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.bold,
+                  ),
                 )
               else
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xffd8f3dc),
                     borderRadius: BorderRadius.circular(16),
@@ -383,10 +531,16 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
               const SizedBox(height: 12),
               Text(
                 'وقت التركيز: ${_formatDuration(focusedSeconds)}',
-                style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 6),
-              const Text('لم تبلغ الحد الأدنى لزراعة شجرة (5 دقائق).', textAlign: TextAlign.center),
+              const Text(
+                'لم تبلغ الحد الأدنى لزراعة شجرة (5 دقائق).',
+                textAlign: TextAlign.center,
+              ),
             ],
           ],
         ),
@@ -394,8 +548,12 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
           FilledButton(
             onPressed: () => Navigator.pop(ctx),
             style: FilledButton.styleFrom(
-              backgroundColor: isBurned ? const Color(0xffb91c1c) : const Color(0xff2d6a4f),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              backgroundColor: isBurned
+                  ? const Color(0xffb91c1c)
+                  : const Color(0xff2d6a4f),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
             ),
             child: Text(isBurned ? 'موافق' : 'رائع!'),
@@ -410,8 +568,6 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       }
     });
   }
-
-
 
   Future<void> _addThought() async {
     final controller = TextEditingController();
@@ -491,7 +647,8 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                   color: Color(0xff2d3748),
                 ),
                 decoration: InputDecoration(
-                  hintText: 'ما هي الفكرة التي تشغل بالك الآن؟ اكتبها هنا لتفرغها وتعود إليها لاحقاً...',
+                  hintText:
+                      'ما هي الفكرة التي تشغل بالك الآن؟ اكتبها هنا لتفرغها وتعود إليها لاحقاً...',
                   hintStyle: TextStyle(
                     fontFamily: 'Cairo',
                     fontSize: 13,
@@ -506,9 +663,15 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xff2d6a4f), width: 1.8),
+                    borderSide: const BorderSide(
+                      color: Color(0xff2d6a4f),
+                      width: 1.8,
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -519,8 +682,13 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                     onPressed: () => Navigator.pop(context),
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.grey.shade600,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: const Text(
                       'إلغاء',
@@ -532,12 +700,16 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                   ),
                   const SizedBox(width: 10),
                   FilledButton(
-                    onPressed: () => Navigator.pop(context, controller.text.trim()),
+                    onPressed: () =>
+                        Navigator.pop(context, controller.text.trim()),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xff2d6a4f),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -572,10 +744,7 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       if (online) {
         await ref
             .read(studentContentRepositoryProvider)
-            .storeTreeFarmThought(
-              body: body,
-              clientUuid: _clientUuid(),
-            );
+            .storeTreeFarmThought(body: body, clientUuid: _clientUuid());
         ref.invalidate(_treeFarmProvider);
       } else {
         await _saveLocal(
@@ -606,7 +775,7 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       await ref
           .read(studentContentRepositoryProvider)
           .requestTreeFarmReward(coins);
-      ref.invalidate(_treeFarmProvider);
+      _refreshFarmProviders();
       _showMessage('تم إرسال طلب المكافأة للمراجعة.');
     } catch (error) {
       _showMessage(_errorMessage(error));
@@ -631,7 +800,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
             final isValid = val >= 25 && val <= availableCoins && val % 25 == 0;
 
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
               title: const Text(
                 'طلب مكافأة تحويل النجوم',
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -642,7 +813,10 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 children: [
                   Text(
                     'الرصيد المتاح: $availableCoins عملة',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -652,14 +826,20 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                     decoration: const InputDecoration(
                       labelText: 'عدد العملات للتحويل',
                       hintText: 'مثال: 25، 50...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
                   const SizedBox(height: 12),
                   if (isValid)
                     Text(
-                      'ستحصل على: $stars ${stars == 1 ? 'نجمة' : stars == 2 ? 'نجمتين' : 'نجوم'}',
+                      'ستحصل على: $stars ${stars == 1
+                          ? 'نجمة'
+                          : stars == 2
+                          ? 'نجمتين'
+                          : 'نجوم'}',
                       style: const TextStyle(
                         color: Color(0xff15803d),
                         fontWeight: FontWeight.bold,
@@ -710,7 +890,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                           Navigator.pop(context);
                           await _requestReward(val);
                         },
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xff2d6a4f)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xff2d6a4f),
+                  ),
                   child: const Text('إرسال الطلب'),
                 ),
               ],
@@ -734,7 +916,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       disableDrawer: _hasActiveSession,
       child: farmAsync.when(
         data: (data) => _buildContent(data, isOnline),
-        loading: () => const Center(child: CircularProgressIndicator(color: Color(0xff2d6a4f))),
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: Color(0xff2d6a4f)),
+        ),
         error: (error, _) => _buildContent(
           {
             'profile': const <String, dynamic>{},
@@ -755,6 +939,7 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
     String? errorMessage,
   }) {
     final profile = _asMap(data['profile']);
+    _profileIsPublic = profile['is_public'] == true;
     final plants = [
       ..._asList(data['plants']).whereType<Map>().map(_mapFromDynamic),
       ..._local.pendingPlants,
@@ -771,7 +956,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       ..._local.pendingThoughts,
       ..._asList(data['thoughts']).whereType<Map>().map(_mapFromDynamic),
     ];
-    final rewardRequests = _asList(data['reward_requests']).whereType<Map>().map(_mapFromDynamic).toList();
+    final rewardRequests = _asList(
+      data['reward_requests'],
+    ).whereType<Map>().map(_mapFromDynamic).toList();
     final session = _activeSession;
 
     // جلب المقررات الدراسية الحالية للطالب لربطها بالتركيز
@@ -802,9 +989,10 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 if (errorMessage != null) _InfoBanner(message: errorMessage),
                 if (!isOnline)
                   const _InfoBanner(
-                    message: 'أنت تعمل بدون اتصال. سيتم تسجيل الأشجار محلياً ومزامنتها لاحقاً.',
+                    message:
+                        'أنت تعمل بدون اتصال. سيتم تسجيل الأشجار محلياً ومزامنتها لاحقاً.',
                   ),
-                
+
                 // المحتوى المتغير بناء على التبويب
                 Expanded(
                   child: IndexedStack(
@@ -814,6 +1002,7 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                       _buildForestTab(plants, profile, leaderboard),
                       _buildStoreTab(catalog, profile, rewardRequests),
                       _buildSettingsTab(profile, thoughts),
+                      _buildPublicFarmTab(),
                     ],
                   ),
                 ),
@@ -821,7 +1010,7 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
             ),
           ),
         ),
-        
+
         // شريط التنقل السفلي العائم الزجاجي الفخم
         Positioned(
           bottom: 20,
@@ -838,13 +1027,20 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: const Color(0xffe8efe9),
-        border: Border.all(color: const Color(0xff2d6a4f).withOpacity(0.3), width: 1.5),
+        border: Border.all(
+          color: const Color(0xff2d6a4f).withOpacity(0.3),
+          width: 1.5,
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.monetization_on_rounded, color: Colors.amber, size: 18),
+          const Icon(
+            Icons.monetization_on_rounded,
+            color: Colors.amber,
+            size: 18,
+          ),
           const SizedBox(width: 6),
           Text(
             '${_asInt(profile['coins_balance'])}',
@@ -887,6 +1083,7 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 _buildDockItem(1, 'غابتي', Icons.park_rounded),
                 _buildDockItem(2, 'المتجر', Icons.storefront_rounded),
                 _buildDockItem(3, 'الإعدادات', Icons.settings_rounded),
+                _buildDockItem(4, 'العامة', Icons.public_rounded),
               ],
             ),
           ),
@@ -924,7 +1121,7 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                           color: const Color(0xff2d6a4f).withOpacity(0.25),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
-                        )
+                        ),
                       ]
                     : null,
               ),
@@ -941,7 +1138,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 fontFamily: 'Cairo',
                 fontSize: 9.5,
                 fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                color: isSelected ? const Color(0xff1b4332) : const Color(0xff5f7d6a),
+                color: isSelected
+                    ? const Color(0xff1b4332)
+                    : const Color(0xff5f7d6a),
               ),
               child: Text(label),
             ),
@@ -958,9 +1157,15 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
     Map<String, dynamic> profile,
   ) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 85), // مساحة سفلية للشريط العائم
+      padding: const EdgeInsets.fromLTRB(
+        24,
+        12,
+        24,
+        85,
+      ), // مساحة سفلية للشريط العائم
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly, // توزيع متناسق على ارتفاع الشاشة
+        mainAxisAlignment:
+            MainAxisAlignment.spaceEvenly, // توزيع متناسق على ارتفاع الشاشة
         children: [
           // لوحة اختيار نمط التركيز المنزلقة الفخمة مع رصيد العملات المدمج
           Row(
@@ -999,7 +1204,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 children: [
                   Text(
                     _isFreeTime ? 'وقت حر' : 'مدة التركيز',
-                    style: const TextStyle(color: Color(0xff5f7d6a), fontSize: 12, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Color(0xff5f7d6a),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -1066,7 +1275,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
             children: [
               const Text(
                 'اختر البذرة لزراعتها:',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xff1b4332)),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: Color(0xff1b4332),
+                ),
               ),
               const SizedBox(height: 6),
               SizedBox(
@@ -1095,9 +1308,13 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                         width: 104,
                         margin: const EdgeInsets.only(left: 8),
                         decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xffe8efe9) : Colors.white,
+                          color: isSelected
+                              ? const Color(0xffe8efe9)
+                              : Colors.white,
                           border: Border.all(
-                            color: isSelected ? const Color(0xff2d6a4f) : Colors.grey.shade200,
+                            color: isSelected
+                                ? const Color(0xff2d6a4f)
+                                : Colors.grey.shade200,
                             width: isSelected ? 2 : 1,
                           ),
                           borderRadius: BorderRadius.circular(14),
@@ -1116,15 +1333,22 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                               plant['name']?.toString() ?? '',
                               style: TextStyle(
                                 fontSize: 10.5,
-                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.normal,
-                                color: isSelected ? const Color(0xff1b4332) : Colors.black87,
+                                fontWeight: isSelected
+                                    ? FontWeight.w800
+                                    : FontWeight.normal,
+                                color: isSelected
+                                    ? const Color(0xff1b4332)
+                                    : Colors.black87,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
                               '$reqMinد',
-                              style: const TextStyle(fontSize: 8, color: Colors.grey),
+                              style: const TextStyle(
+                                fontSize: 8,
+                                color: Colors.grey,
+                              ),
                             ),
                           ],
                         ),
@@ -1142,7 +1366,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
             children: [
               const Text(
                 'اختر المادة الدراسية للتركيز عليها:',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xff1b4332)),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: Color(0xff1b4332),
+                ),
               ),
               const SizedBox(height: 6),
               DropdownButtonFormField<int?>(
@@ -1159,17 +1387,29 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xff2d6a4f), width: 1.5),
+                    borderSide: const BorderSide(
+                      color: Color(0xff2d6a4f),
+                      width: 1.5,
+                    ),
                   ),
                   filled: true,
                   fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                 ),
-                hint: const Text('عام / بدون تحديد مقرر', style: TextStyle(fontSize: 12)),
+                hint: const Text(
+                  'عام / بدون تحديد مقرر',
+                  style: TextStyle(fontSize: 12),
+                ),
                 items: [
                   const DropdownMenuItem<int?>(
                     value: null,
-                    child: Text('عام / بدون تحديد مقرر', style: TextStyle(fontSize: 12)),
+                    child: Text(
+                      'عام / بدون تحديد مقرر',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                   ...subjects.map((sub) {
                     final subMap = _asMap(sub);
@@ -1191,13 +1431,18 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                         (sub) => _asInt(_asMap(sub)['id']) == id,
                         orElse: () => null,
                       );
-                      _selectedSubjectName = found != null ? _asMap(found)['name']?.toString() : null;
+                      _selectedSubjectName = found != null
+                          ? _asMap(found)['name']?.toString()
+                          : null;
                     }
                   });
                 },
               ),
             ],
           ),
+
+          // اختيار نطاق المزرعة (خاصة / عامة)
+          _buildFarmScopeSelector(),
 
           // زر بدء التركيز الأسطوري
           SizedBox(
@@ -1207,18 +1452,36 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
               onPressed: _busy
                   ? null
                   : () => _startSession(
-                        farmScope: 'private',
-                        minutes: _minutes,
-                        isFreeTime: _isFreeTime,
-                      ),
+                      farmScope: _farmScope,
+                      minutes: _minutes,
+                      isFreeTime: _isFreeTime,
+                    ),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xff2d6a4f),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                backgroundColor: _farmScope == 'public'
+                    ? const Color(0xff1d4ed8)
+                    : const Color(0xff2d6a4f),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
               ),
-              icon: const Icon(Icons.spa_rounded, size: 20),
+              icon: Icon(
+                _farmScope == 'public'
+                    ? Icons.public_rounded
+                    : Icons.lock_outline_rounded,
+                size: 20,
+              ),
               label: Text(
-                _isFreeTime ? 'بدء التركيز الحر' : 'بدء التركيز الآن',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                _isFreeTime
+                    ? (_farmScope == 'public'
+                          ? 'بدء التركيز الحر (عام)'
+                          : 'بدء التركيز الحر')
+                    : (_farmScope == 'public'
+                          ? 'بدء التركيز (مزرعة عامة)'
+                          : 'بدء التركيز الآن'),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -1244,7 +1507,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeInOut,
                 decoration: BoxDecoration(
-                  color: !_isFreeTime ? const Color(0xff2d6a4f) : Colors.transparent,
+                  color: !_isFreeTime
+                      ? const Color(0xff2d6a4f)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: !_isFreeTime
                       ? [
@@ -1252,7 +1517,7 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                             color: const Color(0xff2d6a4f).withOpacity(0.2),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
-                          )
+                          ),
                         ]
                       : null,
                 ),
@@ -1261,7 +1526,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                   'مؤقت تنازلي',
                   style: TextStyle(
                     fontFamily: 'Cairo',
-                    color: !_isFreeTime ? Colors.white : const Color(0xff5f7d6a),
+                    color: !_isFreeTime
+                        ? Colors.white
+                        : const Color(0xff5f7d6a),
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
                   ),
@@ -1276,7 +1543,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeInOut,
                 decoration: BoxDecoration(
-                  color: _isFreeTime ? const Color(0xff2d6a4f) : Colors.transparent,
+                  color: _isFreeTime
+                      ? const Color(0xff2d6a4f)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: _isFreeTime
                       ? [
@@ -1284,7 +1553,7 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                             color: const Color(0xff2d6a4f).withOpacity(0.2),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
-                          )
+                          ),
                         ]
                       : null,
                 ),
@@ -1322,11 +1591,553 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
     );
   }
 
+  // ── اختيار نطاق المزرعة (خاصة / عامة) ──
+  Widget _buildFarmScopeSelector() {
+    final isPublic = _farmScope == 'public';
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isPublic ? const Color(0xffeff6ff) : const Color(0xffe8efe9),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isPublic ? const Color(0xff93c5fd) : const Color(0xff86efac),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _farmScope = 'private'),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: !isPublic
+                      ? const Color(0xff2d6a4f)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      size: 15,
+                      color: !isPublic ? Colors.white : const Color(0xff5f7d6a),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'مزرعة خاصة',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        color: !isPublic
+                            ? Colors.white
+                            : const Color(0xff5f7d6a),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _farmScope = 'public'),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: isPublic
+                      ? const Color(0xff1d4ed8)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.public_rounded,
+                      size: 15,
+                      color: isPublic ? Colors.white : const Color(0xff5f7d6a),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'مزرعة عامة',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        color: isPublic
+                            ? Colors.white
+                            : const Color(0xff5f7d6a),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── تبويب 4: المزرعة العامة (University-wide Public Farm) ──
+  Widget _buildPublicFarmTab() {
+    final publicFarmAsync = ref.watch(_publicFarmProvider);
+
+    return publicFarmAsync.when(
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: Color(0xff2d6a4f)),
+      ),
+      error: (err, _) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.public_off_rounded, size: 48, color: Colors.grey),
+            const SizedBox(height: 12),
+            const Text(
+              'تعذّر تحميل المزرعة العامة',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: () => ref.invalidate(_publicFarmProvider),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xff2d6a4f),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      ),
+      data: (data) {
+        final rows = _asList(
+          data['rows'],
+        ).whereType<Map>().map(_mapFromDynamic).toList();
+        final stats = _asMap(data['stats']);
+        final participantCount = _asInt(stats['participant_count']);
+        final totalPublicSeconds = _asInt(stats['total_public_focus_seconds']);
+
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(_publicFarmProvider),
+          color: const Color(0xff2d6a4f),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+            children: [
+              // ── بطاقة الإحصائيات العامة ──
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xff1d4ed8), Color(0xff3b82f6)],
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xff1d4ed8).withOpacity(0.25),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.public_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'المزرعة العامة 🌍',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'تنافس مع طلاب جامعتك وابنِ مزرعتك في المجتمع',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.85),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        _buildPublicStatChip(
+                          Icons.people_rounded,
+                          '$participantCount',
+                          'مشارك',
+                        ),
+                        const SizedBox(width: 12),
+                        _buildPublicStatChip(
+                          Icons.access_time_rounded,
+                          _formatPublicFocusTime(totalPublicSeconds),
+                          'إجمالي التركيز',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── رسالة التشجيع إذا كانت المزرعة فارغة ──
+              if (rows.isEmpty) ...[
+                const SizedBox(height: 40),
+                const Center(
+                  child: Column(
+                    children: [
+                      Text('🌱', style: TextStyle(fontSize: 56)),
+                      SizedBox(height: 16),
+                      Text(
+                        'المزرعة العامة فارغة حتى الآن!',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 17,
+                          color: Color(0xff1b4332),
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'ابدأ جلسة تركيز بنمط "مزرعة عامة" لتظهر في القائمة وتتنافس مع زملائك!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 13,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                // ── لوحة مرتبة الشرف ──
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '🏆 مرتبة الشرف - الجامعة',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      color: Color(0xff1b4332),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // ── أفضل 3 ──
+                if (rows.isNotEmpty) _buildTopThreePodium(rows),
+                const SizedBox(height: 16),
+
+                // ── القائمة الكاملة ──
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.grey.shade100),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 12,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: List.generate(rows.length, (index) {
+                      final row = rows[index];
+                      final rank = _asInt(row['rank']);
+                      final name = row['name']?.toString() ?? 'مستخدم';
+                      final publicSecs = _asInt(row['public_focus_seconds']);
+                      final isTopThree = rank <= 3;
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          border: index < rows.length - 1
+                              ? Border(
+                                  bottom: BorderSide(
+                                    color: Colors.grey.shade100,
+                                  ),
+                                )
+                              : null,
+                          color: isTopThree
+                              ? (rank == 1
+                                    ? const Color(0xfffff9e7)
+                                    : rank == 2
+                                    ? const Color(0xfff5f5f5)
+                                    : const Color(0xfffff3e0))
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(
+                            index == 0
+                                ? 20
+                                : index == rows.length - 1
+                                ? 20
+                                : 0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            // الرتبة
+                            SizedBox(
+                              width: 36,
+                              child: Text(
+                                rank == 1
+                                    ? '🥇'
+                                    : rank == 2
+                                    ? '🥈'
+                                    : rank == 3
+                                    ? '🥉'
+                                    : '$rank',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: rank <= 3 ? 20 : 13,
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xff6b7280),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            // أيقونة شجرة
+                            const Text('🌳', style: TextStyle(fontSize: 20)),
+                            const SizedBox(width: 10),
+                            // الاسم
+                            Expanded(
+                              child: Text(
+                                name,
+                                style: TextStyle(
+                                  fontWeight: isTopThree
+                                      ? FontWeight.w900
+                                      : FontWeight.w600,
+                                  fontSize: isTopThree ? 14 : 13,
+                                  color: const Color(0xff1b4332),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            // وقت التركيز
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isTopThree
+                                    ? const Color(0xff1d4ed8).withOpacity(0.1)
+                                    : const Color(0xffe8efe9),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                _formatPublicFocusTime(publicSecs),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11,
+                                  color: isTopThree
+                                      ? const Color(0xff1d4ed8)
+                                      : const Color(0xff2d6a4f),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 20),
+              // ── تنبيه التشجيع للمشاركة ──
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xffeff6ff),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xffbfdbfe),
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Text('💡', style: TextStyle(fontSize: 22)),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'لكي تظهر في المزرعة العامة، ابدأ جلسة تركيز واختر "مزرعة عامة" من تبويب التركيز، وتأكد من تفعيل الظهور العام من الإعدادات.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xff1e40af),
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPublicStatChip(IconData icon, String value, String label) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 10,
+                    color: Colors.white.withOpacity(0.8),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopThreePodium(List<Map<String, dynamic>> rows) {
+    final top = rows.take(3).toList();
+    if (top.isEmpty) return const SizedBox.shrink();
+
+    // ترتيب المنصة: المركز 2 - المركز 1 - المركز 3
+    final order = [
+      if (top.length > 1) top[1],
+      top[0],
+      if (top.length > 2) top[2],
+    ];
+    final heights = top.length > 1 ? [100.0, 130.0, 80.0] : [130.0];
+    final colors = [
+      const Color(0xffc0c0c0),
+      const Color(0xffffd700),
+      const Color(0xffcd7f32),
+    ];
+    final medals = ['🥈', '🥇', '🥉'];
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(order.length, (i) {
+        final row = order[i];
+        final name = row['name']?.toString() ?? '';
+        final secs = _asInt(row['public_focus_seconds']);
+        return Expanded(
+          child: Column(
+            children: [
+              Text(
+                medals[i < heights.length ? i : i],
+                style: const TextStyle(fontSize: 24),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                name,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                  color: Color(0xff1b4332),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _formatPublicFocusTime(secs),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                  color: Color(0xff2d6a4f),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                height: i < heights.length ? heights[i] : 80,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: i < colors.length ? colors[i] : colors.last,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
+  String _formatPublicFocusTime(int seconds) {
+    if (seconds < 3600) {
+      return '${seconds ~/ 60}د';
+    }
+    final h = seconds ~/ 3600;
+    final m = (seconds % 3600) ~/ 60;
+    if (m > 0) return '$hس $mد';
+    return '$hس';
+  }
+
   // شاشة الجلسة النشطة
   Widget _buildActiveFocusView(Map<String, dynamic> session) {
     final isFreeTime = session['is_free_time'] == true;
     final planned = _asInt(session['planned_seconds']);
-    final startedAt = DateTime.tryParse(session['started_at']?.toString() ?? '');
+    final startedAt = DateTime.tryParse(
+      session['started_at']?.toString() ?? '',
+    );
     final elapsed = startedAt == null
         ? 0
         : DateTime.now().toUtc().difference(startedAt.toUtc()).inSeconds;
@@ -1343,15 +2154,25 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.center_focus_strong_rounded, color: Color(0xff2d6a4f), size: 40),
+        const Icon(
+          Icons.center_focus_strong_rounded,
+          color: Color(0xff2d6a4f),
+          size: 40,
+        ),
         const SizedBox(height: 10),
         const Text(
           'أنت الآن في وضع التركيز العميق',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xff1b4332)),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            color: Color(0xff1b4332),
+          ),
         ),
         const SizedBox(height: 6),
         Text(
-          isFreeTime ? 'الوقت يمر والتربة تنمو ثماراً...' : 'ابق بعيداً عن المشتتات لتنمو شجرتك!',
+          isFreeTime
+              ? 'الوقت يمر والتربة تنمو ثماراً...'
+              : 'ابق بعيداً عن المشتتات لتنمو شجرتك!',
           style: const TextStyle(color: Colors.grey, fontSize: 13),
         ),
         const SizedBox(height: 36),
@@ -1361,7 +2182,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
           width: 230,
           height: 230,
           child: _CircularTimerDial(
-            duration: Duration(seconds: isFreeTime ? elapsed : math.max(0, planned - elapsed)),
+            duration: Duration(
+              seconds: isFreeTime ? elapsed : math.max(0, planned - elapsed),
+            ),
             minMinutes: 10,
             maxMinutes: 120,
             readOnly: true,
@@ -1370,7 +2193,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
             child: Stack(
               alignment: Alignment.center,
               children: [
-                if (_activeAmbientSound != null && (_activeAmbientSound == 'rain' || _activeAmbientSound == 'forest'))
+                if (_activeAmbientSound != null &&
+                    (_activeAmbientSound == 'rain' ||
+                        _activeAmbientSound == 'forest'))
                   Positioned.fill(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(115),
@@ -1383,11 +2208,18 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                     SizedBox(
                       height: 80,
                       width: 80,
-                      child: _PlantAnimation(progress: 1.0, code: activePlantCode),
+                      child: _PlantAnimation(
+                        progress: 1.0,
+                        code: activePlantCode,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      isFreeTime ? _formatRemainingTime(elapsed) : _formatRemainingTime(math.max(0, planned - elapsed)),
+                      isFreeTime
+                          ? _formatRemainingTime(elapsed)
+                          : _formatRemainingTime(
+                              math.max(0, planned - elapsed),
+                            ),
                       style: const TextStyle(
                         fontSize: 30,
                         fontWeight: FontWeight.w900,
@@ -1407,7 +2239,12 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildFocusActionButton('تفريغ فكرة 💡', const Color(0xffe8efe9), const Color(0xff2d6a4f), _addThought),
+            _buildFocusActionButton(
+              'تفريغ فكرة 💡',
+              const Color(0xffe8efe9),
+              const Color(0xff2d6a4f),
+              _addThought,
+            ),
           ],
         ),
         _buildAmbientPlayer(),
@@ -1416,42 +2253,77 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
           width: 200,
           height: 48,
           child: FilledButton.icon(
-            onPressed: _busy ? null : () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('إنهاء الجلسة', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-                  content: const Text('هل أنت متأكد من رغبتك في إنهاء جلسة التركيز الحالية؟', style: TextStyle(fontFamily: 'Cairo')),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-                    ),
-                    FilledButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      style: FilledButton.styleFrom(backgroundColor: const Color(0xffb91c1c)),
-                      child: const Text('إنهاء', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              );
-              if (confirm == true) {
-                await _finishSession();
-              }
-            },
+            onPressed: _busy
+                ? null
+                : () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text(
+                          'إنهاء الجلسة',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        content: const Text(
+                          'هل أنت متأكد من رغبتك في إنهاء جلسة التركيز الحالية؟',
+                          style: TextStyle(fontFamily: 'Cairo'),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text(
+                              'إلغاء',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xffb91c1c),
+                            ),
+                            child: const Text(
+                              'إنهاء',
+                              style: TextStyle(
+                                fontFamily: 'Cairo',
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      await _finishSession();
+                    }
+                  },
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xffb91c1c),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
             ),
             icon: const Icon(Icons.stop_circle_rounded),
-            label: const Text('إنهاء الجلسة', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: const Text(
+              'إنهاء الجلسة',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildFocusActionButton(String label, Color bg, Color textCol, VoidCallback onTap) {
+  Widget _buildFocusActionButton(
+    String label,
+    Color bg,
+    Color textCol,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1462,7 +2334,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
         ),
         child: Text(
           label,
-          style: TextStyle(color: textCol, fontWeight: FontWeight.bold, fontSize: 13),
+          style: TextStyle(
+            color: textCol,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
         ),
       ),
     );
@@ -1482,7 +2358,12 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       color: const Color(0xff2d6a4f),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 95), // مساحة سفلية للشريط العائم
+        padding: const EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          95,
+        ), // مساحة سفلية للشريط العائم
         child: Column(
           children: [
             // كرت الإحصائيات
@@ -1492,16 +2373,29 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.grey.shade200),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 10,
+                  ),
+                ],
               ),
               child: Row(
                 children: [
                   Expanded(
-                    child: _buildForestStat('إجمالي التركيز', _formatDuration(_asInt(profile['total_focus_seconds'])), Icons.punch_clock_rounded),
+                    child: _buildForestStat(
+                      'إجمالي التركيز',
+                      _formatDuration(_asInt(profile['total_focus_seconds'])),
+                      Icons.punch_clock_rounded,
+                    ),
                   ),
                   Container(width: 1, height: 40, color: Colors.grey.shade200),
                   Expanded(
-                    child: _buildForestStat('عدد الأشجار', '${plants.length}', Icons.eco_rounded),
+                    child: _buildForestStat(
+                      'عدد الأشجار',
+                      '${plants.length}',
+                      Icons.eco_rounded,
+                    ),
                   ),
                 ],
               ),
@@ -1518,7 +2412,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 children: [
                   const Text(
                     'أشجاري هذا الأسبوع:',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xff1b4332)),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      color: Color(0xff1b4332),
+                    ),
                   ),
                   _buildCoinsBadge(profile),
                 ],
@@ -1532,7 +2430,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 alignment: Alignment.centerRight,
                 child: Text(
                   'سجل زراعة الأشجار الأخير:',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xff1b4332)),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: Color(0xff1b4332),
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
@@ -1546,42 +2448,59 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                     border: Border.all(color: Colors.grey.shade200),
                   ),
                   child: Column(
-                    children: List.generate(
-                      math.min(5, plants.length),
-                      (index) {
-                        final plant = plants[index];
-                        final subject = plant['subject_name']?.toString();
-                        final plantCode = plant['plant_code']?.toString() ?? plant['code']?.toString();
-                        final isBurned = plantCode == 'burned_tree';
-                        final plantName = isBurned ? 'شجرة جافة 🍂' : (plant['name']?.toString() ?? 'شجرة');
-                        
-                        return ListTile(
-                          leading: SizedBox(
-                            width: 32,
-                            height: 32,
-                            child: _PlantAnimation(
-                              progress: 1.0,
-                              code: plantCode,
-                            ),
+                    children: List.generate(math.min(5, plants.length), (
+                      index,
+                    ) {
+                      final plant = plants[index];
+                      final subject = plant['subject_name']?.toString();
+                      final plantCode =
+                          plant['plant_code']?.toString() ??
+                          plant['code']?.toString();
+                      final isBurned = plantCode == 'burned_tree';
+                      final plantName = isBurned
+                          ? 'شجرة جافة 🍂'
+                          : (plant['name']?.toString() ?? 'شجرة');
+
+                      return ListTile(
+                        leading: SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: _PlantAnimation(
+                            progress: 1.0,
+                            code: plantCode,
                           ),
-                          title: Text(plantName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(_formatDateTime(plant['planted_at'] ?? plant['synced_at'])),
-                          trailing: subject != null
-                              ? Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xffe8efe9),
-                                    borderRadius: BorderRadius.circular(8),
+                        ),
+                        title: Text(
+                          plantName,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          _formatDateTime(
+                            plant['planted_at'] ?? plant['synced_at'],
+                          ),
+                        ),
+                        trailing: subject != null
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xffe8efe9),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  subject,
+                                  style: const TextStyle(
+                                    color: Color(0xff2d6a4f),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  child: Text(
-                                    subject,
-                                    style: const TextStyle(color: Color(0xff2d6a4f), fontSize: 11, fontWeight: FontWeight.bold),
-                                  ),
-                                 )
-                              : null,
-                        );
-                      },
-                    ),
+                                ),
+                              )
+                            : null,
+                      );
+                    }),
                   ),
                 ),
             ] else ...[
@@ -1590,7 +2509,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 children: [
                   const Text(
                     'توزيع التركيز حسب المواد الدراسية:',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xff1b4332)),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      color: Color(0xff1b4332),
+                    ),
                   ),
                   _buildCoinsBadge(profile),
                 ],
@@ -1602,7 +2525,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 alignment: Alignment.centerRight,
                 child: Text(
                   'تفاصيل أوقات المذاكرة لكل مقرر:',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xff1b4332)),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: Color(0xff1b4332),
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
@@ -1613,7 +2540,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
               alignment: Alignment.centerRight,
               child: Text(
                 'مرتبة الشرف (المزرعة العامة) 🏆',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xff1b4332)),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: Color(0xff1b4332),
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -1630,7 +2561,14 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
         Icon(icon, color: const Color(0xff2d6a4f), size: 20),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
-        Text(val, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xff1b4332))),
+        Text(
+          val,
+          style: const TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 15,
+            color: Color(0xff1b4332),
+          ),
+        ),
       ],
     );
   }
@@ -1673,16 +2611,23 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 decoration: BoxDecoration(
-                  color: hasTree ? const Color(0xffd8f3dc) : Colors.white.withOpacity(0.3),
+                  color: hasTree
+                      ? const Color(0xffd8f3dc)
+                      : Colors.white.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: hasTree ? const Color(0xffb7e4c7) : Colors.white.withOpacity(0.1),
+                    color: hasTree
+                        ? const Color(0xffb7e4c7)
+                        : Colors.white.withOpacity(0.1),
                     width: 1,
                   ),
                 ),
                 padding: const EdgeInsets.all(4),
                 child: hasTree
-                    ? _PlantAnimation(progress: 1.0, code: plant?['plant_code']?.toString())
+                    ? _PlantAnimation(
+                        progress: 1.0,
+                        code: plant?['plant_code']?.toString(),
+                      )
                     : null,
               ),
             ),
@@ -1706,7 +2651,12 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       color: const Color(0xff2d6a4f),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 95), // مساحة سفلية للشريط العائم
+        padding: const EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          95,
+        ), // مساحة سفلية للشريط العائم
         children: [
           // كرت طلب جائزة فوري
           Container(
@@ -1715,21 +2665,39 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: const Color(0xffd8f3dc)),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 10)],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.01),
+                  blurRadius: 10,
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.redeem_rounded, color: Colors.amber, size: 28),
+                    const Icon(
+                      Icons.redeem_rounded,
+                      color: Colors.amber,
+                      size: 28,
+                    ),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('طلب مكافأة نجوم', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text('حول 25 عملة إلى نجمة واحدة لدعم مستواك', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                          Text(
+                            'طلب مكافأة نجوم',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            'حول 25 عملة إلى نجمة واحدة لدعم مستواك',
+                            style: TextStyle(color: Colors.grey, fontSize: 11),
+                          ),
                         ],
                       ),
                     ),
@@ -1739,12 +2707,18 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: () => _showRewardDialog(_asInt(profile['coins_balance'])),
+                    onPressed: () =>
+                        _showRewardDialog(_asInt(profile['coins_balance'])),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xff2d6a4f),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
-                    child: const Text('طلب تحويل العملات الآن', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'طلب تحويل العملات الآن',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ],
@@ -1758,7 +2732,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
             children: [
               const Text(
                 'كتالوج بذور النباتات المتاحة 🌱',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xff1b4332)),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: Color(0xff1b4332),
+                ),
               ),
               _buildCoinsBadge(profile),
             ],
@@ -1788,14 +2766,21 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                   style: const TextStyle(fontSize: 12),
                 ),
                 trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xffe8efe9),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     '+${_asInt(plant['coins'])} عملة',
-                    style: const TextStyle(color: Color(0xff2d6a4f), fontWeight: FontWeight.bold, fontSize: 12),
+                    style: const TextStyle(
+                      color: Color(0xff2d6a4f),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ),
@@ -1809,7 +2794,10 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
   }
 
   // تبويب 3: الإعدادات والأفكار
-  Widget _buildSettingsTab(Map<String, dynamic> profile, List<Map<String, dynamic>> thoughts) {
+  Widget _buildSettingsTab(
+    Map<String, dynamic> profile,
+    List<Map<String, dynamic>> thoughts,
+  ) {
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(_treeFarmProvider);
@@ -1818,17 +2806,16 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       color: const Color(0xff2d6a4f),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 95), // مساحة سفلية للشريط العائم
+        padding: const EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          95,
+        ), // مساحة سفلية للشريط العائم
         children: [
-          _ProfileSettingsSection(
-            profile: profile,
-            onUpdate: _updateProfile,
-          ),
+          _ProfileSettingsSection(profile: profile, onUpdate: _updateProfile),
           const SizedBox(height: 20),
-          _ThoughtsSection(
-            thoughts: thoughts,
-            onAddThought: _addThought,
-          ),
+          _ThoughtsSection(thoughts: thoughts, onAddThought: _addThought),
         ],
       ),
     );
@@ -1840,12 +2827,14 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
     bool? useAlias,
   }) async {
     try {
-      await ref.read(studentContentRepositoryProvider).updateTreeFarmProfile(
+      await ref
+          .read(studentContentRepositoryProvider)
+          .updateTreeFarmProfile(
             publicName: publicName,
             isPublic: isPublic,
             useAlias: useAlias,
           );
-      ref.invalidate(_treeFarmProvider);
+      _refreshFarmProviders();
       _showMessage('تم حفظ التغييرات بنجاح.');
     } catch (error) {
       _showMessage(_errorMessage(error));
@@ -1853,11 +2842,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
   }
 
   Map<String, dynamic>? _pendingPlantFor(Map<String, dynamic> session) {
-    final status = session['status']?.toString();
-    final isInterrupted = status == 'interrupted';
     final focused = _focusedSeconds(session);
 
-    if (isInterrupted || focused < 600) {
+    if (focused < 600) {
       return {
         'plant_code': 'burned_tree',
         'code': 'burned_tree',
@@ -1891,17 +2878,21 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
   }
 
   int _focusedSeconds(Map<String, dynamic> session) {
-    final startedAt = DateTime.tryParse(session['started_at']?.toString() ?? '');
-    final endedAt = DateTime.tryParse(session['ended_at']?.toString() ?? '') ?? DateTime.now().toUtc();
+    final startedAt = DateTime.tryParse(
+      session['started_at']?.toString() ?? '',
+    );
+    final endedAt =
+        DateTime.tryParse(session['ended_at']?.toString() ?? '') ??
+        DateTime.now().toUtc();
     final elapsed = startedAt == null
         ? 0
         : endedAt.toUtc().difference(startedAt.toUtc()).inSeconds;
     final planned = _asInt(session['planned_seconds']);
-    
+
     // إذا كانت وقت حر، لا يوجد حد أقصى مخطط، نكتفي بالـ 4 ساعات (14400 ثانية) كحد أقصى
     final isFree = session['is_free_time'] == true;
     final limit = isFree ? 14400 : planned;
-    
+
     return math.max(0, math.min(limit, elapsed));
   }
 
@@ -1911,7 +2902,10 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       SnackBar(
         content: Text(
           message,
-          style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontFamily: 'Cairo',
+            fontWeight: FontWeight.bold,
+          ),
         ),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1947,7 +2941,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
             children: [
               const Row(
                 children: [
-                  Icon(Icons.headset_rounded, color: Color(0xff2d6a4f), size: 18),
+                  Icon(
+                    Icons.headset_rounded,
+                    color: Color(0xff2d6a4f),
+                    size: 18,
+                  ),
                   SizedBox(width: 8),
                   Text(
                     'أصوات الخلفية المهدئة (أوفلاين) 🎧',
@@ -1981,7 +2979,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
             const SizedBox(height: 12),
             Row(
               children: [
-                const Icon(Icons.volume_down_rounded, color: Colors.grey, size: 16),
+                const Icon(
+                  Icons.volume_down_rounded,
+                  color: Colors.grey,
+                  size: 16,
+                ),
                 Expanded(
                   child: Slider(
                     value: _ambientVolume,
@@ -1995,7 +2997,11 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                     inactiveColor: const Color(0xffe8efe9),
                   ),
                 ),
-                const Icon(Icons.volume_up_rounded, color: Colors.grey, size: 16),
+                const Icon(
+                  Icons.volume_up_rounded,
+                  color: Colors.grey,
+                  size: 16,
+                ),
               ],
             ),
           ],
@@ -2056,7 +3062,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
       setState(() {
         _activeAmbientSound = previousActiveSound;
       });
-      _showMessage('عذراً، تعذر تشغيل الصوت. الرجاء إيقاف التطبيق بالكامل وإعادة تشغيله (flutter run) لتفعيل إضافات الصوت. خطأ: $e');
+      _showMessage(
+        'عذراً، تعذر تشغيل الصوت. الرجاء إيقاف التطبيق بالكامل وإعادة تشغيله (flutter run) لتفعيل إضافات الصوت. خطأ: $e',
+      );
     }
   }
 
@@ -2064,39 +3072,45 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
     final code = plant['plant_code']?.toString() ?? plant['code']?.toString();
     final plantedAtStr = plant['planted_at'] ?? plant['synced_at'];
     if (code == null || plantedAtStr == null) return null;
-    
+
     final plantedAt = DateTime.tryParse(plantedAtStr.toString());
     if (plantedAt == null) return null;
-    
+
     Map<String, dynamic>? bestMatch;
     int minDiffSeconds = 999999;
-    
+
     for (final meta in _local.localHistoryMetadata) {
       if (meta['plant_code'] != code) continue;
       final metaTimeStr = meta['planted_at'];
       if (metaTimeStr == null) continue;
       final metaTime = DateTime.tryParse(metaTimeStr.toString());
       if (metaTime == null) continue;
-      
+
       final diff = metaTime.difference(plantedAt).inSeconds.abs();
-      if (diff < minDiffSeconds && diff < 600) { // Max 10 minutes difference
+      if (diff < minDiffSeconds && diff < 600) {
+        // Max 10 minutes difference
         minDiffSeconds = diff;
         bestMatch = meta;
       }
     }
-    
+
     return bestMatch;
   }
 
   void _showPlantDetailsBottomSheet(Map<String, dynamic> plant) {
     final meta = _getPlantMetadata(plant);
-    final subject = plant['subject_name']?.toString() ?? meta?['subject_name']?.toString();
-    final thoughts = _asList(plant['thoughts']).isNotEmpty 
-        ? _asList(plant['thoughts']).cast<String>() 
-        : (meta?['thoughts'] != null ? List<String>.from(meta!['thoughts']) : const <String>[]);
+    final subject =
+        plant['subject_name']?.toString() ?? meta?['subject_name']?.toString();
+    final thoughts = _asList(plant['thoughts']).isNotEmpty
+        ? _asList(plant['thoughts']).cast<String>()
+        : (meta?['thoughts'] != null
+              ? List<String>.from(meta!['thoughts'])
+              : const <String>[]);
     final durationMin = _asInt(plant['required_seconds']) ~/ 60;
     final isBurned = plant['plant_code']?.toString() == 'burned_tree';
-    final plantName = isBurned ? 'شجرة جافة 🍂' : (plant['name']?.toString() ?? 'نبتة');
+    final plantName = isBurned
+        ? 'شجرة جافة 🍂'
+        : (plant['name']?.toString() ?? 'نبتة');
 
     showModalBottomSheet<void>(
       context: context,
@@ -2161,7 +3175,10 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                       child: SizedBox(
                         height: 52,
                         width: 52,
-                        child: _PlantAnimation(progress: 1.0, code: plant['plant_code']?.toString()),
+                        child: _PlantAnimation(
+                          progress: 1.0,
+                          code: plant['plant_code']?.toString(),
+                        ),
                       ),
                     ),
                   ),
@@ -2176,7 +3193,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                             fontFamily: 'Cairo',
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            color: isBurned ? const Color(0xffb45309) : const Color(0xff1b4332),
+                            color: isBurned
+                                ? const Color(0xffb45309)
+                                : const Color(0xff1b4332),
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -2210,10 +3229,16 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                   Expanded(
                     child: _buildBentoStatCard(
                       icon: Icons.monetization_on_rounded,
-                      value: isBurned ? '0' : '+${_asInt(plant['coins_awarded'])}',
+                      value: isBurned
+                          ? '0'
+                          : '+${_asInt(plant['coins_awarded'])}',
                       label: 'العملات',
-                      bgColor: isBurned ? const Color(0xfff5f5f5) : const Color(0xfffef3c7),
-                      iconColor: isBurned ? Colors.grey.shade600 : const Color(0xffb45309),
+                      bgColor: isBurned
+                          ? const Color(0xfff5f5f5)
+                          : const Color(0xfffef3c7),
+                      iconColor: isBurned
+                          ? Colors.grey.shade600
+                          : const Color(0xffb45309),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -2244,17 +3269,25 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isBurned ? const Color(0xfffdfaf7) : const Color(0xfff7fbf7),
+                    color: isBurned
+                        ? const Color(0xfffdfaf7)
+                        : const Color(0xfff7fbf7),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isBurned ? const Color(0xfffee2e2) : const Color(0xffe8efe9),
+                      color: isBurned
+                          ? const Color(0xfffee2e2)
+                          : const Color(0xffe8efe9),
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
-                        isBurned ? Icons.info_outline_rounded : Icons.stars_rounded,
-                        color: isBurned ? const Color(0xffb45309) : const Color(0xff2d6a4f),
+                        isBurned
+                            ? Icons.info_outline_rounded
+                            : Icons.stars_rounded,
+                        color: isBurned
+                            ? const Color(0xffb45309)
+                            : const Color(0xff2d6a4f),
                         size: 24,
                       ),
                       const SizedBox(width: 12),
@@ -2266,7 +3299,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                           style: TextStyle(
                             fontFamily: 'Cairo',
                             fontSize: 12,
-                            color: isBurned ? const Color(0xff78350f) : const Color(0xff1b4332),
+                            color: isBurned
+                                ? const Color(0xff78350f)
+                                : const Color(0xff1b4332),
                             fontWeight: FontWeight.w600,
                             height: 1.4,
                           ),
@@ -2280,48 +3315,52 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                   constraints: const BoxConstraints(maxHeight: 140),
                   child: SingleChildScrollView(
                     child: Column(
-                      children: thoughts.map((t) => Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xfffdfbf7),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.grey.shade100),
-                        ),
-                        width: double.infinity,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Stack(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  top: 10,
-                                  bottom: 10,
-                                  left: 10,
-                                  right: 14,
-                                ),
-                                child: Text(
-                                  t,
-                                  style: const TextStyle(
-                                    fontFamily: 'Cairo',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xff2c3e50),
-                                  ),
+                      children: thoughts
+                          .map(
+                            (t) => Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xfffdfbf7),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.grey.shade100),
+                              ),
+                              width: double.infinity,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Stack(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        top: 10,
+                                        bottom: 10,
+                                        left: 10,
+                                        right: 14,
+                                      ),
+                                      child: Text(
+                                        t,
+                                        style: const TextStyle(
+                                          fontFamily: 'Cairo',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xff2c3e50),
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 0,
+                                      bottom: 0,
+                                      right: 0,
+                                      width: 3,
+                                      child: Container(
+                                        color: const Color(0xff2d6a4f),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              Positioned(
-                                top: 0,
-                                bottom: 0,
-                                right: 0,
-                                width: 3,
-                                child: Container(
-                                  color: const Color(0xff2d6a4f),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )).toList(),
+                            ),
+                          )
+                          .toList(),
                     ),
                   ),
                 ),
@@ -2334,8 +3373,12 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                         final shareText = isBurned
                             ? 'لقد حاولت زراعة شجرة في مزرعة معين لتركيزي، سأحاول مجدداً وبشكل أفضل!'
                             : 'لقد زرعت شجرة $plantName بنجاح في مزرعة معين لتركيزي لمدة $durationMin دقيقة! 🌲✨';
-                        Clipboard.setData(ClipboardData(text: shareText)).then((_) {
-                          _showMessage('تم نسخ تفاصيل الإنجاز لمشاركتها مع أصدقائك! 📋');
+                        Clipboard.setData(ClipboardData(text: shareText)).then((
+                          _,
+                        ) {
+                          _showMessage(
+                            'تم نسخ تفاصيل الإنجاز لمشاركتها مع أصدقائك! 📋',
+                          );
                         });
                       },
                       icon: const Icon(Icons.share_rounded, size: 18),
@@ -2452,7 +3495,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 decoration: BoxDecoration(
-                  color: _forestSubTab == 0 ? const Color(0xff2d6a4f) : Colors.transparent,
+                  color: _forestSubTab == 0
+                      ? const Color(0xff2d6a4f)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(17),
                 ),
                 alignment: Alignment.center,
@@ -2460,7 +3505,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                   'خريطة الغابة 🌲',
                   style: TextStyle(
                     fontFamily: 'Cairo',
-                    color: _forestSubTab == 0 ? Colors.white : const Color(0xff5f7d6a),
+                    color: _forestSubTab == 0
+                        ? Colors.white
+                        : const Color(0xff5f7d6a),
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                   ),
@@ -2474,7 +3521,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 decoration: BoxDecoration(
-                  color: _forestSubTab == 1 ? const Color(0xff2d6a4f) : Colors.transparent,
+                  color: _forestSubTab == 1
+                      ? const Color(0xff2d6a4f)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(17),
                 ),
                 alignment: Alignment.center,
@@ -2482,7 +3531,9 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
                   'إحصائيات المواد 📊',
                   style: TextStyle(
                     fontFamily: 'Cairo',
-                    color: _forestSubTab == 1 ? Colors.white : const Color(0xff5f7d6a),
+                    color: _forestSubTab == 1
+                        ? Colors.white
+                        : const Color(0xff5f7d6a),
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                   ),
@@ -2497,9 +3548,12 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
 
   Widget _buildSubjectBreakdownList(Map<String, int> data) {
     if (data.isEmpty) {
-      return const _EmptyBox(message: 'لا توجد سجلات تركيز للمواد الدراسية بعد.');
+      return const _EmptyBox(
+        message: 'لا توجد سجلات تركيز للمواد الدراسية بعد.',
+      );
     }
-    final sorted = data.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final sorted = data.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -2516,8 +3570,17 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
               foregroundColor: Color(0xff2d6a4f),
               child: Icon(Icons.menu_book_rounded, size: 18),
             ),
-            title: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
-            subtitle: Text('إجمالي الدقائق: $mins دقيقة', style: const TextStyle(fontFamily: 'Cairo', fontSize: 12)),
+            title: Text(
+              entry.key,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Cairo',
+              ),
+            ),
+            subtitle: Text(
+              'إجمالي الدقائق: $mins دقيقة',
+              style: const TextStyle(fontFamily: 'Cairo', fontSize: 12),
+            ),
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
@@ -2526,7 +3589,12 @@ class _StudentTreeFarmScreenState extends ConsumerState<StudentTreeFarmScreen>
               ),
               child: Text(
                 '$hours ساعة',
-                style: const TextStyle(color: Color(0xff2d6a4f), fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'Cairo'),
+                style: const TextStyle(
+                  color: Color(0xff2d6a4f),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  fontFamily: 'Cairo',
+                ),
               ),
             ),
           );
@@ -2581,7 +3649,10 @@ class _CircularTimerDialState extends State<_CircularTimerDial> {
     if (angle < 0) angle += 2 * math.pi;
     double pct = angle / (2 * math.pi);
     int minutes = (pct * widget.maxMinutes).round();
-    minutes = ((minutes / 5).round() * 5).clamp(widget.minMinutes, widget.maxMinutes);
+    minutes = ((minutes / 5).round() * 5).clamp(
+      widget.minMinutes,
+      widget.maxMinutes,
+    );
     if (minutes != widget.duration.inMinutes) {
       HapticFeedback.lightImpact();
       widget.onChanged(Duration(minutes: minutes));
@@ -2621,7 +3692,9 @@ class _CircularTimerDialState extends State<_CircularTimerDial> {
       onPanCancel: () => setState(() => _isDragging = false),
       child: CustomPaint(
         painter: _TimerDialPainter(
-          progress: widget.readOnly ? widget.progress : (widget.duration.inMinutes / widget.maxMinutes),
+          progress: widget.readOnly
+              ? widget.progress
+              : (widget.duration.inMinutes / widget.maxMinutes),
           readOnly: widget.readOnly,
           isDragging: _isDragging,
         ),
@@ -2759,8 +3832,6 @@ class _PlantAnimation extends StatelessWidget {
   }
 }
 
-
-
 class _InfoBanner extends StatelessWidget {
   const _InfoBanner({required this.message});
 
@@ -2783,7 +3854,11 @@ class _InfoBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xffb45309)),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Color(0xffb45309),
+              ),
             ),
           ),
         ],
@@ -2933,10 +4008,7 @@ String _errorMessage(Object error) {
 }
 
 class _ThoughtsSection extends StatelessWidget {
-  const _ThoughtsSection({
-    required this.thoughts,
-    required this.onAddThought,
-  });
+  const _ThoughtsSection({required this.thoughts, required this.onAddThought});
 
   final List<Map<String, dynamic>> thoughts;
   final VoidCallback onAddThought;
@@ -2997,7 +4069,10 @@ class _ThoughtsSection extends StatelessWidget {
                   backgroundColor: const Color(0xff2d6a4f),
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -3048,7 +4123,9 @@ class _ThoughtsSection extends StatelessWidget {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xfffdfbf7), // Warm premium cream paper color
+                    color: const Color(
+                      0xfffdfbf7,
+                    ), // Warm premium cream paper color
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.grey.shade100),
                     boxShadow: [
@@ -3068,7 +4145,8 @@ class _ThoughtsSection extends StatelessWidget {
                             top: 16,
                             bottom: 16,
                             left: 16,
-                            right: 20, // extra padding on the right for the accent line
+                            right:
+                                20, // extra padding on the right for the accent line
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3076,7 +4154,9 @@ class _ThoughtsSection extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xfffaedcd).withOpacity(0.5),
+                                  color: const Color(
+                                    0xfffaedcd,
+                                  ).withOpacity(0.5),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Transform.rotate(
@@ -3084,7 +4164,9 @@ class _ThoughtsSection extends StatelessWidget {
                                   child: const Icon(
                                     Icons.push_pin_rounded,
                                     size: 16,
-                                    color: Color(0xffe76f51), // Subtle warm orange pin color
+                                    color: Color(
+                                      0xffe76f51,
+                                    ), // Subtle warm orange pin color
                                   ),
                                 ),
                               ),
@@ -3113,7 +4195,10 @@ class _ThoughtsSection extends StatelessWidget {
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
-                                          _formatDateTime(thought['created_at'] ?? thought['synced_at']),
+                                          _formatDateTime(
+                                            thought['created_at'] ??
+                                                thought['synced_at'],
+                                          ),
                                           style: TextStyle(
                                             fontFamily: 'Cairo',
                                             color: Colors.grey.shade500,
@@ -3134,9 +4219,7 @@ class _ThoughtsSection extends StatelessWidget {
                           bottom: 0,
                           right: 0,
                           width: 4,
-                          child: Container(
-                            color: const Color(0xff2d6a4f),
-                          ),
+                          child: Container(color: const Color(0xff2d6a4f)),
                         ),
                       ],
                     ),
@@ -3169,7 +4252,11 @@ class _RewardRequestsSection extends StatelessWidget {
         children: [
           const Text(
             'طلبات المكافآت السابقة 🎁',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xff1b4332)),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xff1b4332),
+            ),
           ),
           const SizedBox(height: 12),
           if (requests.isEmpty)
@@ -3215,29 +4302,50 @@ class _RewardRequestsSection extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '$stars ${stars == 1 ? 'نجمة' : stars == 2 ? 'نجمتين' : 'نجوم'} ($coins عملة)',
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                              '$stars ${stars == 1
+                                  ? 'نجمة'
+                                  : stars == 2
+                                  ? 'نجمتين'
+                                  : 'نجوم'} ($coins عملة)',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                            if (status == 'rejected' && reason != null && reason.isNotEmpty) ...[
+                            if (status == 'rejected' &&
+                                reason != null &&
+                                reason.isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
                                 'السبب: $reason',
-                                style: const TextStyle(color: Color(0xffb91c1c), fontSize: 12),
+                                style: const TextStyle(
+                                  color: Color(0xffb91c1c),
+                                  fontSize: 12,
+                                ),
                               ),
                             ],
                           ],
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: statusColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: statusColor.withOpacity(0.2)),
+                          border: Border.all(
+                            color: statusColor.withOpacity(0.2),
+                          ),
                         ),
                         child: Text(
                           statusText,
-                          style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -3262,10 +4370,12 @@ class _ProfileSettingsSection extends StatefulWidget {
     String? publicName,
     bool? isPublic,
     bool? useAlias,
-  }) onUpdate;
+  })
+  onUpdate;
 
   @override
-  State<_ProfileSettingsSection> createState() => _ProfileSettingsSectionState();
+  State<_ProfileSettingsSection> createState() =>
+      _ProfileSettingsSectionState();
 }
 
 class _ProfileSettingsSectionState extends State<_ProfileSettingsSection> {
@@ -3279,7 +4389,9 @@ class _ProfileSettingsSectionState extends State<_ProfileSettingsSection> {
     super.initState();
     _isPublic = widget.profile['is_public'] == true;
     _useAlias = widget.profile['use_alias'] == true;
-    _nameController = TextEditingController(text: widget.profile['public_name']?.toString() ?? '');
+    _nameController = TextEditingController(
+      text: widget.profile['public_name']?.toString() ?? '',
+    );
   }
 
   @override
@@ -3319,13 +4431,20 @@ class _ProfileSettingsSectionState extends State<_ProfileSettingsSection> {
         children: [
           const Text(
             'إعدادات الخصوصية واللوحة العامة ⚙️',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xff1b4332)),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xff1b4332),
+            ),
           ),
           const SizedBox(height: 12),
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
             title: const Text('عرض اسمي في لوحة الصدارة العامة'),
-            subtitle: const Text('يسمح للآخرين بمشاهدة وقت تركيزك الكلي في المزرعة العامة', style: TextStyle(fontSize: 11)),
+            subtitle: const Text(
+              'يسمح للآخرين بمشاهدة وقت تركيزك الكلي في المزرعة العامة',
+              style: TextStyle(fontSize: 11),
+            ),
             activeColor: const Color(0xff2d6a4f),
             value: _isPublic,
             onChanged: (val) {
@@ -3336,7 +4455,10 @@ class _ProfileSettingsSectionState extends State<_ProfileSettingsSection> {
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
             title: const Text('استخدام اسم مستعار'),
-            subtitle: const Text('إخفاء اسمك الحقيقي واستبداله باسم مستعار في قائمة المتصدرين', style: TextStyle(fontSize: 11)),
+            subtitle: const Text(
+              'إخفاء اسمك الحقيقي واستبداله باسم مستعار في قائمة المتصدرين',
+              style: TextStyle(fontSize: 11),
+            ),
             activeColor: const Color(0xff2d6a4f),
             value: _useAlias,
             onChanged: (val) {
@@ -3353,8 +4475,13 @@ class _ProfileSettingsSectionState extends State<_ProfileSettingsSection> {
                     controller: _nameController,
                     decoration: const InputDecoration(
                       labelText: 'الاسم المستعار الظاهر للجميع',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                     ),
                   ),
                 ),
@@ -3364,10 +4491,15 @@ class _ProfileSettingsSectionState extends State<_ProfileSettingsSection> {
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Icon(Icons.check),
-                  style: IconButton.styleFrom(backgroundColor: const Color(0xff2d6a4f)),
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xff2d6a4f),
+                  ),
                   onPressed: _saving ? null : _save,
                 ),
               ],
@@ -3409,21 +4541,29 @@ class _LeaderboardList extends StatelessWidget {
               backgroundColor: rank == 1
                   ? Colors.amber.shade100
                   : rank == 2
-                      ? Colors.grey.shade300
-                      : rank == 3
-                          ? const Color(0xfffcd34d).withOpacity(0.2)
-                          : const Color(0xffe8efe9),
+                  ? Colors.grey.shade300
+                  : rank == 3
+                  ? const Color(0xfffcd34d).withOpacity(0.2)
+                  : const Color(0xffe8efe9),
               foregroundColor: rank == 1
                   ? Colors.amber.shade900
                   : rank == 2
-                      ? Colors.grey.shade700
-                      : rank == 3
-                          ? Colors.amber.shade800
-                          : const Color(0xff2d6a4f),
-              child: Text('$rank', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ? Colors.grey.shade700
+                  : rank == 3
+                  ? Colors.amber.shade800
+                  : const Color(0xff2d6a4f),
+              child: Text(
+                '$rank',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
-            title: Text(row['name']?.toString() ?? 'طالب', style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('وقت التركيز الكلي: ${_formatDuration(_asInt(row['focus_seconds']))}'),
+            title: Text(
+              row['name']?.toString() ?? 'طالب',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              'وقت التركيز الكلي: ${_formatDuration(_asInt(row['focus_seconds']))}',
+            ),
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -3432,7 +4572,11 @@ class _LeaderboardList extends StatelessWidget {
               ),
               child: Text(
                 '${_asInt(row['coins'])} عملة',
-                style: const TextStyle(color: Color(0xff2d6a4f), fontWeight: FontWeight.bold, fontSize: 12),
+                style: const TextStyle(
+                  color: Color(0xff2d6a4f),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
               ),
             ),
           );
@@ -3459,7 +4603,10 @@ class _EmptyBox extends StatelessWidget {
       child: Center(
         child: Text(
           message,
-          style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.grey,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
@@ -3474,7 +4621,8 @@ class _WeatherOverlay extends StatefulWidget {
   State<_WeatherOverlay> createState() => _WeatherOverlayState();
 }
 
-class _WeatherOverlayState extends State<_WeatherOverlay> with SingleTickerProviderStateMixin {
+class _WeatherOverlayState extends State<_WeatherOverlay>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   final List<_Particle> _particles = [];
   final math.Random _random = math.Random();
@@ -3502,16 +4650,20 @@ class _WeatherOverlayState extends State<_WeatherOverlay> with SingleTickerProvi
     _particles.clear();
     final count = widget.type == 'rain' ? 35 : 15;
     for (int i = 0; i < count; i++) {
-      _particles.add(_Particle(
-        x: _random.nextDouble(),
-        y: _random.nextDouble(),
-        speed: 0.01 + _random.nextDouble() * 0.02,
-        size: widget.type == 'rain' 
-            ? 1.2 + _random.nextDouble() * 1.5
-            : 2.5 + _random.nextDouble() * 3.5,
-        opacity: 0.1 + _random.nextDouble() * 0.6,
-        angle: widget.type == 'rain' ? math.pi / 6 : _random.nextDouble() * 2 * math.pi,
-      ));
+      _particles.add(
+        _Particle(
+          x: _random.nextDouble(),
+          y: _random.nextDouble(),
+          speed: 0.01 + _random.nextDouble() * 0.02,
+          size: widget.type == 'rain'
+              ? 1.2 + _random.nextDouble() * 1.5
+              : 2.5 + _random.nextDouble() * 3.5,
+          opacity: 0.1 + _random.nextDouble() * 0.6,
+          angle: widget.type == 'rain'
+              ? math.pi / 6
+              : _random.nextDouble() * 2 * math.pi,
+        ),
+      );
     }
   }
 
@@ -3550,13 +4702,13 @@ class _WeatherOverlayState extends State<_WeatherOverlay> with SingleTickerProvi
       } else if (widget.type == 'forest') {
         p.x += math.cos(p.angle) * 0.002;
         p.y += math.sin(p.angle) * 0.002;
-        
+
         // Wrap around boundary coordinates
         if (p.x < 0) p.x = 1.0;
         if (p.x > 1.0) p.x = 0.0;
         if (p.y < 0) p.y = 1.0;
         if (p.y > 1.0) p.y = 0.0;
-        
+
         // Randomly change directions occasionally
         if (_random.nextDouble() < 0.02) {
           p.angle = _random.nextDouble() * 2 * math.pi;
@@ -3585,7 +4737,11 @@ class _Particle {
 }
 
 class _WeatherPainter extends CustomPainter {
-  _WeatherPainter({required this.particles, required this.type, required this.tick});
+  _WeatherPainter({
+    required this.particles,
+    required this.type,
+    required this.tick,
+  });
   final List<_Particle> particles;
   final String type;
   final double tick;
@@ -3611,8 +4767,14 @@ class _WeatherPainter extends CustomPainter {
         final cx = p.x * size.width;
         final cy = p.y * size.height;
         // Pulse opacity using sine based on the tick
-        final pulseOpacity = (p.opacity * (0.4 + 0.6 * (math.sin(tick * 2 * math.pi + p.size) + 1.0) / 2.0)).clamp(0.0, 1.0);
-        
+        final pulseOpacity =
+            (p.opacity *
+                    (0.4 +
+                        0.6 *
+                            (math.sin(tick * 2 * math.pi + p.size) + 1.0) /
+                            2.0))
+                .clamp(0.0, 1.0);
+
         // Firefly glow
         final paintGlow = Paint()
           ..color = const Color(0xff52b788).withOpacity(pulseOpacity * 0.25)
@@ -3654,14 +4816,19 @@ class _SubjectPieChart extends StatelessWidget {
         child: Center(
           child: Text(
             'لا توجد بيانات لرسوم بيانية بعد.',
-            style: TextStyle(color: Colors.grey, fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Colors.grey,
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       );
     }
 
     final totalSeconds = data.values.fold<int>(0, (a, b) => a + b);
-    final sortedEntries = data.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final sortedEntries = data.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
 
     double startAngle = -math.pi / 2;
     final List<_PieSegment> segments = [];
@@ -3671,14 +4838,16 @@ class _SubjectPieChart extends StatelessWidget {
       final percentage = totalSeconds == 0 ? 0.0 : entry.value / totalSeconds;
       final sweepAngle = percentage * 2 * math.pi;
       final color = _palette[i % _palette.length];
-      segments.add(_PieSegment(
-        subject: entry.key,
-        seconds: entry.value,
-        percentage: percentage,
-        startAngle: startAngle,
-        sweepAngle: sweepAngle,
-        color: color,
-      ));
+      segments.add(
+        _PieSegment(
+          subject: entry.key,
+          seconds: entry.value,
+          percentage: percentage,
+          startAngle: startAngle,
+          sweepAngle: sweepAngle,
+          color: color,
+        ),
+      );
       startAngle += sweepAngle;
     }
 
@@ -3697,7 +4866,11 @@ class _SubjectPieChart extends StatelessWidget {
                   color: Colors.white,
                   shape: BoxShape.circle,
                   boxShadow: [
-                    BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
                   ],
                 ),
                 child: Column(
@@ -3705,7 +4878,12 @@ class _SubjectPieChart extends StatelessWidget {
                   children: [
                     const Text(
                       'التركيز الكلي',
-                      style: TextStyle(fontSize: 10, color: Colors.grey, fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey,
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Text(
                       _formatDurationHours(totalSeconds),

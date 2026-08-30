@@ -10,7 +10,6 @@ class _ClinicalListCard extends StatelessWidget {
     this.onTap,
     this.onEdit,
     this.onDelete,
-    this.editLabel,
   });
 
   final String title;
@@ -21,7 +20,6 @@ class _ClinicalListCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
-  final String? editLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +92,7 @@ class _ClinicalListCard extends StatelessWidget {
                         ActionChip(
                           onPressed: onEdit,
                           avatar: const Icon(Icons.edit_rounded, size: 16),
-                          label: Text(editLabel ?? 'تعديل'),
+                          label: const Text('تعديل'),
                         ),
                       if (onDelete != null)
                         ActionChip(

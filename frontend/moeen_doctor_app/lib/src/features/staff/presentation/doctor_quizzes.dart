@@ -3268,6 +3268,7 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
   bool _showCorrectionNotes = true;
   bool _notifyStudents = false;
   bool _showCountdown = true;
+  bool _allowQuestionBacktracking = true;
   bool _useAccessCode = false;
   bool _saving = false;
   bool _canEditContent = true;
@@ -3293,6 +3294,10 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
       _showCorrectionNotes = _docBool(quiz['show_correction_notes']);
       _notifyStudents = _docBool(quiz['notify_students']);
       _showCountdown = _docBool(quiz['show_countdown']);
+      _allowQuestionBacktracking =
+          quiz.containsKey('allow_question_backtracking')
+          ? _docBool(quiz['allow_question_backtracking'])
+          : true;
       _canEditContent = _docBool(widget.quizDetails?['can_edit_content']);
       final models = _docList(quiz['models']);
       _models.addAll(models.map(_QuizModelDraft.fromJson));
@@ -3584,6 +3589,14 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
                     value: _showCountdown,
                     onChanged: (v) => setState(() => _showCountdown = v),
                   ),
+                  if (_timerMode == 'quiz')
+                    _QuizSwitch(
+                      label: 'السماح بالرجوع للأسئلة',
+                      value: _allowQuestionBacktracking,
+                      onChanged: (v) => setState(() {
+                        _allowQuestionBacktracking = v;
+                      }),
+                    ),
                 ],
               ),
             ],
@@ -3699,6 +3712,8 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
         'time_limit_minutes': _timerMode == 'quiz'
             ? int.tryParse(_timeLimit.text.trim())
             : null,
+        'allow_question_backtracking':
+            _timerMode == 'quiz' && _allowQuestionBacktracking,
         'shuffle_questions': _shuffleQuestions,
         'shuffle_options': _shuffleOptions,
         'show_correct_answers': _showCorrectAnswers,
@@ -3738,6 +3753,8 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
   }
 
   bool _validateModels() {
+    final accessCodes = <String>{};
+
     for (var modelIndex = 0; modelIndex < _models.length; modelIndex++) {
       final model = _models[modelIndex];
       final modelName = model.name.text.trim();
@@ -3753,6 +3770,17 @@ class _QuizFormSheetState extends ConsumerState<_QuizFormSheet> {
       if (model.questions.isEmpty) {
         _quizValidationError('أضف سؤالًا واحدًا على الأقل في $modelLabel.');
         return false;
+      }
+
+      if (_useAccessCode) {
+        final accessCode = model.accessCode.text.trim().toUpperCase();
+        if (accessCode.isNotEmpty && accessCodes.contains(accessCode)) {
+          _quizValidationError(
+            'كود الدخول مكرر داخل نفس الكويز. استخدم كوداً مختلفاً لكل نموذج.',
+          );
+          return false;
+        }
+        if (accessCode.isNotEmpty) accessCodes.add(accessCode);
       }
 
       if (_useAccessCode && model.accessCode.text.trim().isEmpty) {

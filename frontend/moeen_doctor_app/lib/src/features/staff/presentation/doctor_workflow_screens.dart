@@ -22,9 +22,138 @@ Future<void> _showWorkflowApiError(
     return;
   }
   if (!context.mounted) return;
+  if (await _maybeRequestDoctorAttendanceEdit(context, error)) {
+    return;
+  }
+  if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text(error.message), backgroundColor: AppColors.danger),
   );
+}
+
+Future<bool> _maybeRequestDoctorAttendanceEdit(
+  BuildContext context,
+  ApiException error,
+) async {
+  if (error.statusCode != 403 ||
+      !error.message.contains('تعديل سجل الحضور مغلق')) {
+    return false;
+  }
+
+  final scope = _doctorAttendanceEditScope(error.errors);
+  final reasonController = TextEditingController();
+  var submitting = false;
+
+  final sent = await showDialog<bool>(
+    context: context,
+    barrierDismissible: !submitting,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setDialogState) {
+        Future<void> submit() async {
+          final reason = reasonController.text.trim();
+          if (reason.length < 5 || submitting) return;
+          setDialogState(() => submitting = true);
+          try {
+            final response = await ProviderScope.containerOf(dialogContext)
+                .read(staffRepositoryProvider)
+                .post('/doctor/attendance-edit-requests', {
+                  ...scope,
+                  'reason': reason,
+                });
+            final message =
+                response['message']?.toString() ??
+                'تم إرسال طلب فتح تعديل الحضور.';
+            if (!dialogContext.mounted) return;
+            Navigator.pop(dialogContext, true);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(message),
+                backgroundColor: AppColors.success,
+              ),
+            );
+          } on ApiException catch (requestError) {
+            if (!dialogContext.mounted) return;
+            setDialogState(() => submitting = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(requestError.message),
+                backgroundColor: AppColors.danger,
+              ),
+            );
+          }
+        }
+
+        return AlertDialog(
+          title: const Text('تعديل الحضور مغلق'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(error.message),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                minLines: 3,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  labelText: 'سبب طلب فتح التعديل',
+                  hintText: 'اكتب سبب التعديل المطلوب...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: submitting
+                  ? null
+                  : () => Navigator.pop(dialogContext, false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: submitting ? null : submit,
+              child: submitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('إرسال الطلب'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+
+  reasonController.dispose();
+  return sent == true;
+}
+
+Map<String, dynamic> _doctorAttendanceEditScope(Object? errors) {
+  if (errors is Map<String, dynamic>) {
+    return {
+      if (errors['attendance_id'] != null)
+        'attendance_id': errors['attendance_id'],
+      if (errors['subject_id'] != null) 'subject_id': errors['subject_id'],
+      if (errors['lecture_id'] != null) 'lecture_id': errors['lecture_id'],
+      if (errors['qr_attendance_session_id'] != null)
+        'qr_attendance_session_id': errors['qr_attendance_session_id'],
+      if (errors['date'] != null) 'date': errors['date'],
+    };
+  }
+  if (errors is Map) {
+    return {
+      if (errors['attendance_id'] != null)
+        'attendance_id': errors['attendance_id'],
+      if (errors['subject_id'] != null) 'subject_id': errors['subject_id'],
+      if (errors['lecture_id'] != null) 'lecture_id': errors['lecture_id'],
+      if (errors['qr_attendance_session_id'] != null)
+        'qr_attendance_session_id': errors['qr_attendance_session_id'],
+      if (errors['date'] != null) 'date': errors['date'],
+    };
+  }
+  return const {};
 }
 
 class DoctorExcusesScreen extends ConsumerStatefulWidget {
@@ -1178,7 +1307,6 @@ class _DoctorAttendanceTrackingScreenState
     if (picked == null) return;
     setState(() {
       _dateController.text = picked.toIso8601String().substring(0, 10);
-      _future = _fetch();
     });
   }
 
@@ -1711,10 +1839,7 @@ class _DoctorSubjectReportScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withValues(alpha: 0.12),
-          width: 1.2,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.12), width: 1.2),
         boxShadow: [
           BoxShadow(
             color: color.withValues(alpha: 0.03),
@@ -1829,8 +1954,12 @@ class _DoctorSubjectReportScreenState
                         students.length)
                     .round();
 
-          final totalLectures = students.isNotEmpty ? _int(students.first['total']) : 0;
-          final atRiskCount = students.where((student) => _int(student['attendance_rate']) < 50).length;
+          final totalLectures = students.isNotEmpty
+              ? _int(students.first['total'])
+              : 0;
+          final atRiskCount = students
+              .where((student) => _int(student['attendance_rate']) < 50)
+              .length;
 
           // تصفية الطلاب محلياً
           final query = _searchQuery.trim().toLowerCase();
@@ -1842,11 +1971,21 @@ class _DoctorSubjectReportScreenState
 
           // فرز وترتيب الطلاب محلياً
           if (_sortBy == 'name') {
-            filteredStudents.sort((a, b) => _text(a, 'name').compareTo(_text(b, 'name')));
+            filteredStudents.sort(
+              (a, b) => _text(a, 'name').compareTo(_text(b, 'name')),
+            );
           } else if (_sortBy == 'rate_asc') {
-            filteredStudents.sort((a, b) => _int(a['attendance_rate']).compareTo(_int(b['attendance_rate'])));
+            filteredStudents.sort(
+              (a, b) => _int(
+                a['attendance_rate'],
+              ).compareTo(_int(b['attendance_rate'])),
+            );
           } else if (_sortBy == 'rate_desc') {
-            filteredStudents.sort((a, b) => _int(b['attendance_rate']).compareTo(_int(a['attendance_rate'])));
+            filteredStudents.sort(
+              (a, b) => _int(
+                b['attendance_rate'],
+              ).compareTo(_int(a['attendance_rate'])),
+            );
           }
 
           return RefreshIndicator(
@@ -1940,10 +2079,18 @@ class _DoctorSubjectReportScreenState
                       color: AppColors.slate400,
                       fontSize: 13,
                     ),
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.royalBlue, size: 20),
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      color: AppColors.royalBlue,
+                      size: 20,
+                    ),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, color: AppColors.slate400, size: 18),
+                            icon: const Icon(
+                              Icons.clear_rounded,
+                              color: AppColors.slate400,
+                              size: 18,
+                            ),
                             onPressed: () {
                               _searchController.clear();
                               setState(() => _searchQuery = '');
@@ -1952,14 +2099,23 @@ class _DoctorSubjectReportScreenState
                         : null,
                     filled: true,
                     fillColor: AppColors.slate50,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: AppColors.slate200, width: 1.2),
+                      borderSide: const BorderSide(
+                        color: AppColors.slate200,
+                        width: 1.2,
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: AppColors.royalBlue, width: 1.5),
+                      borderSide: const BorderSide(
+                        color: AppColors.royalBlue,
+                        width: 1.5,
+                      ),
                     ),
                   ),
                 ),
@@ -1972,12 +2128,18 @@ class _DoctorSubjectReportScreenState
                       const SizedBox(width: 8),
                       _buildSortChip(label: 'الأقل حضوراً', value: 'rate_asc'),
                       const SizedBox(width: 8),
-                      _buildSortChip(label: 'الأعلى حضوراً', value: 'rate_desc'),
+                      _buildSortChip(
+                        label: 'الأعلى حضوراً',
+                        value: 'rate_desc',
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
-                _SubjectReportView(subject: subject, students: filteredStudents),
+                _SubjectReportView(
+                  subject: subject,
+                  students: filteredStudents,
+                ),
               ],
             ),
           );
@@ -5197,134 +5359,145 @@ class _SubjectReportView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 14),
-        ...students.map(
-          (student) {
-            final rate = _int(student['attendance_rate']);
-            final name = _text(student, 'name');
-            final number = _text(student, 'student_number');
-            final rateColor = _rateColor(rate);
+        ...students.map((student) {
+          final rate = _int(student['attendance_rate']);
+          final name = _text(student, 'name');
+          final number = _text(student, 'student_number');
+          final rateColor = _rateColor(rate);
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: AppColors.slate200),
-                boxShadow: [
-                  BoxShadow(
-                    color: rateColor.withValues(alpha: 0.02),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: AppColors.slate200),
+              boxShadow: [
+                BoxShadow(
+                  color: rateColor.withValues(alpha: 0.02),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    // Avatar
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [rateColor.withValues(alpha: 0.8), rateColor],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _getInitials(name),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Name & Student Number
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                              color: AppColors.midnight,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'رقم القيد: $number',
+                            style: const TextStyle(
+                              fontFamily: 'Cairo',
+                              color: AppColors.slate500,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Attendance Rate Circle or Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: rateColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: rateColor.withValues(alpha: 0.18),
+                        ),
+                      ),
+                      child: Text(
+                        '$rate%',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          color: rateColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Bento stats row
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
                     children: [
-                      // Avatar
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              rateColor.withValues(alpha: 0.8),
-                              rateColor,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          _getInitials(name),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontFamily: 'Cairo',
-                            fontWeight: FontWeight.w900,
-                            fontSize: 14,
-                          ),
-                        ),
+                      _buildTinyStatChip(
+                        'حاضر',
+                        _int(student['present']),
+                        AppColors.success,
                       ),
-                      const SizedBox(width: 12),
-                      // Name & Student Number
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name,
-                              style: const TextStyle(
-                                fontFamily: 'Cairo',
-                                fontWeight: FontWeight.w900,
-                                fontSize: 14,
-                                color: AppColors.midnight,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'رقم القيد: $number',
-                              style: const TextStyle(
-                                fontFamily: 'Cairo',
-                                color: AppColors.slate500,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
+                      const SizedBox(width: 6),
+                      _buildTinyStatChip(
+                        'غائب',
+                        _int(student['absent']),
+                        AppColors.danger,
                       ),
-                      const SizedBox(width: 12),
-                      // Attendance Rate Circle or Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: rateColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: rateColor.withValues(alpha: 0.18),
-                          ),
-                        ),
-                        child: Text(
-                          '$rate%',
-                          style: TextStyle(
-                            fontFamily: 'Cairo',
-                            color: rateColor,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
+                      const SizedBox(width: 6),
+                      _buildTinyStatChip(
+                        'بعذر',
+                        _int(student['excused']),
+                        AppColors.info,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildTinyStatChip(
+                        'المحاضرات',
+                        _int(student['total']),
+                        AppColors.royalBlue,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  // Bento stats row
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildTinyStatChip('حاضر', _int(student['present']), AppColors.success),
-                        const SizedBox(width: 6),
-                        _buildTinyStatChip('غائب', _int(student['absent']), AppColors.danger),
-                        const SizedBox(width: 6),
-                        _buildTinyStatChip('بعذر', _int(student['excused']), AppColors.info),
-                        const SizedBox(width: 6),
-                        _buildTinyStatChip('المحاضرات', _int(student['total']), AppColors.royalBlue),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
+                ),
+              ],
+            ),
+          );
+        }),
       ],
     );
   }
@@ -5343,10 +5516,7 @@ class _SubjectReportView extends StatelessWidget {
           Container(
             width: 6,
             height: 6,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
           Text(
@@ -6526,11 +6696,16 @@ class _ReportSubjectCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: _rateColor(rate).withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _rateColor(rate).withValues(alpha: 0.18)),
+                    border: Border.all(
+                      color: _rateColor(rate).withValues(alpha: 0.18),
+                    ),
                   ),
                   child: Text(
                     '$rate%',
@@ -6559,13 +6734,29 @@ class _ReportSubjectCard extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildSubjectStatPill('طلاب', _int(subject['students_count']), AppColors.info),
+                  _buildSubjectStatPill(
+                    'طلاب',
+                    _int(subject['students_count']),
+                    AppColors.info,
+                  ),
                   const SizedBox(width: 6),
-                  _buildSubjectStatPill('محاضرات', _int(subject['lectures_count']), AppColors.royalBlue),
+                  _buildSubjectStatPill(
+                    'محاضرات',
+                    _int(subject['lectures_count']),
+                    AppColors.royalBlue,
+                  ),
                   const SizedBox(width: 6),
-                  _buildSubjectStatPill('حاضر', _int(subject['present_count']), AppColors.success),
+                  _buildSubjectStatPill(
+                    'حاضر',
+                    _int(subject['present_count']),
+                    AppColors.success,
+                  ),
                   const SizedBox(width: 6),
-                  _buildSubjectStatPill('غائب', _int(subject['absent_count']), AppColors.danger),
+                  _buildSubjectStatPill(
+                    'غائب',
+                    _int(subject['absent_count']),
+                    AppColors.danger,
+                  ),
                 ],
               ),
             ),
@@ -6589,10 +6780,7 @@ class _ReportSubjectCard extends StatelessWidget {
           Container(
             width: 6,
             height: 6,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
           Text(

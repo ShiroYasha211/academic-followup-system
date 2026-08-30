@@ -15,7 +15,9 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   );
 });
 
-final publicSupportSettingsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+final publicSupportSettingsProvider = FutureProvider<Map<String, dynamic>>((
+  ref,
+) async {
   return ref.watch(authRepositoryProvider).fetchPublicSupportSettings();
 });
 
@@ -31,22 +33,21 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     ref.onDispose(() => _permissionSyncTimer?.cancel());
     var session = await ref.watch(sessionStorageProvider).read();
     if (session != null) {
-      session = await _refreshDelegatePermissions(session);
-      _startDelegatePermissionSync(session);
+      session = await _refreshPermissions(session);
+      _startPermissionSync(session);
       unawaited(PushNotificationService.registerDevice(session));
     }
     return session;
   }
 
-  Future<AuthSession> _refreshDelegatePermissions(AuthSession session) async {
-    if (!session.canAccessDelegateWorkspace) return session;
-
+  Future<AuthSession> _refreshPermissions(AuthSession session) async {
     try {
-      final response = await ApiClient(
-        token: session.token,
-      ).get('/delegate/me');
+      final endpoint = session.workspace == AuthWorkspace.delegate
+          ? '/delegate/me'
+          : '/student/me';
+      final response = await ApiClient(token: session.token).get(endpoint);
       final data = response['data'];
-      final user = data is Map ? data['user'] : null;
+      final user = data is Map && data['user'] is Map ? data['user'] : data;
       final permissions = user is Map
           ? (user['permissions'] as List?)
                 ?.map((permission) => permission.toString())
@@ -62,24 +63,23 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     }
   }
 
-  void _startDelegatePermissionSync(AuthSession session) {
+  void _startPermissionSync(AuthSession session) {
     _permissionSyncTimer?.cancel();
-    if (!session.canAccessDelegateWorkspace) return;
 
     _permissionSyncTimer = Timer.periodic(
       const Duration(seconds: 10),
-      (_) => unawaited(refreshDelegatePermissionsNow()),
+      (_) => unawaited(refreshPermissionsNow()),
     );
   }
 
-  Future<void> refreshDelegatePermissionsNow() async {
+  Future<void> refreshPermissionsNow() async {
     if (_permissionSyncRunning) return;
     final session = state.valueOrNull;
-    if (session == null || !session.canAccessDelegateWorkspace) return;
+    if (session == null) return;
 
     _permissionSyncRunning = true;
     try {
-      final updated = await _refreshDelegatePermissions(session);
+      final updated = await _refreshPermissions(session);
       if (!_samePermissions(session.permissions, updated.permissions)) {
         state = AsyncData(updated);
       }
@@ -102,9 +102,9 @@ class AuthController extends AsyncNotifier<AuthSession?> {
       final session = await ref
           .read(authRepositoryProvider)
           .login(login: login, password: password);
-      final refreshed = await _refreshDelegatePermissions(session);
+      final refreshed = await _refreshPermissions(session);
       await ref.read(sessionStorageProvider).save(refreshed);
-      _startDelegatePermissionSync(refreshed);
+      _startPermissionSync(refreshed);
       await PushNotificationService.registerDevice(refreshed);
       return refreshed;
     });
@@ -145,10 +145,10 @@ class AuthController extends AsyncNotifier<AuthSession?> {
 
     final updated = session.copyWith(workspace: workspace);
     await ref.read(sessionStorageProvider).save(updated);
-    _startDelegatePermissionSync(updated);
+    _startPermissionSync(updated);
     await PushNotificationService.registerDevice(updated);
     state = AsyncData(updated);
-    unawaited(refreshDelegatePermissionsNow());
+    unawaited(refreshPermissionsNow());
     return updated;
   }
 }

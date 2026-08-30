@@ -263,7 +263,9 @@ class StaffPushNotificationService {
       'assignments' || 'assignment' => '/doctor/assignments',
       'quizzes' || 'quiz' => '/doctor/quizzes',
       'grades' || 'grade' => '/doctor/grades',
-      'attendance' || 'lecture_report' => '/doctor/attendance',
+      'attendance' ||
+      'attendance_edit_request' ||
+      'lecture_report' => '/doctor/attendance',
       'reports' => '/doctor/reports',
       'excuses' || 'excuse' => '/doctor/excuses',
       'inquiries' || 'inquiry' || 'doctor_inquiry' => '/doctor/inquiries',

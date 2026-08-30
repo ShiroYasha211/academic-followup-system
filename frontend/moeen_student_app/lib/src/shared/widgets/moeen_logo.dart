@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../core/config/app_variant.dart';
 
 abstract final class MoeenBrandAssets {
-  static const full = 'assets/brand/logo.jpeg';
-  static const mark = 'assets/brand/logo.jpeg';
-  static const icon = 'assets/brand/logo.jpeg';
+  static const full = StudentAppBrand.logoAsset;
+  static const mark = StudentAppBrand.logoAsset;
+  static const icon = StudentAppBrand.logoAsset;
 }
 
 class MoeenLogo extends StatelessWidget {
@@ -53,8 +53,9 @@ class MoeenLogo extends StatelessWidget {
     if (compact) {
       return Row(
         mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment:
-            centered ? MainAxisAlignment.center : MainAxisAlignment.start,
+        mainAxisAlignment: centered
+            ? MainAxisAlignment.center
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           logoWidget,
@@ -64,9 +65,9 @@ class MoeenLogo extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'معين',
+                StudentAppBrand.displayName,
                 style: TextStyle(
-                  color: onDark ? Colors.white : AppColors.royalBlueDark,
+                  color: onDark ? Colors.white : StudentBrandColors.primaryDark,
                   fontWeight: FontWeight.w900,
                   fontSize: 15.5,
                   fontFamily: 'Cairo',
@@ -75,11 +76,11 @@ class MoeenLogo extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'المنصة التعليمية',
+                StudentAppBrand.tagline,
                 style: TextStyle(
                   color: onDark
                       ? Colors.white.withValues(alpha: 0.7)
-                      : AppColors.slate500,
+                      : StudentBrandColors.textSecondary,
                   fontWeight: FontWeight.w700,
                   fontSize: 9.5,
                   fontFamily: 'Cairo',
@@ -94,15 +95,16 @@ class MoeenLogo extends StatelessWidget {
 
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment:
-          centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: centered
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         logoWidget,
         const SizedBox(height: 14),
         Text(
-          'معين',
+          StudentAppBrand.displayName,
           style: TextStyle(
-            color: onDark ? Colors.white : AppColors.royalBlueDark,
+            color: onDark ? Colors.white : StudentBrandColors.primaryDark,
             fontWeight: FontWeight.w900,
             fontSize: 22,
             fontFamily: 'Cairo',
@@ -111,12 +113,12 @@ class MoeenLogo extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'منصتك التعليمية في مكان واحد',
+          StudentAppBrand.fullTagline,
           textAlign: centered ? TextAlign.center : TextAlign.start,
           style: TextStyle(
             color: onDark
                 ? Colors.white.withValues(alpha: 0.82)
-                : AppColors.slate700,
+                : StudentBrandColors.textSecondary,
             fontWeight: FontWeight.w800,
             fontSize: 12,
             fontFamily: 'Cairo',
@@ -137,13 +139,11 @@ class _FallbackLogo extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: const BoxDecoration(
-        gradient: AppColors.goldGradient,
-      ),
+      decoration: BoxDecoration(gradient: StudentBrandColors.accentGradient),
       child: Center(
         child: Icon(
           Icons.favorite_rounded,
-          color: AppColors.royalBlue,
+          color: StudentBrandColors.primary,
           size: size * 0.55,
         ),
       ),

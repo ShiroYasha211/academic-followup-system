@@ -85,6 +85,7 @@ class StaffAccountRepository {
     required int excusesDeadlineDays,
     required String excuseReceiver,
     required int qrRotationSeconds,
+    required int doctorInitialStarBalance,
   }) async {
     final response = await _api.put(
       '/administrative/settings',
@@ -93,6 +94,7 @@ class StaffAccountRepository {
         'excuses_deadline_days': excusesDeadlineDays,
         'excuse_receiver': excuseReceiver,
         'qr_rotation_seconds': qrRotationSeconds,
+        'doctor_initial_star_balance': doctorInitialStarBalance,
       },
     );
     return (response['message'] ?? 'تم تحديث إعدادات الكلية بنجاح.').toString();
@@ -122,10 +124,7 @@ class StaffAccountRepository {
   }) async {
     final response = await _api.patch(
       '/${workspace.name}/profile/email',
-      data: {
-        'email': email,
-        'current_password': currentPassword,
-      },
+      data: {'email': email, 'current_password': currentPassword},
     );
     return _data(response);
   }

@@ -434,6 +434,14 @@ class DelegateRepository {
     return (response['message'] ?? 'تم حفظ الحضور.').toString();
   }
 
+  Future<String> requestAttendanceEdit(Map<String, dynamic> data) async {
+    final response = await _api.post(
+      '/delegate/attendance-edit-requests',
+      data: data,
+    );
+    return (response['message'] ?? 'تم إرسال طلب فتح تعديل الحضور.').toString();
+  }
+
   Future<Map<String, dynamic>> issuePairingCode({
     required int subjectId,
     required String date,

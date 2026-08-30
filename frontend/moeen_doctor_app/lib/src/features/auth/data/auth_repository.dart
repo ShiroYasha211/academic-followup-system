@@ -52,19 +52,35 @@ class AuthRepository {
   }
 
   Future<StaffAuthSession> refresh(StaffAuthSession session) async {
-    final response = await ApiClient(
-      token: session.token,
-    ).get('/${session.workspace.name}/me');
+    Map<String, dynamic> response;
+    try {
+      response = await ApiClient(
+        token: session.token,
+      ).get('/${session.workspace.name}/me');
+    } on ApiException catch (error) {
+      if (session.workspace != StaffWorkspace.administrative ||
+          error.statusCode != 403) {
+        rethrow;
+      }
+      response = await ApiClient(token: session.token).get('/doctor/me');
+    }
     final data = response['data'];
     if (data is! Map) return session;
+    final availableWorkspaces = _parseWorkspaces(data['available_workspaces']);
+    final workspace = availableWorkspaces.contains(session.workspace)
+        ? session.workspace
+        : availableWorkspaces.contains(StaffWorkspace.doctor)
+        ? StaffWorkspace.doctor
+        : availableWorkspaces.first;
     return session.copyWith(
+      workspace: workspace,
       name: (data['name'] ?? session.name).toString(),
       email: (data['email'] ?? session.email).toString(),
       role: (data['role'] ?? session.role).toString(),
       university: data['university']?.toString(),
       college: data['college']?.toString(),
       major: data['major']?.toString(),
-      availableWorkspaces: _parseWorkspaces(data['available_workspaces']),
+      availableWorkspaces: availableWorkspaces,
     );
   }
 

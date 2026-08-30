@@ -1,11 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/app_variant.dart';
 import '../../../core/notifications/push_notification_service.dart';
 import '../../../core/router/landing_route.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/moeen_logo.dart';
+import '../data/auth_session.dart';
 import '../logic/auth_controller.dart';
 import 'login_screen.dart';
 
@@ -43,9 +46,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Future<void> _goNext() async {
     await Future<void>.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
-    final session = await ref.read(authControllerProvider.future);
+    final session = await _readSessionSafely();
     if (!mounted) return;
-    await PushNotificationService.initialize();
+    await _initializeNotificationsSafely();
     if (!mounted) return;
 
     final pendingPath = PushNotificationService.takePendingNavigationPath();
@@ -60,6 +63,29 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     }
 
     context.go(session == null ? LoginScreen.route : landingRouteFor(session));
+  }
+
+  Future<void> _initializeNotificationsSafely() async {
+    try {
+      await PushNotificationService.initialize().timeout(
+        const Duration(seconds: 8),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Splash notification initialization skipped: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  Future<AuthSession?> _readSessionSafely() async {
+    try {
+      return await ref
+          .read(authControllerProvider.future)
+          .timeout(const Duration(seconds: 8));
+    } catch (error, stackTrace) {
+      debugPrint('Splash auth session read failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return null;
+    }
   }
 
   @override
@@ -77,11 +103,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFFFBF2),
-              Color(0xFFFFF7E6),
-              Color(0xFFF8FAFC),
-            ],
+            colors: [Color(0xFFFFFBF2), Color(0xFFFFF7E6), Color(0xFFF8FAFC)],
           ),
         ),
         child: Stack(
@@ -91,7 +113,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               right: -90,
               child: _Orb(
                 size: 280,
-                color: AppColors.gold.withValues(alpha: 0.16),
+                color: StudentBrandColors.accent.withValues(alpha: 0.14),
               ),
             ),
             Positioned(
@@ -99,7 +121,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               left: -80,
               child: _Orb(
                 size: 250,
-                color: AppColors.royalBlue.withValues(alpha: 0.08),
+                color: StudentBrandColors.primary.withValues(alpha: 0.08),
               ),
             ),
             Center(
@@ -113,14 +135,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       Container(
                         padding: const EdgeInsets.all(22),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFFCF5),
+                          color: StudentBrandColors.surface,
                           borderRadius: BorderRadius.circular(36),
                           border: Border.all(
-                            color: AppColors.gold.withValues(alpha: 0.16),
+                            color: StudentBrandColors.border.withValues(
+                              alpha: 0.8,
+                            ),
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.royalBlue.withValues(alpha: 0.08),
+                              color: StudentBrandColors.primary.withValues(
+                                alpha: 0.08,
+                              ),
                               blurRadius: 34,
                               offset: const Offset(0, 18),
                             ),
@@ -132,17 +158,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       Text(
                         'مساحتك التعليمية في مكان واحد',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppColors.royalBlueDark,
+                          color: StudentBrandColors.primaryDark,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                       const SizedBox(height: 30),
-                      const SizedBox(
+                      SizedBox(
                         width: 34,
                         height: 34,
                         child: CircularProgressIndicator(
                           strokeWidth: 3,
-                          color: AppColors.gold,
+                          color: StudentBrandColors.primary,
                         ),
                       ),
                     ],

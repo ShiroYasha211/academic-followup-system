@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/config/app_variant.dart';
 import '../../core/theme/app_colors.dart';
 
 class AuthShell extends StatelessWidget {
@@ -11,7 +12,7 @@ class AuthShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.authGradient),
+        decoration: BoxDecoration(gradient: StudentBrandColors.authGradient),
         child: Stack(
           children: [
             Positioned(
@@ -19,7 +20,7 @@ class AuthShell extends StatelessWidget {
               left: -70,
               child: _Glow(
                 size: 240,
-                color: AppColors.gold.withValues(alpha: 0.20),
+                color: StudentBrandColors.accent.withValues(alpha: 0.16),
               ),
             ),
             Positioned(
@@ -27,7 +28,7 @@ class AuthShell extends StatelessWidget {
               right: -60,
               child: _Glow(
                 size: 300,
-                color: AppColors.royalBlue.withValues(alpha: 0.12),
+                color: StudentBrandColors.primary.withValues(alpha: 0.12),
               ),
             ),
             Positioned(

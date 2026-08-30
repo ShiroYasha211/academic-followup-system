@@ -61,11 +61,7 @@ String value(Object? source, String key, {String fallback = '0'}) {
 }
 
 String timeText(Object? source) {
-  final val = text(
-    source,
-    'created_at',
-    fallback: text(source, 'updated_at'),
-  );
+  final val = text(source, 'created_at', fallback: text(source, 'updated_at'));
   if (val.isEmpty) return '-';
   return timeAgo(val);
 }
@@ -87,11 +83,7 @@ String timeOnly(String value) {
   if (value.isEmpty) return '-';
   final date = DateTime.tryParse(value)?.toLocal();
   if (date != null) {
-    final hour = date.hour;
-    final minute = date.minute.toString().padLeft(2, '0');
-    final period = hour >= 12 ? 'م' : 'ص';
-    final hour12 = hour % 12 == 0 ? 12 : hour % 12;
-    return '$hour12:$minute $period';
+    return _formatTime12h(date.hour, date.minute);
   }
   if (value.contains(':') && value.length <= 8) {
     final parts = value.split(':');
@@ -99,19 +91,23 @@ String timeOnly(String value) {
       final hour = int.tryParse(parts[0]);
       final minute = int.tryParse(parts[1]);
       if (hour != null && minute != null) {
-        final period = hour >= 12 ? 'م' : 'ص';
-        final hour12 = hour % 12 == 0 ? 12 : hour % 12;
-        return '$hour12:${minute.toString().padLeft(2, '0')} $period';
+        return _formatTime12h(hour, minute);
       }
     }
   }
-  if (value.length >= 16) return value.substring(11, 16);
-  if (value.length >= 5) return value.substring(0, 5);
+  if (value.length >= 16) return timeOnly(value.substring(11, 16));
+  if (value.length >= 5) return timeOnly(value.substring(0, 5));
   return value;
 }
 
+String _formatTime12h(int hour, int minute) {
+  final period = hour >= 12 ? 'م' : 'ص';
+  final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+  return '$hour12:${minute.toString().padLeft(2, '0')} $period';
+}
+
 String timeOnly24h(String value) {
-  if (value.isEmpty) return '09:00';
+  if (value.trim().isEmpty) return '';
   final date = DateTime.tryParse(value)?.toLocal();
   if (date != null) {
     final hour = date.hour.toString().padLeft(2, '0');
@@ -121,12 +117,29 @@ String timeOnly24h(String value) {
   if (value.contains(':')) {
     final parts = value.split(':');
     if (parts.length >= 2) {
-      final hour = parts[0].padLeft(2, '0');
-      final minute = parts[1].padLeft(2, '0');
-      return '$hour:$minute';
+      final hour = int.tryParse(parts[0].trim());
+      final minute = int.tryParse(parts[1].trim());
+      if (hour != null &&
+          minute != null &&
+          hour >= 0 &&
+          hour <= 23 &&
+          minute >= 0 &&
+          minute <= 59) {
+        return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+      }
     }
   }
-  return value;
+  return '';
+}
+
+int? timeMinutes(String value) {
+  final normalized = timeOnly24h(value);
+  if (normalized.isEmpty) return null;
+  final parts = normalized.split(':');
+  final hour = int.tryParse(parts[0]);
+  final minute = int.tryParse(parts[1]);
+  if (hour == null || minute == null) return null;
+  return (hour * 60) + minute;
 }
 
 String _formatReminderTime(TimeOfDay time) {

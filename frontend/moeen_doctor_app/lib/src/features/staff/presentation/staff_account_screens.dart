@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/downloads/download_service.dart';
+import '../../../core/config/app_variant.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/refresh/staff_refresh_coordinator.dart';
 import '../../../core/theme/app_colors.dart';
@@ -78,7 +79,7 @@ class _DashboardOfflineBanner extends StatelessWidget {
     }
     final color = dashboard.fromCache || !online
         ? AppColors.warning
-        : AppColors.royalBlue;
+        : StaffBrandColors.primary;
     final message = dashboard.fromCache
         ? 'تعمل الآن على آخر بيانات محفوظة${_cachedAtText(dashboard.cachedAt)}'
         : refreshing
@@ -404,6 +405,7 @@ class _StaffAdministrativeSettingsScreenState
   final _absenceController = TextEditingController();
   final _deadlineController = TextEditingController();
   final _qrRotationController = TextEditingController();
+  final _doctorInitialStarsController = TextEditingController();
   String _excuseReceiver = 'administrative';
   int? _loadedSettingsId;
   bool _saving = false;
@@ -413,6 +415,7 @@ class _StaffAdministrativeSettingsScreenState
     _absenceController.dispose();
     _deadlineController.dispose();
     _qrRotationController.dispose();
+    _doctorInitialStarsController.dispose();
     super.dispose();
   }
 
@@ -452,7 +455,8 @@ class _StaffAdministrativeSettingsScreenState
                           controller: _absenceController,
                           label: 'نسبة الحرمان من المادة',
                           suffix: '%',
-                          helper: 'النسبة التي يحرم بعدها الطالب من المادة بسبب تراكم الغياب.',
+                          helper:
+                              'النسبة التي يحرم بعدها الطالب من المادة بسبب تراكم الغياب.',
                           min: 1,
                           max: 100,
                           icon: Icons.block_rounded,
@@ -473,7 +477,8 @@ class _StaffAdministrativeSettingsScreenState
                               controller: _deadlineController,
                               label: 'آخر موعد تقديم العذر',
                               suffix: 'يوم',
-                              helper: 'عدد الأيام المسموح بها للطالب لتقديم عذر بعد تاريخ الغياب.',
+                              helper:
+                                  'عدد الأيام المسموح بها للطالب لتقديم عذر بعد تاريخ الغياب.',
                               min: 1,
                               max: 30,
                               icon: Icons.calendar_today_rounded,
@@ -495,8 +500,12 @@ class _StaffAdministrativeSettingsScreenState
                                       Container(
                                         padding: const EdgeInsets.all(7),
                                         decoration: BoxDecoration(
-                                          color: AppColors.goldDeep.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(10),
+                                          color: AppColors.goldDeep.withValues(
+                                            alpha: 0.12,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
                                         ),
                                         child: const Icon(
                                           Icons.route_rounded,
@@ -539,12 +548,33 @@ class _StaffAdministrativeSettingsScreenState
                           controller: _qrRotationController,
                           label: 'مدة تجدد رمز QR',
                           suffix: 'ثانية',
-                          helper: 'الفترة الزمنية بين تجديد كل رمز QR خلال جلسة التحضير.',
+                          helper:
+                              'الفترة الزمنية بين تجديد كل رمز QR خلال جلسة التحضير.',
                           min: 5,
                           max: 300,
                           icon: Icons.timer_outlined,
                           accentColor: AppColors.royalBlue,
                           step: 5,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _SettingsSection(
+                        accentColor: AppColors.goldDeep,
+                        icon: Icons.stars_rounded,
+                        title: 'رصيد منح النجوم للدكاترة',
+                        subtitle:
+                            'تحديد الرصيد الذي تبدأ به محفظة أي دكتور جديد',
+                        child: _SettingsStepperField(
+                          controller: _doctorInitialStarsController,
+                          label: 'الرصيد الابتدائي للدكتور',
+                          suffix: 'نجمة',
+                          helper:
+                              'يطبق على الدكاترة الجدد، ويمكن إضافة رصيد مستقل لكل دكتور من صفحة إدارة الدكاترة.',
+                          min: 0,
+                          max: 1000000,
+                          icon: Icons.account_balance_wallet_rounded,
+                          accentColor: AppColors.goldDeep,
+                          step: 10,
                         ),
                       ),
                       const SizedBox(height: 28),
@@ -560,7 +590,9 @@ class _StaffAdministrativeSettingsScreenState
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.royalBlue.withValues(alpha: 0.35),
+                              color: AppColors.royalBlue.withValues(
+                                alpha: 0.35,
+                              ),
                               blurRadius: 20,
                               offset: const Offset(0, 8),
                             ),
@@ -585,9 +617,14 @@ class _StaffAdministrativeSettingsScreenState
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Icon(Icons.check_circle_outline_rounded, size: 22),
+                              : const Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  size: 22,
+                                ),
                           label: Text(
-                            _saving ? 'جاري حفظ الإعدادات...' : 'حفظ الإعدادات وتحديث النظام',
+                            _saving
+                                ? 'جاري حفظ الإعدادات...'
+                                : 'حفظ الإعدادات وتحديث النظام',
                             style: const TextStyle(
                               fontFamily: 'Cairo',
                               fontWeight: FontWeight.w900,
@@ -613,6 +650,8 @@ class _StaffAdministrativeSettingsScreenState
     _absenceController.text = settings.absenceDeprivationPercentage.toString();
     _deadlineController.text = settings.excusesDeadlineDays.toString();
     _qrRotationController.text = settings.qrRotationSeconds.toString();
+    _doctorInitialStarsController.text = settings.doctorInitialStarBalance
+        .toString();
     _excuseReceiver = settings.excuseReceiver;
   }
 
@@ -627,6 +666,9 @@ class _StaffAdministrativeSettingsScreenState
             excusesDeadlineDays: int.parse(_deadlineController.text),
             excuseReceiver: _excuseReceiver,
             qrRotationSeconds: int.parse(_qrRotationController.text),
+            doctorInitialStarBalance: int.parse(
+              _doctorInitialStarsController.text,
+            ),
           );
       if (!mounted) return;
       await showMoeenInfoDialog(
@@ -672,7 +714,6 @@ class _StaffAdministrativeSettingsScreenState
     }
   }
 }
-
 
 bool _looksLikePdf(List<int> bytes) {
   if (bytes.length < 5) return false;
@@ -936,7 +977,7 @@ class _DoctorDashboardView extends ConsumerWidget {
               label: 'المواد',
               value: _int(data['subjects_count']).toString(),
               icon: Icons.menu_book_rounded,
-              color: AppColors.royalBlue,
+              color: StaffBrandColors.primary,
               compact: true,
             ),
             _StatCard(
@@ -971,7 +1012,7 @@ class _DoctorDashboardView extends ConsumerWidget {
               label: 'طلاب لديهم درجات',
               value: _int(data['grades_entered']).toString(),
               icon: Icons.grade_rounded,
-              color: AppColors.goldDeep,
+              color: StaffBrandColors.accentDeep,
               compact: true,
             ),
           ],
@@ -1035,19 +1076,19 @@ class _AdministrativeWelcomeBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppColors.royalBlue,
-            AppColors.royalBlueDark,
-            Color(0xFF1E3A8A),
+            StaffBrandColors.primary,
+            StaffBrandColors.primaryDark,
+            StaffBrandColors.accentDeep,
           ],
         ),
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: AppColors.royalBlue.withValues(alpha: 0.3),
+            color: StaffBrandColors.primary.withValues(alpha: 0.3),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),
@@ -1107,7 +1148,9 @@ class _AdministrativeWelcomeBanner extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      collegeName.isNotEmpty ? collegeName : 'لوحة التحكم الإدارية بالكلية',
+                      collegeName.isNotEmpty
+                          ? collegeName
+                          : 'لوحة التحكم الإدارية بالكلية',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
@@ -1165,7 +1208,7 @@ class _AdministrativeDashboardView extends StatelessWidget {
               label: 'الدكاترة',
               value: _int(stats['doctors_count']).toString(),
               icon: Icons.school_rounded,
-              color: AppColors.royalBlue,
+              color: StaffBrandColors.primary,
               compact: true,
             ),
             _StatCard(
@@ -1210,7 +1253,9 @@ class _AdministrativeDashboardView extends StatelessWidget {
             ),
             _StatCard(
               label: 'مستقبل الأعذار',
-              value: college['excuse_receiver']?.toString() == 'administrative' ? 'الإدارة' : 'الدكتور',
+              value: college['excuse_receiver']?.toString() == 'administrative'
+                  ? 'الإدارة'
+                  : 'الدكتور',
               icon: Icons.assignment_turned_in_rounded,
               color: AppColors.violet,
               compact: true,
@@ -1227,7 +1272,7 @@ class _AdministrativeDashboardView extends StatelessWidget {
             _QuickActionCard(
               label: 'الإشعارات',
               icon: Icons.notifications_active_rounded,
-              color: AppColors.royalBlue,
+              color: StaffBrandColors.primary,
               onTap: () => context.go('/administrative/notifications'),
             ),
             _QuickActionCard(
@@ -1245,7 +1290,7 @@ class _AdministrativeDashboardView extends StatelessWidget {
             _QuickActionCard(
               label: 'الإعدادات',
               icon: Icons.settings_rounded,
-              color: AppColors.goldDeep,
+              color: StaffBrandColors.accentDeep,
               onTap: () => context.go('/administrative/settings'),
             ),
           ],
@@ -1267,11 +1312,11 @@ class _BalanceHeader extends StatelessWidget {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            gradient: AppColors.primaryGradient,
+            gradient: StaffBrandColors.primaryGradient,
             borderRadius: BorderRadius.circular(AppDimensions.heroRadius),
             boxShadow: [
               BoxShadow(
-                color: AppColors.royalBlue.withValues(alpha: 0.24),
+                color: StaffBrandColors.primary.withValues(alpha: 0.24),
                 blurRadius: 24,
                 offset: const Offset(0, 12),
               ),
@@ -2265,19 +2310,19 @@ class _DoctorWelcomeBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppColors.royalBlue,
-            AppColors.royalBlueDark,
-            Color(0xFF1E3A8A),
+            StaffBrandColors.primary,
+            StaffBrandColors.primaryDark,
+            StaffBrandColors.accentDeep,
           ],
         ),
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: AppColors.royalBlue.withValues(alpha: 0.3),
+            color: StaffBrandColors.primary.withValues(alpha: 0.3),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),
@@ -2368,7 +2413,6 @@ class _DoctorWelcomeBanner extends StatelessWidget {
     );
   }
 }
-
 
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title, required this.icon});
@@ -3111,7 +3155,6 @@ class _AccountDetailRow extends StatelessWidget {
   }
 }
 
-
 class _QuickActionCard extends StatelessWidget {
   const _QuickActionCard({
     required this.label,
@@ -3128,7 +3171,11 @@ class _QuickActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: (MediaQuery.sizeOf(context).width - (AppDimensions.pageHorizontal * 2) - 12) / 2,
+      width:
+          (MediaQuery.sizeOf(context).width -
+              (AppDimensions.pageHorizontal * 2) -
+              12) /
+          2,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -3234,7 +3281,6 @@ class _EmptyCard extends StatelessWidget {
   }
 }
 
-
 // ──────────────────────────────────────────────────────────────────────────
 // Settings Hero — Premium college identity banner
 // ──────────────────────────────────────────────────────────────────────────
@@ -3262,12 +3308,12 @@ class _SettingsHero extends StatelessWidget {
       child: Stack(
         children: [
           // Subtle diagonal pattern
-          Positioned.fill(
-            child: CustomPaint(painter: _GridPatternPainter()),
-          ),
+          Positioned.fill(child: CustomPaint(painter: _GridPatternPainter())),
           // Gold accent line at top
           Positioned(
-            top: 0, left: 0, right: 0,
+            top: 0,
+            left: 0,
+            right: 0,
             child: Container(
               height: 3,
               decoration: BoxDecoration(
@@ -3330,7 +3376,10 @@ class _SettingsHero extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.goldDeep.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
@@ -3467,10 +3516,7 @@ class _SettingsSection extends StatelessWidget {
             ),
           ),
           // ── Content ─────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: child,
-          ),
+          Padding(padding: const EdgeInsets.all(20), child: child),
         ],
       ),
     );
@@ -3656,8 +3702,6 @@ class _StepButton extends StatelessWidget {
     );
   }
 }
-
-
 
 class _ReceiverChoice extends StatelessWidget {
   const _ReceiverChoice({required this.value, required this.onChanged});

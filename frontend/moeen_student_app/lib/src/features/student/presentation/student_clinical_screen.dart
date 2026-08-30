@@ -104,16 +104,10 @@ class StudentClinicalScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 22),
-                _ClinicalSectionTitle(
-                  'آخر السجلات',
-                  Icons.history_rounded,
-                ),
+                _ClinicalSectionTitle('آخر السجلات', Icons.history_rounded),
                 const SizedBox(height: 10),
                 if (logs.isEmpty)
-                  const EmptyState(
-                    message:
-                        'لا توجد سجلات عملية حتى الآن.',
-                  )
+                  const EmptyState(message: 'لا توجد سجلات عملية حتى الآن.')
                 else
                   ...logs
                       .take(3)
@@ -125,9 +119,7 @@ class StudentClinicalScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10),
                 if (assignments.isEmpty)
-                  const EmptyState(
-                    message: 'لا توجد مهام سريرية حالية.',
-                  )
+                  const EmptyState(message: 'لا توجد مهام سريرية حالية.')
                 else
                   ...assignments
                       .take(3)
@@ -270,15 +262,11 @@ class _StudentClinicalLogbookScreenState
                 ),
                 const SizedBox(height: 20),
 
-                _ClinicalSectionTitle(
-                  'سجلاتك اليومية',
-                  Icons.event_available,
-                ),
+                _ClinicalSectionTitle('سجلاتك اليومية', Icons.event_available),
                 const SizedBox(height: 10),
                 if (filteredLogs.isEmpty)
                   const EmptyState(
-                    message:
-                        'لا توجد سجلات عملية تطابق خيار التصفية.',
+                    message: 'لا توجد سجلات عملية تطابق خيار التصفية.',
                   )
                 else
                   ...filteredLogs.map(
@@ -291,9 +279,7 @@ class _StudentClinicalLogbookScreenState
                 ),
                 const SizedBox(height: 10),
                 if (assignments.isEmpty)
-                  const EmptyState(
-                    message: 'لا توجد مهام سريرية حالية.',
-                  )
+                  const EmptyState(message: 'لا توجد مهام سريرية حالية.')
                 else
                   ...assignments.map(
                     (raw) => _ClinicalAssignmentCard(item: asMap(raw)),
@@ -452,8 +438,7 @@ class _StudentClinicalLogFormScreenState
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 96),
               children: [
                 const EmptyState(
-                  message:
-                      'لم يتم العثور على التكليف السريري المطلوب.',
+                  message: 'لم يتم العثور على التكليف السريري المطلوب.',
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
@@ -716,9 +701,7 @@ class _StudentClinicalLogFormScreenState
           ),
           const SizedBox(height: 14),
           if (_roundControllers.isEmpty)
-            const EmptyState(
-              message: 'لم تتم إضافة حالات مرور بعد.',
-            )
+            const EmptyState(message: 'لم تتم إضافة حالات مرور بعد.')
           else
             ..._roundControllers.asMap().entries.map((entry) {
               final index = entry.key;
@@ -836,10 +819,7 @@ class _StudentClinicalLogFormScreenState
                 'القسم',
                 _optionName(departments, _departmentId),
               ),
-              _ClinicalDetailRow(
-                'الدكتور',
-                _optionName(doctors, _doctorId),
-              ),
+              _ClinicalDetailRow('الدكتور', _optionName(doctors, _doctorId)),
               if (assignment.isNotEmpty)
                 _ClinicalDetailRow(
                   'التكليف',
@@ -1052,10 +1032,8 @@ class _StudentClinicalLogFormScreenState
 
   bool _validateLocation() {
     final nextErrors = <String, String>{};
-    if (_centerId == null)
-      nextErrors['center'] = 'اختر مركز التدريب.';
-    if (_departmentId == null)
-      nextErrors['department'] = 'اختر القسم.';
+    if (_centerId == null) nextErrors['center'] = 'اختر مركز التدريب.';
+    if (_departmentId == null) nextErrors['department'] = 'اختر القسم.';
     if (_doctorId == null) nextErrors['doctor'] = 'اختر الدكتور.';
     setState(() {
       _errors
@@ -1094,8 +1072,7 @@ class _StudentClinicalLogFormScreenState
       await showMoeenInfoDialog(
         context: context,
         title: 'لا يوجد اتصال بالإنترنت',
-        message:
-            'يرجى الاتصال بالإنترنت لحفظ سجل اليوم العملي.',
+        message: 'يرجى الاتصال بالإنترنت لحفظ سجل اليوم العملي.',
         icon: Icons.wifi_off_rounded,
         color: AppColors.danger,
       );
@@ -1446,9 +1423,7 @@ class _ActivitySelectionPanel extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (bodies.isEmpty)
-            const EmptyState(
-              message: 'لا توجد نتائج مطابقة للبحث.',
-            )
+            const EmptyState(message: 'لا توجد نتائج مطابقة للبحث.')
           else
             Wrap(
               spacing: 8,
@@ -1600,10 +1575,7 @@ class StudentClinicalAssignmentsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
                 if (assignments.isEmpty)
-                  const EmptyState(
-                    message:
-                        'لا توجد تكليفات سريرية حاليًا.',
-                  )
+                  const EmptyState(message: 'لا توجد تكليفات سريرية حاليًا.')
                 else
                   ...assignments.map(
                     (item) => _ClinicalAssignmentCard(item: item),
@@ -1955,31 +1927,19 @@ class StudentClinicalMockExamsScreen extends ConsumerWidget {
                   colors: const [AppColors.teal, Color(0xFF0D5E57)],
                 ),
                 const SizedBox(height: 20),
-                _ClinicalSectionTitle(
-                  'النماذج المتاحة',
-                  Icons.list_alt,
-                ),
+                _ClinicalSectionTitle('النماذج المتاحة', Icons.list_alt),
                 const SizedBox(height: 10),
                 if (checklists.isEmpty)
-                  const EmptyState(
-                    message:
-                        'لا توجد نماذج تدريبية متاحة.',
-                  )
+                  const EmptyState(message: 'لا توجد نماذج تدريبية متاحة.')
                 else
                   ...checklists.map(
                     (raw) => _ClinicalChecklistCard(item: asMap(raw)),
                   ),
                 const SizedBox(height: 22),
-                _ClinicalSectionTitle(
-                  'محاولاتك السابقة',
-                  Icons.history,
-                ),
+                _ClinicalSectionTitle('محاولاتك السابقة', Icons.history),
                 const SizedBox(height: 10),
                 if (attempts.isEmpty)
-                  const EmptyState(
-                    message:
-                        'لا توجد محاولات تدريبية بعد.',
-                  )
+                  const EmptyState(message: 'لا توجد محاولات تدريبية بعد.')
                 else
                   ...attempts.map(
                     (raw) => _ClinicalMockAttemptCard(item: asMap(raw)),
@@ -2094,11 +2054,7 @@ class _StudentClinicalMockTakeScreenState
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  text(
-                    parent,
-                    'description',
-                    fallback: 'عنصر التقييم',
-                  ),
+                  text(parent, 'description', fallback: 'عنصر التقييم'),
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
@@ -2122,11 +2078,7 @@ class _StudentClinicalMockTakeScreenState
     final note = _notes.putIfAbsent(id, () => TextEditingController());
     final isExpanded = _expandedNotes.contains(id);
     final hasNote = note.text.trim().isNotEmpty;
-    final description = text(
-      item,
-      'description',
-      fallback: 'عنصر فرعي',
-    );
+    final description = text(item, 'description', fallback: 'عنصر فرعي');
     final adaptiveIcon = _getAdaptiveIcon(description);
 
     return Container(
@@ -2219,9 +2171,7 @@ class _StudentClinicalMockTakeScreenState
                   color: hasNote ? AppColors.teal : AppColors.slate400,
                 ),
                 label: Text(
-                  hasNote
-                      ? 'تعديل الملاحظة'
-                      : 'إضافة ملاحظة',
+                  hasNote ? 'تعديل الملاحظة' : 'إضافة ملاحظة',
                   style: TextStyle(
                     fontFamily: 'Cairo',
                     fontSize: 10,
@@ -2381,7 +2331,7 @@ class _StudentClinicalMockTakeScreenState
       return Icons.vaccines_rounded;
     }
     if (t.contains('نبض') ||
-        t.contains('ط¶ط؛ط·') ||
+        t.contains('ضغط') ||
         t.contains('حرارة') ||
         t.contains('تنفس') ||
         t.contains('pulse') ||
@@ -2424,8 +2374,7 @@ class _StudentClinicalMockTakeScreenState
               description: text(
                 data,
                 'description',
-                fallback:
-                    'اختر طريقة حساب الوقت قبل بدء التدريب.',
+                fallback: 'اختر طريقة حساب الوقت قبل بدء التدريب.',
               ),
               officialMinutes: officialMinutes,
               timerMode: _timerMode,
@@ -2526,9 +2475,7 @@ class _StudentClinicalMockTakeScreenState
               ),
               const SizedBox(height: 10),
               if (itemsTree.isEmpty)
-                const EmptyState(
-                  message: 'لا توجد بنود في هذا النموذج.',
-                )
+                const EmptyState(message: 'لا توجد بنود في هذا النموذج.')
               else
                 ...itemsTree.asMap().entries.map((entry) {
                   return _evaluationGroup(entry.key, entry.value);
@@ -2628,9 +2575,7 @@ class _StudentClinicalMockTakeScreenState
         if (automatic) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text(
-                'انتهى وقت التدريب وتم تسليم النتيجة.',
-              ),
+              content: Text('انتهى وقت التدريب وتم تسليم النتيجة.'),
             ),
           );
         }
@@ -2701,8 +2646,7 @@ class _MockTimerSetup extends StatelessWidget {
                 value: 'official',
                 groupValue: timerMode,
                 title: 'الوقت الرسمي',
-                subtitle:
-                    '$officialMinutes دقيقة مثل إعداد الويب',
+                subtitle: '$officialMinutes دقيقة مثل إعداد الويب',
                 icon: Icons.school_rounded,
                 onChanged: onModeChanged,
               ),
@@ -3016,10 +2960,7 @@ class StudentClinicalMockResultScreen extends ConsumerWidget {
               const SizedBox(height: 18),
               ...radar.map((raw) => _ClinicalSkillBar(item: asMap(raw))),
               const SizedBox(height: 18),
-              _ClinicalSectionTitle(
-                'تفاصيل العناصر',
-                Icons.checklist_rounded,
-              ),
+              _ClinicalSectionTitle('تفاصيل العناصر', Icons.checklist_rounded),
               const SizedBox(height: 10),
               ...scores.map((raw) => _ClinicalMockScoreCard(item: asMap(raw))),
             ],
@@ -3065,9 +3006,7 @@ class StudentClinicalRareCasesScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
                 if (items.isEmpty)
-                  const EmptyState(
-                    message: 'لا توجد حالات نادرة نشطة.',
-                  )
+                  const EmptyState(message: 'لا توجد حالات نادرة نشطة.')
                 else
                   ...items.map((raw) => _RareCaseCard(item: asMap(raw))),
               ],
@@ -3837,10 +3776,7 @@ class _ClinicalLogDetailsPanelState
           ),
           child: Column(
             children: [
-              _ClinicalDetailRow(
-                'المركز',
-                text(center, 'name', fallback: '-'),
-              ),
+              _ClinicalDetailRow('المركز', text(center, 'name', fallback: '-')),
               const Divider(height: 16, color: AppColors.slate200),
               _ClinicalDetailRow(
                 'القسم',
@@ -3852,10 +3788,7 @@ class _ClinicalLogDetailsPanelState
                 text(doctor, 'name', fallback: '-'),
               ),
               const Divider(height: 16, color: AppColors.slate200),
-              _ClinicalDetailRow(
-                'التاريخ',
-                dateOnly(text(_log, 'log_date')),
-              ),
+              _ClinicalDetailRow('التاريخ', dateOnly(text(_log, 'log_date'))),
               if (text(_log, 'doctor_notes').isNotEmpty) ...[
                 const Divider(height: 16, color: AppColors.slate200),
                 _ClinicalDetailRow(
@@ -3873,10 +3806,7 @@ class _ClinicalLogDetailsPanelState
         ),
         const SizedBox(height: 10),
         if (groups.isEmpty)
-          const EmptyState(
-            message:
-                'لا توجد أنشطة مسجلة في هذا السجل.',
-          )
+          const EmptyState(message: 'لا توجد أنشطة مسجلة في هذا السجل.')
         else
           ...groups.map((group) => _ClinicalLogGroupCard(group: group)),
         if (canRegenerate) ...[
@@ -4043,9 +3973,7 @@ class _ClinicalQrTimerState extends State<_ClinicalQrTimer> {
   @override
   Widget build(BuildContext context) {
     if (_secondsLeft <= 0) {
-      return const _ClinicalMiniBadge(
-        'انتهت صلاحية الباركود',
-      );
+      return const _ClinicalMiniBadge('انتهت صلاحية الباركود');
     }
     final minutes = _secondsLeft ~/ 60;
     final seconds = _secondsLeft % 60;
@@ -4674,10 +4602,7 @@ class _ClinicalAssignmentDetailsPanel extends ConsumerWidget {
           ),
         if (attempts.length > 1) ...[
           const SizedBox(height: 18),
-          _ClinicalSectionTitle(
-            'المحاولات السابقة',
-            Icons.history_rounded,
-          ),
+          _ClinicalSectionTitle('المحاولات السابقة', Icons.history_rounded),
           const SizedBox(height: 10),
           ...attempts.skip(1).map((attempt) {
             final groups = asList(attempt['grouped_activities']).isNotEmpty
@@ -5496,11 +5421,7 @@ class _ClinicalMockAttemptCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    text(
-                      checklist,
-                      'title',
-                      fallback: 'محاولة تدريبية',
-                    ),
+                    text(checklist, 'title', fallback: 'محاولة تدريبية'),
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                   Text(
@@ -5890,18 +5811,12 @@ class _RareCaseDetailsPanel extends ConsumerWidget {
                   'الدكتور المعلن',
                   text(doctor, 'name', fallback: '-'),
                 ),
-                _ClinicalDetailRow(
-                  'حالة الإعلان',
-                  'منشورة ونشطة',
-                ),
+                _ClinicalDetailRow('حالة الإعلان', 'منشورة ونشطة'),
                 _ClinicalDetailRow(
                   'عدد المشاهدات',
                   '${text(item, 'views_count', fallback: '0')} مشاهدة',
                 ),
-                _ClinicalDetailRow(
-                  'تاريخ النشر',
-                  dateOnly(createdAt),
-                ),
+                _ClinicalDetailRow('تاريخ النشر', dateOnly(createdAt)),
                 if (updatedAt.isNotEmpty && updatedAt != createdAt)
                   _ClinicalDetailRow('آخر تعديل', dateOnly(updatedAt)),
                 if (text(item, 'internal_notes').isNotEmpty)
@@ -5939,8 +5854,7 @@ class _RareCaseDetailsPanel extends ConsumerWidget {
                   text(
                     item,
                     'clinical_signs',
-                    fallback:
-                        'لا توجد علامات سريرية مضافة.',
+                    fallback: 'لا توجد علامات سريرية مضافة.',
                   ),
                   style: const TextStyle(
                     height: 1.6,
@@ -6368,9 +6282,7 @@ Future<void> _showClinicalLogSheet(
 
   await showMoeenBottomSheet<void>(
     context: context,
-    title: existing == null
-        ? 'تسجيل بيانات اليوم'
-        : 'تعديل سجل اليوم',
+    title: existing == null ? 'تسجيل بيانات اليوم' : 'تعديل سجل اليوم',
     icon: Icons.local_hospital_rounded,
     color: AppColors.teal,
     child: StatefulBuilder(
@@ -6548,8 +6460,7 @@ Future<void> _showClinicalLogSheet(
                           if (!sheetContext.mounted) return;
                           await showMoeenInfoDialog(
                             context: sheetContext,
-                            title:
-                                'لا يوجد اتصال بالإنترنت',
+                            title: 'لا يوجد اتصال بالإنترنت',
                             message:
                                 'يرجى الاتصال بالإنترنت لتنفيذ هذه العملية.',
                             icon: Icons.wifi_off_rounded,
@@ -6615,8 +6526,7 @@ Future<void> _showClinicalLogSheet(
                             await showMoeenInfoDialog(
                               context: sheetContext,
                               title: 'تعذر حفظ السجل',
-                              message:
-                                  'حدث خطأ غير متوقع. حاول مرة أخرى.',
+                              message: 'حدث خطأ غير متوقع. حاول مرة أخرى.',
                               icon: Icons.error_outline_rounded,
                               color: AppColors.danger,
                             );
@@ -6825,8 +6735,7 @@ class _ClinicalDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<int>(
       value: value,
-      validator: (value) =>
-          value == null ? 'هذا الحقل مطلوب' : null,
+      validator: (value) => value == null ? 'هذا الحقل مطلوب' : null,
       isExpanded: true,
       style: const TextStyle(
         fontFamily: 'Cairo',
@@ -6961,8 +6870,7 @@ Future<void> _deleteClinicalLog(
   final ok = await showMoeenConfirmDialog(
     context: context,
     title: 'حذف السجل العملي',
-    message:
-        'هل تريد حذف هذا السجل؟ لا يمكن حذف السجل بعد اعتماده.',
+    message: 'هل تريد حذف هذا السجل؟ لا يمكن حذف السجل بعد اعتماده.',
     confirmLabel: 'حذف',
     icon: Icons.delete_rounded,
     color: AppColors.danger,
@@ -7004,9 +6912,7 @@ Future<void> _showCustomChecklistSheet(
               validator: (value) => value == null || value.trim().isEmpty
                   ? 'اكتب عنوان النموذج'
                   : null,
-              decoration: const InputDecoration(
-                labelText: 'عنوان النموذج',
-              ),
+              decoration: const InputDecoration(labelText: 'عنوان النموذج'),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -7027,9 +6933,7 @@ Future<void> _showCustomChecklistSheet(
                           value == null || value.trim().isEmpty
                           ? 'مطلوب'
                           : null,
-                      decoration: InputDecoration(
-                        labelText: 'العنصر ${i + 1}',
-                      ),
+                      decoration: InputDecoration(labelText: 'العنصر ${i + 1}'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -7038,12 +6942,8 @@ Future<void> _showCustomChecklistSheet(
                       controller: items[i].marks,
                       keyboardType: TextInputType.number,
                       validator: (value) =>
-                          (num.tryParse(value ?? '') ?? 0) <= 0
-                          ? 'درجة'
-                          : null,
-                      decoration: const InputDecoration(
-                        labelText: 'الدرجة',
-                      ),
+                          (num.tryParse(value ?? '') ?? 0) <= 0 ? 'درجة' : null,
+                      decoration: const InputDecoration(labelText: 'الدرجة'),
                     ),
                   ),
                   IconButton(

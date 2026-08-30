@@ -17,6 +17,7 @@ import '../../../core/downloads/download_service.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/providers.dart';
 import '../../../core/refresh/staff_refresh_coordinator.dart';
+import '../../../core/config/app_variant.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/moeen_dialogs.dart';
 import '../../../shared/widgets/status_message.dart';
@@ -101,7 +102,7 @@ Future<void> showStaffSubscriptionRequiredDialog(
     confirmLabel: 'الاشتراك الآن',
     cancelLabel: 'لاحقاً',
     icon: Icons.lock_rounded,
-    color: AppColors.goldDeep,
+    color: StaffBrandColors.accentDeep,
   );
   if (approved && context.mounted) {
     context.go(staffSubscriptionRouteFor(context));
@@ -297,9 +298,49 @@ final staffRoutes = <GoRoute>[
     ),
   ),
   GoRoute(
+    path: DoctorEvaluationResultDetailsScreen.route,
+    builder: (context, state) {
+      final resultId = int.parse(state.pathParameters['resultId']!);
+      final extra = state.extra is Map
+          ? Map<String, dynamic>.from(state.extra as Map)
+          : null;
+      return DoctorEvaluationResultDetailsScreen(
+        resultId: resultId,
+        initialResult: extra,
+      );
+    },
+  ),
+  GoRoute(
+    path: DoctorChecklistFormScreen.createRoute,
+    builder: (context, state) => const DoctorChecklistFormScreen(),
+  ),
+  GoRoute(
+    path: DoctorChecklistFormScreen.editRoute,
+    builder: (context, state) {
+      final checklistId = int.parse(state.pathParameters['checklistId']!);
+      final extra = state.extra is Map
+          ? Map<String, dynamic>.from(state.extra as Map)
+          : null;
+      return DoctorChecklistFormScreen(
+        checklistId: checklistId,
+        initialChecklist: extra,
+      );
+    },
+  ),
+  GoRoute(
     path: DoctorClinicalSectionScreen.route,
     builder: (context, state) =>
         DoctorClinicalSectionScreen(section: state.pathParameters['section']!),
+  ),
+  GoRoute(
+    path: DoctorClinicalSectionScreen.rareCasesRoute,
+    builder: (context, state) =>
+        const DoctorClinicalSectionScreen(section: 'rare-cases'),
+  ),
+  GoRoute(
+    path: DoctorClinicalSectionScreen.volunteersRoute,
+    builder: (context, state) =>
+        const DoctorClinicalSectionScreen(section: 'volunteers'),
   ),
   GoRoute(
     path: '/administrative/subscription',
@@ -1279,7 +1320,7 @@ class _HeaderCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
+        gradient: StaffBrandColors.primaryGradient,
         borderRadius: BorderRadius.circular(24),
       ),
       child: Row(

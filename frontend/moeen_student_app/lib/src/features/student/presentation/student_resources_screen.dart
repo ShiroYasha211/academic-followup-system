@@ -29,6 +29,7 @@ class _StudentResourcesScreenState extends ConsumerState<StudentResourcesScreen>
   String _sort = 'newest';
   bool _scheduled = false;
   bool _isGrid = false;
+  int _page = 1;
 
   @override
   void initState() {
@@ -36,18 +37,20 @@ class _StudentResourcesScreenState extends ConsumerState<StudentResourcesScreen>
     _tabController = TabController(length: _categories.length, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
-        setState(() {});
+        setState(() => _page = 1);
       }
     });
   }
 
+  String get _selectedCategory => _categories[_tabController.index]['value']!;
+
   ResourceQuery get _query => (
     search: _search.text,
     subjectId: _subjectId,
-    category: 'all',
+    category: _selectedCategory,
     sort: _sort,
     scheduled: _scheduled,
-    page: 1,
+    page: _page,
   );
 
   @override
@@ -76,9 +79,8 @@ class _StudentResourcesScreenState extends ConsumerState<StudentResourcesScreen>
   Widget _buildLayout(BuildContext context, dynamic data) {
     final stats = asMap(data['stats']);
     final subjects = asList(data['subjects']).map(asMap).toList();
-    final resources = asList(
-      asMap(data['resources'])['data'],
-    ).map(asMap).toList();
+    final paginator = asMap(data['resources']);
+    final resources = asList(paginator['data']).map(asMap).toList();
 
     return NestedScrollView(
       headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -98,7 +100,7 @@ class _StudentResourcesScreenState extends ConsumerState<StudentResourcesScreen>
                 _ResourceActionRow(
                   search: _search,
                   isGrid: _isGrid,
-                  onSearch: () => setState(() {}),
+                  onSearch: () => setState(() => _page = 1),
                   onFilter: () => _showAdvancedFilters(context, subjects),
                   onToggleView: () => setState(() => _isGrid = !_isGrid),
                 ),
@@ -170,6 +172,9 @@ class _StudentResourcesScreenState extends ConsumerState<StudentResourcesScreen>
                     return true;
                   return c == catValue;
                 }).toList();
+          final currentPage = number(paginator, 'current_page').toInt();
+          final lastPage = number(paginator, 'last_page').toInt();
+          final total = number(paginator, 'total').toInt();
 
           if (filtered.isEmpty) {
             return const EmptyState(
@@ -179,32 +184,56 @@ class _StudentResourcesScreenState extends ConsumerState<StudentResourcesScreen>
           }
 
           if (_isGrid) {
-            return GridView.builder(
-              padding: const EdgeInsets.all(18),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                childAspectRatio: 0.8,
-              ),
-              itemCount: filtered.length,
-              itemBuilder: (ctx, i) => _CourseResourceGridCard(
-                item: filtered[i],
-                onDownload: () => _downloadDirect(context, filtered[i]),
-                onOpen: () => _openDirect(context, filtered[i]),
-              ),
+            return Column(
+              children: [
+                Expanded(
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(18),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio: 0.8,
+                        ),
+                    itemCount: filtered.length,
+                    itemBuilder: (ctx, i) => _CourseResourceGridCard(
+                      item: filtered[i],
+                      onDownload: () => _downloadDirect(context, filtered[i]),
+                      onOpen: () => _openDirect(context, filtered[i]),
+                    ),
+                  ),
+                ),
+                if (lastPage > 1)
+                  _ResourcesPaginationBar(
+                    currentPage: currentPage,
+                    lastPage: lastPage,
+                    total: total,
+                    onPageChanged: (page) => setState(() => _page = page),
+                  ),
+              ],
             );
           }
 
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 40),
-            itemCount: filtered.length,
+            itemCount: filtered.length + (lastPage > 1 ? 1 : 0),
             separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (ctx, i) => _CourseResourceCard(
-              item: filtered[i],
-              onDownload: () => _downloadDirect(context, filtered[i]),
-              onOpen: () => _openDirect(context, filtered[i]),
-            ),
+            itemBuilder: (ctx, i) {
+              if (i == filtered.length) {
+                return _ResourcesPaginationBar(
+                  currentPage: currentPage,
+                  lastPage: lastPage,
+                  total: total,
+                  onPageChanged: (page) => setState(() => _page = page),
+                );
+              }
+              return _CourseResourceCard(
+                item: filtered[i],
+                onDownload: () => _downloadDirect(context, filtered[i]),
+                onOpen: () => _openDirect(context, filtered[i]),
+              );
+            },
           );
         }).toList(),
       ),
@@ -273,6 +302,7 @@ class _StudentResourcesScreenState extends ConsumerState<StudentResourcesScreen>
   ) async {
     int? subject = _subjectId;
     String selectedSort = _sort;
+    bool scheduled = _scheduled;
 
     final result = await showMoeenBottomSheet<bool>(
       context: context,
@@ -309,6 +339,15 @@ class _StudentResourcesScreenState extends ConsumerState<StudentResourcesScreen>
               onChanged: (val) =>
                   setLocal(() => selectedSort = val ?? 'newest'),
             ),
+            const SizedBox(height: 12),
+            SwitchListTile.adaptive(
+              value: scheduled,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('المصادر المجدولة فقط'),
+              subtitle: const Text('عرض الملفات التي أضفتها إلى جدولك الدراسي'),
+              activeColor: Color(0xFF0D9488),
+              onChanged: (value) => setLocal(() => scheduled = value),
+            ),
             const SizedBox(height: 24),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
@@ -326,8 +365,74 @@ class _StudentResourcesScreenState extends ConsumerState<StudentResourcesScreen>
       setState(() {
         _subjectId = subject;
         _sort = selectedSort;
+        _scheduled = scheduled;
+        _page = 1;
       });
     }
+  }
+}
+
+class _ResourcesPaginationBar extends StatelessWidget {
+  const _ResourcesPaginationBar({
+    required this.currentPage,
+    required this.lastPage,
+    required this.total,
+    required this.onPageChanged,
+  });
+
+  final int currentPage;
+  final int lastPage;
+  final int total;
+  final ValueChanged<int> onPageChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.slate200),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.midnight.withValues(alpha: 0.06),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Text(
+              'صفحة $currentPage من $lastPage - $total ملف',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.slate600,
+              ),
+            ),
+            const Spacer(),
+            IconButton.filledTonal(
+              tooltip: 'السابق',
+              onPressed: currentPage <= 1
+                  ? null
+                  : () => onPageChanged(currentPage - 1),
+              icon: const Icon(Icons.chevron_right_rounded),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              tooltip: 'التالي',
+              onPressed: currentPage >= lastPage
+                  ? null
+                  : () => onPageChanged(currentPage + 1),
+              icon: const Icon(Icons.chevron_left_rounded),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

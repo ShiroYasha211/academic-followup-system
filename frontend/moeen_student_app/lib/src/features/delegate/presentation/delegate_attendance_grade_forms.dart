@@ -930,21 +930,14 @@ Future<void> _showAttendanceReportSheet(
   WidgetRef ref,
   Map<String, dynamic> session,
 ) async {
-  await showModalBottomSheet<void>(
+  await showMoeenBottomSheet(
     context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    builder: (context) => SafeArea(
-      child: DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, controller) => _AttendanceReportWidget(
-          session: session,
-          scrollController: controller,
-        ),
-      ),
+    title: 'تقرير الحضور',
+    icon: Icons.analytics_rounded,
+    color: AppColors.royalBlue,
+    fullScreen: true,
+    child: _AttendanceReportWidget(
+      session: session,
     ),
   );
 }
@@ -952,10 +945,8 @@ Future<void> _showAttendanceReportSheet(
 class _AttendanceReportWidget extends ConsumerStatefulWidget {
   const _AttendanceReportWidget({
     required this.session,
-    required this.scrollController,
   });
   final Map<String, dynamic> session;
-  final ScrollController scrollController;
 
   @override
   ConsumerState<_AttendanceReportWidget> createState() =>
@@ -967,11 +958,20 @@ class _AttendanceReportWidgetState
   bool _isLoading = true;
   bool _isDownloading = false;
   Map<String, dynamic>? _report;
+  String _searchQuery = '';
+  String _statusFilter = 'all';
+  late final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _fetchData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchData() async {
@@ -1010,8 +1010,8 @@ class _AttendanceReportWidgetState
     
     final displaySubjectId = (subjectId == 0 || boolValue(_report, 'is_unofficial')) ? 0 : subjectId;
 
-    final session = ref.read(authControllerProvider).valueOrNull;
-    final token = session?.token;
+    final sessionToken = ref.read(authControllerProvider).valueOrNull;
+    final token = sessionToken?.token;
     if (token == null) {
       _toast(context, 'الرجاء تسجيل الدخول مرة أخرى');
       return;
@@ -1056,31 +1056,91 @@ class _AttendanceReportWidgetState
     );
   }
 
+  Widget _buildFilterChip(String value, String label, Color color) {
+    final selected = _statusFilter == value;
+    return InkWell(
+      onTap: () => setState(() => _statusFilter = value),
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? color : color.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? color : color.withValues(alpha: 0.12),
+            width: 1.2,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              const Icon(Icons.check_rounded, color: Colors.white, size: 14),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : color,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                fontFamily: 'Cairo',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _normalizeAttendanceStatus(String status) {
+    if (status == 'present' || status == 'absent' || status == 'late' || status == 'excused') {
+      return status;
+    }
+    return 'present';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
     if (_report == null) {
-      return const Center(child: Text('فشل تحميل التقرير.'));
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(child: Text('فشل تحميل التقرير.')),
+      );
     }
 
-    final appStudents = asList(_report!['app_students']);
-    final students = appStudents.isNotEmpty ? appStudents : asList(_report!['students']);
+    final appStudents = asList(_report!['app_students']).map(asMap).toList();
+    final students = (appStudents.isNotEmpty ? appStudents : asList(_report!['students'])).map(asMap).toList();
+
     final summary = asMap(_report!['summary']);
     final present = summary.isNotEmpty
         ? number(summary, 'present').toInt()
-        : students.where((s) => text(s, 'status') == 'present').length;
+        : students.where((s) => _normalizeAttendanceStatus(text(s, 'status')) == 'present').length;
     final absent = summary.isNotEmpty
         ? number(summary, 'absent').toInt()
-        : students.where((s) => text(s, 'status') == 'absent').length;
+        : students.where((s) => _normalizeAttendanceStatus(text(s, 'status')) == 'absent').length;
     final lateCount = summary.isNotEmpty
         ? number(summary, 'late').toInt()
-        : students.where((s) => text(s, 'status') == 'late').length;
+        : students.where((s) => _normalizeAttendanceStatus(text(s, 'status')) == 'late').length;
     final excusedCount = summary.isNotEmpty
         ? number(summary, 'excused').toInt()
-        : students.where((s) => text(s, 'status') == 'excused').length;
-    final total = students.length;
+        : students.where((s) => _normalizeAttendanceStatus(text(s, 'status')) == 'excused').length;
 
     final lecture = asMap(_report!['lecture']);
     final dateRaw = text(widget.session, 'date');
@@ -1091,389 +1151,348 @@ class _AttendanceReportWidgetState
     final formattedDate = dateObj != null
         ? intl.DateFormat('yMMMMEEEEd', 'ar').format(dateObj)
         : dateRaw;
+    final isQr = text(widget.session, 'attendance_method') == 'qr';
+    final displaySubjectName = text(asMap(widget.session['subject']), 'name', fallback: text(widget.session, 'display_name'));
 
-    final isUnofficial = boolValue(_report, 'is_unofficial');
-    final lectureType = text(lecture, 'lecture_type');
-    String typeLabel = 'محاضرة رسمية';
-    Color typeColor = AppColors.royalBlue;
-    if (isUnofficial) {
-      typeLabel = 'جلسة غير رسمية';
-      typeColor = Colors.orange;
-    } else if (lectureType == 'special') {
-      typeLabel = 'محاضرة إضافية';
-      typeColor = AppColors.teal;
-    }
+    // Apply client-side search and status filters
+    final filteredStudents = students.where((student) {
+      final name = text(student, 'name').toLowerCase();
+      final numberStr = text(student, 'student_number').toLowerCase();
+      final status = _normalizeAttendanceStatus(text(student, 'status'));
 
-    return ListView(
-      controller: widget.scrollController,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+      final matchesQuery = _searchQuery.isEmpty ||
+          name.contains(_searchQuery.toLowerCase()) ||
+          numberStr.contains(_searchQuery.toLowerCase());
+
+      if (!matchesQuery) return false;
+
+      if (_statusFilter != 'all') {
+        return status == _statusFilter;
+      }
+      return true;
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header Section
-        Center(
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: typeColor.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isUnofficial
-                      ? Icons.stars_rounded
-                      : Icons.assignment_turned_in_rounded,
-                  color: typeColor,
-                  size: 40,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                text(widget.session, 'display_name'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 20,
-                  color: AppColors.midnight,
-                ),
-              ),
-              const SizedBox(height: 4),
-              _ReportTypeBadge(
-                status: isUnofficial ? 'unofficial' : 'official',
-                label: typeLabel,
-                color: typeColor,
+        // Gorgeous Academic Ticket Subject Card
+        Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: AppColors.slate100),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.025),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 24),
-
-        // Info Grid
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.6,
-          children: [
-            _ReportInfoCard(
-              icon: Icons.book_rounded,
-              label: 'المادة',
-              value: text(
-                asMap(widget.session['subject']),
-                'name',
-                fallback: 'غير محدد',
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(26),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Left accent stripe
+                  Container(width: 6, color: AppColors.royalBlue),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.royalBlue.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: AppColors.royalBlue.withValues(alpha: 0.12),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.auto_stories_rounded,
+                                  color: AppColors.royalBlue,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      displaySubjectName,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w900,
+                                        fontFamily: 'Cairo',
+                                        color: AppColors.midnight,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    const Text(
+                                      'تفاصيل جلسة رصد حضور الطلاب',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.slate400,
+                                        fontFamily: 'Cairo',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          const _DashedDivider(),
+                          const SizedBox(height: 14),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _ReportMetaChip(
+                                icon: Icons.calendar_month_rounded,
+                                label: formattedDate,
+                              ),
+                              if (lecture.isNotEmpty)
+                                _ReportMetaChip(
+                                  icon: Icons.menu_book_rounded,
+                                  label: text(lecture, 'title', fallback: 'محاضرة'),
+                                ),
+                              if (text(lecture, 'lecture_number').isNotEmpty)
+                                _ReportMetaChip(
+                                  icon: Icons.tag_rounded,
+                                  label: 'رقم ${text(lecture, 'lecture_number')}',
+                                ),
+                              _ReportMetaChip(
+                                icon: isQr ? Icons.qr_code_rounded : Icons.edit_calendar_rounded,
+                                label: isQr ? 'تحضير QR' : 'تحضير يدوي',
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
+            ),
+          ),
+        ),
+
+        // Bento Grid Metrics Row
+        Row(
+          children: [
+            _ReportMetricCard(
+              label: 'الطلاب',
+              value: '${students.length}',
               color: AppColors.royalBlue,
+              icon: Icons.people_alt_rounded,
             ),
-            _ReportInfoCard(
-              icon: Icons.title_rounded,
-              label: 'العنوان',
-              value: text(lecture, 'title', fallback: 'جلسة عادية'),
-              color: AppColors.teal,
+            const SizedBox(width: 8),
+            _ReportMetricCard(
+              label: 'حاضر',
+              value: '$present',
+              color: AppColors.success,
+              icon: Icons.check_circle_rounded,
             ),
-            _ReportInfoCard(
-              icon: Icons.calendar_today_rounded,
-              label: 'التاريخ',
-              value: formattedDate,
-              color: AppColors.slate600,
+            const SizedBox(width: 8),
+            _ReportMetricCard(
+              label: 'غائب',
+              value: '$absent',
+              color: AppColors.danger,
+              icon: Icons.cancel_rounded,
             ),
-            _ReportInfoCard(
-              icon: Icons.category_rounded,
-              label: 'النوع',
-              value: typeLabel,
-              color: typeColor,
+            const SizedBox(width: 8),
+            _ReportMetricCard(
+              label: 'متأخر',
+              value: '$lateCount',
+              color: AppColors.warning,
+              icon: Icons.watch_later_rounded,
             ),
           ],
         ),
-        const SizedBox(height: 24),
-
-        // Summary Stats Row
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.slate50,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.slate100),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _ReportStatSummary(
-                label: 'حاضر',
-                value: present,
-                color: AppColors.success,
-              ),
-              _ReportStatSummary(
-                label: 'غائب',
-                value: absent,
-                color: AppColors.danger,
-              ),
-              _ReportStatSummary(
-                label: 'متأخر',
-                value: lateCount,
-                color: AppColors.warning,
-              ),
-              _ReportStatSummary(
-                label: 'عذر',
-                value: excusedCount,
-                color: AppColors.royalBlue,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 14),
 
         // Actions Row
         Row(
           children: [
             Expanded(
-              child: _ReportActionButton(
-                onTap: _handleEdit,
-                icon: Icons.edit_note_rounded,
-                label: 'تعديل السجل',
-                color: AppColors.royalBlue,
-                isPrimary: true,
+              child: OutlinedButton.icon(
+                onPressed: _handleEdit,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.royalBlue,
+                  side: const BorderSide(color: AppColors.royalBlue, width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                icon: const Icon(Icons.edit_rounded, size: 18),
+                label: const Text(
+                  'تعديل الجلسة',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _ReportActionButton(
-                onTap: _isDownloading ? null : _handlePrint,
-                icon: Icons.picture_as_pdf_rounded,
-                label: 'تحميل التقرير',
-                color: AppColors.danger,
-                isPrimary: false,
-                loading: _isDownloading,
+              child: FilledButton.icon(
+                onPressed: _isDownloading ? null : _handlePrint,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.royalBlue,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 2,
+                  shadowColor: AppColors.royalBlue.withValues(alpha: 0.2),
+                ),
+                icon: _isDownloading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.picture_as_pdf_rounded, size: 18),
+                label: const Text(
+                  'تحميل التقرير',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 20),
 
-        // Students List Header
-        Row(
-          children: [
-            const Icon(
-              Icons.people_rounded,
-              color: AppColors.slate500,
+        // Real-time Reactive Search Box
+        TextField(
+          controller: _searchController,
+          onChanged: (val) => setState(() => _searchQuery = val),
+          style: const TextStyle(
+            fontFamily: 'Cairo',
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            color: AppColors.midnight,
+          ),
+          decoration: InputDecoration(
+            hintText: 'بحث باسم الطالب أو رقم القيد...',
+            hintStyle: const TextStyle(color: AppColors.slate400),
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              color: AppColors.royalBlue,
               size: 20,
             ),
-            const SizedBox(width: 8),
-            Text(
-              'سجل حضور الطلاب ($total)',
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                color: AppColors.slate700,
-                fontSize: 16,
+            suffixIcon: _searchQuery.isNotEmpty
+                ? GestureDetector(
+                    onTap: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                    child: const Icon(
+                      Icons.cancel_rounded,
+                      color: AppColors.slate400,
+                      size: 20,
+                    ),
+                  )
+                : null,
+            filled: true,
+            fillColor: AppColors.slate50,
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 12,
+              horizontal: 16,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: AppColors.slate100,
+                width: 1.5,
               ),
             ),
-          ],
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: AppColors.royalBlue,
+                width: 2,
+              ),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: AppColors.slate100,
+                width: 1.5,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Horizontal Category Chips
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildFilterChip('all', 'الكل (${students.length})', AppColors.royalBlue),
+              const SizedBox(width: 8),
+              _buildFilterChip('present', 'حاضر ($present)', AppColors.success),
+              const SizedBox(width: 8),
+              _buildFilterChip('absent', 'غائب ($absent)', AppColors.danger),
+              const SizedBox(width: 8),
+              _buildFilterChip('late', 'متأخر ($lateCount)', AppColors.warning),
+              const SizedBox(width: 8),
+              _buildFilterChip('excused', 'عذر ($excusedCount)', AppColors.royalBlue),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
 
-        for (final student in students)
-          _SessionStudentCard(
-            name: text(student, 'name'),
-            status: text(student, 'status'),
-            studentNumber: text(student, 'student_number'),
-          ),
-      ],
-    );
-  }
-}
-
-class _ReportInfoCard extends StatelessWidget {
-  const _ReportInfoCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.slate100),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: AppColors.slate400,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Text(
-            value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 12,
-              color: AppColors.midnight,
-              height: 1.2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReportStatSummary extends StatelessWidget {
-  const _ReportStatSummary({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-  final String label;
-  final int value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value.toString(),
-          style: TextStyle(
-            color: color,
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.slate500,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ReportActionButton extends StatelessWidget {
-  const _ReportActionButton({
-    required this.onTap,
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.isPrimary,
-    this.loading = false,
-  });
-  final VoidCallback? onTap;
-  final IconData icon;
-  final String label;
-  final Color color;
-  final bool isPrimary;
-  final bool loading;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: isPrimary ? color : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color, width: 1.5),
-          boxShadow: isPrimary
-              ? [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+        // Students list
+        filteredStudents.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: Center(
+                  child: Text(
+                    'لا يوجد طلاب يطابقون خيارات التصفية والبحث.',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.slate400,
+                    ),
                   ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (loading)
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: isPrimary ? Colors.white : color,
                 ),
               )
-            else
-              Icon(icon, size: 20, color: isPrimary ? Colors.white : color),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: isPrimary ? Colors.white : color,
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: filteredStudents.length,
+                itemBuilder: (context, index) {
+                  final student = filteredStudents[index];
+                  return _SessionStudentCard(
+                    name: text(student, 'name'),
+                    status: _normalizeAttendanceStatus(text(student, 'status')),
+                    studentNumber: text(student, 'student_number'),
+                  );
+                },
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ReportTypeBadge extends StatelessWidget {
-  const _ReportTypeBadge({
-    required this.status,
-    required this.label,
-    required this.color,
-  });
-  final String status;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
+      ],
     );
   }
 }
@@ -1488,94 +1507,167 @@ class _SessionStudentCard extends StatelessWidget {
   final String status;
   final String studentNumber;
 
+  Color _statusColor(String status) {
+    if (status == 'present') return AppColors.success;
+    if (status == 'absent') return AppColors.danger;
+    if (status == 'late') return AppColors.warning;
+    if (status == 'excused') return AppColors.royalBlue;
+    return AppColors.slate400;
+  }
+
   @override
   Widget build(BuildContext context) {
-    Color color = AppColors.success;
-    String label = 'حاضر';
-    IconData icon = Icons.check_circle_rounded;
-
-    if (status == 'absent') {
-      color = AppColors.danger;
-      label = 'غائب';
-      icon = Icons.cancel_rounded;
-    } else if (status == 'late') {
-      color = AppColors.warning;
-      label = 'متأخر';
-      icon = Icons.watch_later_rounded;
-    } else if (status == 'excused') {
-      color = AppColors.royalBlue;
-      label = 'عذر';
-      icon = Icons.info_outline_rounded;
-    } else if (status.isEmpty || status == 'null') {
-      color = AppColors.slate400;
-      label = 'غير مسجل';
-      icon = Icons.help_outline_rounded;
-    }
+    final color = _statusColor(status);
+    final initialLetter = name.isNotEmpty ? name[0] : '?';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.slate100),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: color.withValues(alpha: 0.1),
-            child: Text(
-              name.isNotEmpty ? name[0] : 'S',
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              name,
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
-                color: AppColors.midnight,
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: color.withValues(alpha: 0.1)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 12, color: color),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Left status accent strip
+              Container(width: 5, color: color),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      // Circular initial avatar with gradient & overlay
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  color.withValues(alpha: 0.15),
+                                  color.withValues(alpha: 0.05),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: color.withValues(alpha: 0.25),
+                                width: 1.5,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              initialLetter,
+                              style: TextStyle(
+                                color: color,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                          ),
+                          // Mini status badge overlay
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: color,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Icon(
+                                status == 'present'
+                                    ? Icons.check_rounded
+                                    : status == 'absent'
+                                        ? Icons.close_rounded
+                                        : status == 'late'
+                                            ? Icons.access_time_rounded
+                                            : Icons.info_outline_rounded,
+                                size: 10,
+                                color: color,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 14),
+                      // Student details
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.midnight,
+                                fontSize: 14,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                            if (studentNumber.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.badge_rounded,
+                                    size: 13,
+                                    color: AppColors.slate400,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    studentNumber,
+                                    style: const TextStyle(
+                                      color: AppColors.slate400,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      fontFamily: 'Cairo',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Premium Status Badge
+                      _PremiumStatusBadge(
+                        status: status,
+                        color: color,
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1872,4 +1964,148 @@ Future<void> _helperDelegationSheet(BuildContext context, WidgetRef ref) async {
       ),
     ),
   );
+}
+
+class _DashedDivider extends StatelessWidget {
+  const _DashedDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 1,
+      color: AppColors.slate100,
+    );
+  }
+}
+
+class _ReportMetaChip extends StatelessWidget {
+  const _ReportMetaChip({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.slate100),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.slate500),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.slate600,
+              fontFamily: 'Cairo',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReportMetricCard extends StatelessWidget {
+  const _ReportMetricCard({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.icon,
+  });
+  final String label;
+  final String value;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.slate100),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.015),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                  ),
+                ),
+                Icon(icon, size: 16, color: color.withValues(alpha: 0.6)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: AppColors.slate400,
+                fontFamily: 'Cairo',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PremiumStatusBadge extends StatelessWidget {
+  const _PremiumStatusBadge({required this.status, required this.color});
+  final String status;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    String label = 'حاضر';
+    if (status == 'absent') {
+      label = 'غائب';
+    } else if (status == 'late') {
+      label = 'متأخر';
+    } else if (status == 'excused') {
+      label = 'عذر';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          fontFamily: 'Cairo',
+        ),
+      ),
+    );
+  }
 }

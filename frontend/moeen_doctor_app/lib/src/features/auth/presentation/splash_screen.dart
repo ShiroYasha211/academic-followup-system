@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_colors.dart';
+import '../../../core/config/app_variant.dart';
 import '../../../shared/widgets/moeen_logo.dart';
 import '../../staff/presentation/staff_screens.dart';
 import '../logic/auth_controller.dart';
@@ -74,7 +74,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               right: -90,
               child: _Orb(
                 size: 280,
-                color: AppColors.gold.withValues(alpha: 0.16),
+                color: StaffBrandColors.accent.withValues(alpha: 0.14),
               ),
             ),
             Positioned(
@@ -82,7 +82,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               left: -80,
               child: _Orb(
                 size: 250,
-                color: AppColors.royalBlue.withValues(alpha: 0.08),
+                color: StaffBrandColors.primary.withValues(alpha: 0.08),
               ),
             ),
             Center(
@@ -96,14 +96,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       Container(
                         padding: const EdgeInsets.all(22),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFFCF5),
+                          color: StaffBrandColors.surface,
                           borderRadius: BorderRadius.circular(36),
                           border: Border.all(
-                            color: AppColors.gold.withValues(alpha: 0.16),
+                            color: StaffBrandColors.border.withValues(
+                              alpha: 0.8,
+                            ),
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.royalBlue.withValues(
+                              color: StaffBrandColors.primary.withValues(
                                 alpha: 0.08,
                               ),
                               blurRadius: 34,
@@ -120,25 +122,29 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.08),
+                          color: StaffBrandColors.primary.withValues(
+                            alpha: 0.08,
+                          ),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.15),
+                            color: StaffBrandColors.primary.withValues(
+                              alpha: 0.15,
+                            ),
                           ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.school_rounded,
-                              color: AppColors.royalBlue,
+                              color: StaffBrandColors.primary,
                               size: 16,
                             ),
                             const SizedBox(width: 6),
                             Text(
                               'بوابة عضو هيئة التدريس',
                               style: TextStyle(
-                                color: AppColors.royalBlueDark,
+                                color: StaffBrandColors.primaryDark,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w900,
                                 fontFamily: 'Cairo',
@@ -151,17 +157,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       Text(
                         'مساحتك الأكاديمية في مكان واحد',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppColors.midnight,
+                          color: StaffBrandColors.textPrimary,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                       const SizedBox(height: 36),
-                      const SizedBox(
+                      SizedBox(
                         width: 32,
                         height: 32,
                         child: CircularProgressIndicator(
                           strokeWidth: 3,
-                          color: AppColors.primary,
+                          color: StaffBrandColors.primary,
                         ),
                       ),
                     ],

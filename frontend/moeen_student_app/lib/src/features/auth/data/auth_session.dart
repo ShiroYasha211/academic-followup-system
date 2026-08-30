@@ -32,6 +32,8 @@ class AuthSession {
   bool hasPermission(String resource, String action) =>
       permissions.contains('$resource.$action');
 
+  bool hasPermissionSlug(String slug) => permissions.contains(slug);
+
   bool get canAccessDelegateWorkspace =>
       role == 'delegate' || role == 'practical_delegate' || isPracticalDelegate;
 

@@ -10,6 +10,25 @@ extension _DoctorClinicalReviewActions on _DoctorClinicalSectionScreenState {
       await _showBodySystemDetails(item);
       return;
     }
+    if (widget.section == 'assignments') {
+      await showMoeenBottomSheet<void>(
+        context: context,
+        title: 'تفاصيل التكليف السريري',
+        icon: Icons.assignment_ind_rounded,
+        color: AppColors.royalBlue,
+        fullScreen: true,
+        child: _ClinicalAssignmentDetails(
+          item: item,
+          onReview: _docText(item['status']) == 'submitted_for_review'
+              ? () {
+                  Navigator.pop(context);
+                  _reviewAssignment(item);
+                }
+              : null,
+        ),
+      );
+      return;
+    }
     if (widget.section == 'checklists') {
       await showMoeenBottomSheet<void>(
         context: context,
@@ -691,6 +710,35 @@ extension _DoctorClinicalReviewActions on _DoctorClinicalSectionScreenState {
           );
       if (!mounted) return;
       _docSnack(context, 'تم استرجاع قائمة التقييم.', color: AppColors.success);
+      _reload();
+    } catch (error) {
+      if (mounted) await _docErrorDialog(context, error);
+    }
+  }
+
+  Future<void> _syncChecklistAdminUpdate(_Json item) async {
+    final title = _docText(item['title'], 'قائمة التقييم');
+    final ok = await showMoeenConfirmDialog(
+      context: context,
+      title: 'تحديث من نسخة الأدمن',
+      message:
+          'سيتم تحديث "$title" من أحدث نسخة نشرها الأدمن. إذا كانت قائمتك مستخدمة في تقييمات سابقة، سيتم حفظ النسخة الحالية للأرشيف وإنشاء نسخة محدثة جديدة.',
+      confirmLabel: 'تحديث',
+      cancelLabel: 'إلغاء',
+      icon: Icons.system_update_alt_rounded,
+      color: AppColors.warning,
+    );
+    if (!ok) return;
+
+    try {
+      await ref
+          .read(staffRepositoryProvider)
+          .post(
+            '/doctor/clinical/evaluations/checklists/${item['id']}/sync-admin-update',
+            {},
+          );
+      if (!mounted) return;
+      _docSnack(context, 'تم تحديث القائمة من نسخة الأدمن.', color: AppColors.success);
       _reload();
     } catch (error) {
       if (mounted) await _docErrorDialog(context, error);

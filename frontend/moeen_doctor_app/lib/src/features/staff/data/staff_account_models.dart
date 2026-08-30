@@ -169,6 +169,7 @@ class StaffAdministrativeSettings {
     required this.excusesDeadlineDays,
     required this.excuseReceiver,
     required this.qrRotationSeconds,
+    required this.doctorInitialStarBalance,
   });
 
   final int id;
@@ -177,6 +178,7 @@ class StaffAdministrativeSettings {
   final int excusesDeadlineDays;
   final String excuseReceiver;
   final int qrRotationSeconds;
+  final int doctorInitialStarBalance;
 
   factory StaffAdministrativeSettings.fromJson(Map<String, dynamic> json) {
     return StaffAdministrativeSettings(
@@ -186,9 +188,9 @@ class StaffAdministrativeSettings {
         json['absence_deprivation_percentage'],
       ),
       excusesDeadlineDays: _int(json['excuses_deadline_days']),
-      excuseReceiver: (json['excuse_receiver'] ?? 'administrative')
-          .toString(),
+      excuseReceiver: (json['excuse_receiver'] ?? 'administrative').toString(),
       qrRotationSeconds: _int(json['qr_rotation_seconds']),
+      doctorInitialStarBalance: _int(json['doctor_initial_star_balance']),
     );
   }
 }
