@@ -319,11 +319,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: StudentResourcesScreen.route,
-        builder: (context, state) => const StudentResourcesScreen(),
+        builder: (context, state) => const StudentResourcesNavigationScreen(),
       ),
       GoRoute(
         path: StudentLibraryScreen.route,
-        builder: (context, state) => const StudentLibraryScreen(),
+        builder: (context, state) => const StudentLibraryNavigationScreen(),
       ),
       GoRoute(
         path: StudentPlaceholderScreen.route,
@@ -381,11 +381,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: DelegateRoutes.resources,
-        builder: (context, state) => const DelegateResourcesScreen(),
+        builder: (context, state) => const DelegateResourcesNavigationScreen(),
       ),
       GoRoute(
         path: DelegateRoutes.libraryImport,
-        builder: (context, state) => const DelegateSharedLibraryScreen(),
+        builder: (context, state) => const DelegateLibraryNavigationScreen(),
       ),
       GoRoute(
         path: DelegateRoutes.reminders,

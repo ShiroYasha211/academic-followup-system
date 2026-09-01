@@ -261,6 +261,91 @@ class DelegateRepository {
     );
   }
 
+  Future<Map<String, dynamic>> libraryNavigation({
+    required String type,
+    required String node,
+    String? search,
+    int page = 1,
+  }) async => _data(
+    await _api.get(
+      '/delegate/library/navigation',
+      queryParameters: {
+        'type': type,
+        'node': node,
+        'page': page,
+        'per_page': 20,
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+      },
+    ),
+  );
+
+  Future<String> libraryDownloadUrl(int resourceId) async {
+    final data = _data(
+      await _api.get('/delegate/library/$resourceId/download'),
+    );
+    final url = data['download_url']?.toString() ?? '';
+    if (url.isEmpty) throw const ApiException('تعذر تجهيز رابط تحميل الملف.');
+    return url;
+  }
+
+  Future<void> createLibraryNode({
+    required int spaceId,
+    int? parentId,
+    required String title,
+  }) async {
+    await _api.post(
+      '/delegate/library/manage/nodes',
+      data: {
+        'library_space_id': spaceId,
+        if (parentId != null) 'parent_id': parentId,
+        'title': title,
+        'node_type': 'folder',
+        'icon': 'folder',
+      },
+    );
+  }
+
+  Future<void> updateLibraryNode(int nodeId, String title) async {
+    await _api.patch(
+      '/delegate/library/manage/nodes/$nodeId',
+      data: {'title': title},
+    );
+  }
+
+  Future<void> deleteLibraryNode(int nodeId) async {
+    await _api.delete('/delegate/library/manage/nodes/$nodeId');
+  }
+
+  Future<void> reorderLibraryNodes(
+    int spaceId,
+    List<Map<String, dynamic>> items,
+  ) async {
+    await _api.post(
+      '/delegate/library/manage/nodes/reorder',
+      data: {'library_space_id': spaceId, 'items': items},
+    );
+  }
+
+  Future<void> uploadLibraryNodeResource({
+    required int nodeId,
+    required String title,
+    required String description,
+    required String visibility,
+    required String filePath,
+    required String fileName,
+  }) async {
+    await _api.post(
+      '/delegate/library/manage/resources/upload',
+      data: FormData.fromMap({
+        'node_id': nodeId,
+        'title': title,
+        if (description.isNotEmpty) 'description': description,
+        'visibility': visibility,
+        'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      }),
+    );
+  }
+
   Future<String> uploadResource({
     required int subjectId,
     required String title,

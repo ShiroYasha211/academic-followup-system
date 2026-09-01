@@ -700,6 +700,85 @@ class StudentContentRepository {
     );
   }
 
+  Future<Map<String, dynamic>> libraryNavigation({
+    required String type,
+    required String node,
+    String? search,
+    int page = 1,
+  }) async {
+    return _data(
+      await _api.get(
+        '/student/library/navigation',
+        queryParameters: {
+          'type': type,
+          'node': node,
+          'page': page,
+          'per_page': 20,
+          if (search != null && search.trim().isNotEmpty)
+            'search': search.trim(),
+        },
+      ),
+    );
+  }
+
+  Future<void> createLibraryNode({
+    required int spaceId,
+    int? parentId,
+    required String title,
+  }) async {
+    await _api.post(
+      '/student/library/manage/nodes',
+      data: {
+        'library_space_id': spaceId,
+        if (parentId != null) 'parent_id': parentId,
+        'title': title,
+        'node_type': 'folder',
+        'icon': 'folder',
+      },
+    );
+  }
+
+  Future<void> updateLibraryNode(int nodeId, String title) async {
+    await _api.patch(
+      '/student/library/manage/nodes/$nodeId',
+      data: {'title': title},
+    );
+  }
+
+  Future<void> deleteLibraryNode(int nodeId) async {
+    await _api.delete('/student/library/manage/nodes/$nodeId');
+  }
+
+  Future<void> reorderLibraryNodes(
+    int spaceId,
+    List<Map<String, dynamic>> items,
+  ) async {
+    await _api.post(
+      '/student/library/manage/nodes/reorder',
+      data: {'library_space_id': spaceId, 'items': items},
+    );
+  }
+
+  Future<void> uploadLibraryNodeResource({
+    required int nodeId,
+    required String title,
+    required String description,
+    required String visibility,
+    required String filePath,
+    required String fileName,
+  }) async {
+    await _api.post(
+      '/student/library/manage/resources/upload',
+      data: FormData.fromMap({
+        'node_id': nodeId,
+        'title': title,
+        if (description.isNotEmpty) 'description': description,
+        'visibility': visibility,
+        'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      }),
+    );
+  }
+
   Future<String> libraryDownloadUrl(int id) async {
     final response = await _api.get('/student/library/$id/download');
     final data = _data(response);

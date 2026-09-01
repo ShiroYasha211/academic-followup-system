@@ -18,8 +18,10 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/providers.dart';
 import '../../../core/refresh/staff_refresh_coordinator.dart';
 import '../../../core/config/app_variant.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/moeen_dialogs.dart';
+import '../../../shared/widgets/library_browser.dart';
 import '../../../shared/widgets/status_message.dart';
 import '../../auth/data/staff_auth_session.dart';
 import '../../auth/logic/auth_controller.dart';
@@ -33,6 +35,7 @@ import 'staff_shell.dart';
 part 'doctor_academic_screens.dart';
 part 'doctor_assignments.dart';
 part 'doctor_library.dart';
+part 'doctor_library_navigation.dart';
 part 'doctor_announcements.dart';
 part 'doctor_grades.dart';
 part 'doctor_quizzes.dart';
@@ -196,7 +199,7 @@ final staffRoutes = <GoRoute>[
   ),
   GoRoute(
     path: DoctorLibraryScreen.route,
-    builder: (context, state) => const DoctorLibraryScreen(),
+    builder: (context, state) => const DoctorLibraryNavigationScreen(),
   ),
   GoRoute(
     path: DoctorAnnouncementsScreen.route,
