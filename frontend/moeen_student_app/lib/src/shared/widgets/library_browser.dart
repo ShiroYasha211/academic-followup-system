@@ -1,6 +1,9 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_colors.dart';
+import 'moeen_dialogs.dart';
+
 typedef LibraryJson = Map<String, dynamic>;
 typedef LibraryLoadCallback =
     Future<LibraryJson> Function(String node, String? search, int page);
@@ -27,6 +30,8 @@ class LibraryBrowser extends StatefulWidget {
     required this.title,
     required this.subtitle,
     required this.accentColor,
+    this.gradient,
+    this.heroIcon,
     required this.load,
     required this.onDownload,
     this.onCreateNode,
@@ -39,6 +44,8 @@ class LibraryBrowser extends StatefulWidget {
   final String title;
   final String subtitle;
   final Color accentColor;
+  final Gradient? gradient;
+  final IconData? heroIcon;
   final LibraryLoadCallback load;
   final LibraryResourceCallback onDownload;
   final LibraryCreateNodeCallback? onCreateNode;
@@ -59,6 +66,8 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   int _page = 1;
   bool _loading = true;
   bool _working = false;
+  bool _isGrid = false;
+  int? _downloadingId;
 
   @override
   void initState() {
@@ -108,6 +117,16 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   bool _can(String key) => _capabilities[key] == true;
   int? _id(Object? value) => int.tryParse(value?.toString() ?? '');
 
+  Future<void> _handleDownload(LibraryJson item) async {
+    final id = _id(item['id']);
+    if (id != null) setState(() => _downloadingId = id);
+    try {
+      await widget.onDownload(item);
+    } finally {
+      if (mounted) setState(() => _downloadingId = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -118,7 +137,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
         }
       },
       child: ColoredBox(
-        color: const Color(0xFFF6F8FB),
+        color: AppColors.slate50,
         child: Stack(
           children: [
             RefreshIndicator(
@@ -128,6 +147,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverToBoxAdapter(child: _header()),
+                  SliverToBoxAdapter(child: _searchBar()),
                   if (_breadcrumbs.isNotEmpty)
                     SliverToBoxAdapter(child: _breadcrumbBar()),
                   if (_error != null)
@@ -138,28 +158,82 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                   else if (_loading && _data == null)
                     SliverToBoxAdapter(child: _loadingState())
                   else ...[
-                    if (_managementActions().isNotEmpty)
-                      SliverToBoxAdapter(child: _managementBar()),
-                    if (_children.isNotEmpty)
+                    if (_children.isNotEmpty) ...[
                       SliverToBoxAdapter(
-                        child: _sectionLabel('الأقسام', _children.length),
+                        child: _sectionHeader(
+                          'الأقسام والمجلدات',
+                          _children.length,
+                          showToggle: _resourceItems.isEmpty,
+                        ),
                       ),
-                    SliverList.separated(
-                      itemCount: _children.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (_, index) =>
-                          _nodeTile(_children[index], index),
-                    ),
-                    if (_resourceItems.isNotEmpty)
+                      if (_isGrid)
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          sliver: SliverGrid(
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 10,
+                              crossAxisSpacing: 10,
+                              childAspectRatio: 1.15,
+                            ),
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) =>
+                                  _nodeGridTile(_children[index], index),
+                              childCount: _children.length,
+                            ),
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          sliver: SliverList.separated(
+                            itemCount: _children.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (_, index) =>
+                                _nodeListTile(_children[index], index),
+                          ),
+                        ),
+                    ],
+                    if (_resourceItems.isNotEmpty) ...[
                       SliverToBoxAdapter(
-                        child: _sectionLabel('الملفات', _resourceTotal),
+                        child: _sectionHeader(
+                          'الملفات التعليمية',
+                          _resourceTotal,
+                          showToggle: true,
+                        ),
                       ),
-                    SliverList.separated(
-                      itemCount: _resourceItems.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (_, index) =>
-                          _resourceTile(_resourceItems[index]),
-                    ),
+                      if (_isGrid)
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          sliver: SliverGrid(
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 10,
+                              crossAxisSpacing: 10,
+                              childAspectRatio: 0.82,
+                            ),
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) =>
+                                  _resourceGridTile(_resourceItems[index]),
+                              childCount: _resourceItems.length,
+                            ),
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          sliver: SliverList.separated(
+                            itemCount: _resourceItems.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (_, index) =>
+                                _resourceListTile(_resourceItems[index]),
+                          ),
+                        ),
+                    ],
                     if (_children.isEmpty &&
                         _resourceItems.isEmpty &&
                         !_loading)
@@ -180,6 +254,12 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                 right: 0,
                 child: LinearProgressIndicator(color: widget.accentColor),
               ),
+            if (_managementActions().isNotEmpty)
+              PositionedDirectional(
+                bottom: 24,
+                start: 16,
+                child: _buildFloatingActionMenu(),
+              ),
             if (_working)
               const Positioned.fill(
                 child: ColoredBox(
@@ -194,162 +274,311 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   }
 
   Widget _header() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE7ECF2))),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
+    final gradient = widget.gradient ??
+        LinearGradient(
+          colors: [
+            widget.accentColor,
+            widget.accentColor.withValues(alpha: 0.82),
+          ],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        );
+    final icon = widget.heroIcon ?? Icons.account_tree_rounded;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: widget.accentColor.withValues(alpha: 0.22),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            Positioned(
+              top: -30,
+              right: -30,
+              child: Container(
+                width: 120,
+                height: 120,
                 decoration: BoxDecoration(
-                  color: widget.accentColor.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: widget.accentColor.withValues(alpha: .18),
-                  ),
-                ),
-                child: Icon(
-                  Icons.account_tree_rounded,
-                  color: widget.accentColor,
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.08),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.title,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF172033),
+            ),
+            Positioned(
+              bottom: -40,
+              left: -20,
+              child: Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.05),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Icon(
+                          icon,
+                          color: Colors.white,
+                          size: 25,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      widget.subtitle,
-                      style: const TextStyle(
-                        color: Color(0xFF667085),
-                        fontSize: 12.5,
-                        height: 1.35,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.title,
+                              style: const TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                fontFamily: 'Cairo',
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.subtitle,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                fontSize: 12,
+                                height: 1.35,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_data != null) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.15),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.auto_stories_rounded,
+                            size: 15,
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            _availableFiles == 0
+                                ? 'لا توجد ملفات في هذا المسار حالياً'
+                                : 'إجمالي الملفات المتاحة في هذا المسار: $_availableFiles',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              fontFamily: 'Cairo',
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
-          if (_data != null) ...[
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Icon(
-                  Icons.description_outlined,
-                  size: 17,
-                  color: widget.accentColor,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _availableFiles == 0
-                      ? 'لا توجد ملفات في هذا المسار حالياً'
-                      : 'إجمالي الملفات المتاحة في هذا المسار: $_availableFiles',
-                  style: TextStyle(
-                    color: _availableFiles == 0
-                        ? const Color(0xFF7A8699)
-                        : const Color(0xFF344054),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
             ),
           ],
-          const SizedBox(height: 16),
-          TextField(
-            controller: _search,
-            textInputAction: TextInputAction.search,
-            onChanged: (_) => setState(() {}),
-            onSubmitted: (_) => _load(page: 1),
-            decoration: InputDecoration(
-              hintText: 'ابحث داخل هذا المستوى...',
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: _search.text.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'مسح البحث',
-                      onPressed: () {
-                        _search.clear();
-                        _load(page: 1);
-                      },
-                      icon: const Icon(Icons.close_rounded),
+        ),
+      ),
+    );
+  }
+
+  Widget _searchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.midnight.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+          ],
+          border: Border.all(color: AppColors.slate200),
+        ),
+        child: TextField(
+          controller: _search,
+          textInputAction: TextInputAction.search,
+          onChanged: (_) => setState(() {}),
+          onSubmitted: (_) => _load(page: 1),
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: AppColors.midnight,
+            fontFamily: 'Cairo',
+          ),
+          decoration: InputDecoration(
+            hintText: 'ابحث داخل هذا المستوى...',
+            hintStyle: const TextStyle(
+              color: AppColors.slate400,
+              fontSize: 12,
+              fontFamily: 'Cairo',
+            ),
+            prefixIcon: Icon(
+              Icons.search_rounded,
+              color: widget.accentColor,
+              size: 21,
+            ),
+            suffixIcon: _search.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'مسح البحث',
+                    onPressed: () {
+                      _search.clear();
+                      _load(page: 1);
+                    },
+                    icon: const Icon(
+                      Icons.cancel_rounded,
+                      color: AppColors.slate400,
+                      size: 19,
                     ),
-              filled: true,
-              fillColor: const Color(0xFFF8FAFC),
-              contentPadding: const EdgeInsets.symmetric(vertical: 13),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFDDE3EA)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFDDE3EA)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: widget.accentColor, width: 1.5),
+                  ),
+            filled: true,
+            fillColor: Colors.transparent,
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 12,
+              horizontal: 14,
+            ),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: widget.accentColor.withValues(alpha: 0.6),
+                width: 1.5,
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _breadcrumbBar() {
     return Container(
-      height: 50,
-      color: Colors.white,
+      height: 44,
+      margin: const EdgeInsets.only(top: 2, bottom: 4),
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
         scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
         itemCount: _breadcrumbs.length + 1,
-        separatorBuilder: (_, _) => const Icon(
-          Icons.chevron_left_rounded,
-          size: 18,
-          color: Color(0xFF98A2B3),
+        separatorBuilder: (_, _) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Icon(
+            Icons.chevron_right_rounded,
+            size: 17,
+            color: AppColors.slate400,
+          ),
         ),
         itemBuilder: (_, index) {
           final home = index == 0;
           final item = home
-              ? <String, dynamic>{'key': 'root', 'title': 'البداية'}
+              ? <String, dynamic>{'key': 'root', 'title': 'الرئيسية'}
               : _breadcrumbs[index - 1];
           final active = item['key']?.toString() == _node;
-          return TextButton.icon(
-            onPressed: active
+          final title = item['title']?.toString() ?? '';
+
+          return InkWell(
+            onTap: active
                 ? null
                 : () => _navigate(item['key']?.toString() ?? 'root'),
-            icon: home
-                ? const Icon(Icons.home_rounded, size: 17)
-                : const SizedBox.shrink(),
-            label: Text(item['title']?.toString() ?? ''),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              minimumSize: const Size(0, 36),
-              foregroundColor: active
-                  ? const Color(0xFF344054)
-                  : widget.accentColor,
-              textStyle: TextStyle(
-                fontSize: 12,
-                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+            borderRadius: BorderRadius.circular(18),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+              decoration: BoxDecoration(
+                color: active ? widget.accentColor : Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: active ? widget.accentColor : AppColors.slate200,
+                  width: 1,
+                ),
+                boxShadow: [
+                  if (active)
+                    BoxShadow(
+                      color: widget.accentColor.withValues(alpha: 0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    )
+                  else
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (home) ...[
+                    Icon(
+                      Icons.home_rounded,
+                      size: 14,
+                      color: active ? Colors.white : widget.accentColor,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: active ? FontWeight.w900 : FontWeight.w700,
+                      color: active ? Colors.white : AppColors.slate700,
+                      fontFamily: 'Cairo',
+                    ),
+                  ),
+                ],
               ),
             ),
           );
@@ -389,146 +618,379 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     return actions;
   }
 
-  Widget _managementBar() {
+  Widget _buildFloatingActionMenu() {
+    final actions = _managementActions();
+    if (actions.isEmpty) return const SizedBox.shrink();
+
+    if (actions.length == 1 && actions.contains('upload')) {
+      return FloatingActionButton.extended(
+        onPressed: _showUpload,
+        backgroundColor: widget.accentColor,
+        elevation: 6,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        icon: const Icon(Icons.cloud_upload_rounded, color: Colors.white, size: 22),
+        label: const Text(
+          'رفع ملف',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            fontFamily: 'Cairo',
+          ),
+        ),
+      );
+    }
+
+    return FloatingActionButton.extended(
+      onPressed: _showManagementActionsSheet,
+      backgroundColor: widget.accentColor,
+      elevation: 6,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      icon: const Icon(Icons.add_task_rounded, color: Colors.white, size: 22),
+      label: const Text(
+        'إدارة القسم',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+          fontSize: 13,
+          fontFamily: 'Cairo',
+        ),
+      ),
+    );
+  }
+
+  void _showManagementActionsSheet() {
+    final actions = _managementActions();
+    showMoeenBottomSheet(
+      context: context,
+      title: 'خيارات إدارة القسم',
+      icon: Icons.tune_rounded,
+      color: widget.accentColor,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (actions.contains('upload'))
+              _managementSheetTile(
+                icon: Icons.cloud_upload_rounded,
+                title: 'رفع ملف جديد',
+                subtitle: 'إضافة ملف تعليمي (PDF، عرض، ملخص) في هذا المسار',
+                color: widget.accentColor,
+                onTap: () {
+                  Navigator.pop(context);
+                  _showUpload();
+                },
+              ),
+            if (actions.contains('create'))
+              _managementSheetTile(
+                icon: Icons.create_new_folder_rounded,
+                title: 'إنشاء قسم جديد',
+                subtitle: 'إضافة مجلد أو تصنيف فرعي داخل هذا المستوى',
+                color: const Color(0xFF0F766E),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showCreateNode();
+                },
+              ),
+            if (actions.contains('edit'))
+              _managementSheetTile(
+                icon: Icons.edit_note_rounded,
+                title: 'تعديل اسم القسم',
+                subtitle: 'تغيير عنوان المجلد الحالي',
+                color: const Color(0xFFD97706),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showEditNode();
+                },
+              ),
+            if (actions.contains('delete'))
+              _managementSheetTile(
+                icon: Icons.delete_forever_rounded,
+                title: 'حذف القسم الحالي',
+                subtitle: 'حذف هذا المجلد وفروعه من المكتبة',
+                color: AppColors.danger,
+                danger: true,
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmDelete();
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _managementSheetTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+    bool danger = false,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: danger ? AppColors.danger.withValues(alpha: 0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: danger
+              ? AppColors.danger.withValues(alpha: 0.2)
+              : AppColors.slate200,
+        ),
+      ),
+      child: ListTile(
+        onTap: onTap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Icon(icon, color: color, size: 23),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 13.5,
+            color: danger ? AppColors.danger : AppColors.midnight,
+            fontFamily: 'Cairo',
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 11,
+            color: danger
+                ? AppColors.danger.withValues(alpha: 0.8)
+                : AppColors.slate500,
+            fontFamily: 'Cairo',
+          ),
+        ),
+        trailing: Icon(
+          Icons.chevron_right_rounded,
+          color: danger ? AppColors.danger : AppColors.slate400,
+          size: 20,
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String title, int count, {bool showToggle = false}) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      child: Row(
         children: [
-          if (_managementActions().contains('create'))
-            _actionButton(
-              Icons.create_new_folder_rounded,
-              'قسم جديد',
-              _showCreateNode,
+          Container(
+            width: 4,
+            height: 18,
+            decoration: BoxDecoration(
+              color: widget.accentColor,
+              borderRadius: BorderRadius.circular(4),
             ),
-          if (_managementActions().contains('upload'))
-            _actionButton(Icons.upload_file_rounded, 'رفع ملف', _showUpload),
-          if (_managementActions().contains('edit'))
-            _actionButton(Icons.edit_rounded, 'تعديل القسم', _showEditNode),
-          if (_managementActions().contains('delete'))
-            _actionButton(
-              Icons.delete_outline_rounded,
-              'حذف القسم',
-              _confirmDelete,
-              danger: true,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Row(
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.midnight,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: widget.accentColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: widget.accentColor,
+                      fontFamily: 'Cairo',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (showToggle)
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.slate200),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _viewModeButton(
+                    icon: Icons.view_list_rounded,
+                    selected: !_isGrid,
+                    onTap: () => setState(() => _isGrid = false),
+                    tooltip: 'عرض كقائمة',
+                  ),
+                  const SizedBox(width: 2),
+                  _viewModeButton(
+                    icon: Icons.grid_view_rounded,
+                    selected: _isGrid,
+                    onTap: () => setState(() => _isGrid = true),
+                    tooltip: 'عرض كشبكة',
+                  ),
+                ],
+              ),
             ),
         ],
       ),
     );
   }
 
-  Widget _actionButton(
-    IconData icon,
-    String label,
-    VoidCallback action, {
-    bool danger = false,
+  Widget _viewModeButton({
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+    required String tooltip,
   }) {
-    return OutlinedButton.icon(
-      onPressed: action,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: danger ? const Color(0xFFB42318) : widget.accentColor,
-        side: BorderSide(
-          color: danger
-              ? const Color(0xFFFECACA)
-              : widget.accentColor.withValues(alpha: .35),
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: selected ? widget.accentColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            size: 16,
+            color: selected ? Colors.white : AppColors.slate500,
+          ),
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
 
-  Widget _sectionLabel(String title, int count) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 18, 16, 9),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF273247),
-            ),
-          ),
-        ),
-        Text(
-          '$count',
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF7A8699),
-          ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _nodeTile(LibraryJson item, int index) {
+  Widget _nodeListTile(LibraryJson item, int index) {
     final key = item['key']?.toString() ?? '';
     final type = item['type']?.toString();
     final itemsCount = _id(item['items_count']) ?? 0;
     final empty = item['is_empty'] == true || itemsCount == 0;
+    final badge = _nodeBadgeInfo(type, empty);
     final canReorder =
         _can('can_reorder_sections') &&
         widget.onReorder != null &&
         key.startsWith('custom:');
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Material(
-        color: empty ? const Color(0xFFFBFCFE) : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(
-            color: empty
-                ? const Color(0xFFE7EBF0)
-                : widget.accentColor.withValues(alpha: .2),
-          ),
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: empty
+              ? AppColors.slate200
+              : badge.color.withValues(alpha: 0.18),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.midnight.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
         child: ListTile(
-          minTileHeight: 74,
-          contentPadding: const EdgeInsetsDirectional.fromSTEB(12, 5, 8, 5),
+          minTileHeight: 70,
+          contentPadding: const EdgeInsetsDirectional.fromSTEB(14, 6, 8, 6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           onTap: () => _navigate(key),
           leading: Container(
-            width: 38,
-            height: 38,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: empty
-                  ? const Color(0xFFF0F2F5)
-                  : widget.accentColor.withValues(alpha: .1),
-              borderRadius: BorderRadius.circular(7),
+              color: badge.color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
-              _nodeIcon(type),
-              color: empty ? const Color(0xFF98A2B3) : widget.accentColor,
-              size: 21,
+              badge.icon,
+              color: badge.color,
+              size: 24,
             ),
           ),
           title: Text(
             item['title']?.toString() ?? 'قسم',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 14,
-              color: empty ? const Color(0xFF5E6A7D) : const Color(0xFF202A3B),
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 13.5,
+              color: AppColors.midnight,
+              fontFamily: 'Cairo',
             ),
           ),
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              '${_nodeTypeLabel(type)}  •  ${_itemsLabel(itemsCount)}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: itemsCount > 0 ? FontWeight.w700 : FontWeight.w500,
-                color: itemsCount > 0
-                    ? widget.accentColor
-                    : const Color(0xFF98A2B3),
-              ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.slate100,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    badge.label,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.slate600,
+                      fontFamily: 'Cairo',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _itemsLabel(itemsCount),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight:
+                        itemsCount > 0 ? FontWeight.w800 : FontWeight.w600,
+                    color: itemsCount > 0
+                        ? widget.accentColor
+                        : AppColors.slate400,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+              ],
             ),
           ),
           trailing: canReorder
@@ -548,7 +1010,132 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                       ),
                   ],
                 )
-              : const Icon(Icons.chevron_left_rounded),
+              : Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: AppColors.slate50,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.slate200),
+                  ),
+                  child: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.slate500,
+                    size: 19,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _nodeGridTile(LibraryJson item, int index) {
+    final key = item['key']?.toString() ?? '';
+    final type = item['type']?.toString();
+    final itemsCount = _id(item['items_count']) ?? 0;
+    final empty = item['is_empty'] == true || itemsCount == 0;
+    final badge = _nodeBadgeInfo(type, empty);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: empty
+              ? AppColors.slate200
+              : badge.color.withValues(alpha: 0.18),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.midnight.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _navigate(key),
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: badge.color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        badge.icon,
+                        color: badge.color,
+                        size: 21,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: itemsCount > 0
+                            ? widget.accentColor.withValues(alpha: 0.1)
+                            : AppColors.slate100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _itemsLabel(itemsCount),
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: itemsCount > 0
+                              ? widget.accentColor
+                              : AppColors.slate500,
+                          fontFamily: 'Cairo',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item['title']?.toString() ?? 'قسم',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12.5,
+                        color: AppColors.midnight,
+                        fontFamily: 'Cairo',
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      badge.label,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.slate400,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -557,35 +1144,67 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   List<LibraryJson> get _resourceItems => _maps(_resources['data']);
   int get _lastPage => _id(_map(_resources['pagination'])['last_page']) ?? 1;
 
-  Widget _resourceTile(LibraryJson item) {
-    final type = item['file_type']?.toString().toUpperCase() ?? 'FILE';
-    final fileColor = _fileTypeColor(type);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Material(
+  Widget _resourceListTile(LibraryJson item) {
+    final rawType = item['file_type']?.toString() ?? 'FILE';
+    final badge = _fileBadgeInfo(rawType);
+    final id = _id(item['id']);
+    final isDownloading = _downloadingId != null && _downloadingId == id;
+    final subjectName = _map(item['subject'])['name']?.toString();
+    final uploaderName = _map(item['uploader'])['name']?.toString();
+
+    return Container(
+      decoration: BoxDecoration(
         color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: const BorderSide(color: Color(0xFFE1E6ED)),
-        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.slate200),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.midnight.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
         child: ListTile(
           minTileHeight: 74,
-          contentPadding: const EdgeInsetsDirectional.fromSTEB(12, 5, 4, 5),
+          contentPadding: const EdgeInsetsDirectional.fromSTEB(12, 6, 10, 6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           leading: Container(
-            width: 42,
-            height: 42,
-            alignment: Alignment.center,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: fileColor.withValues(alpha: .1),
-              borderRadius: BorderRadius.circular(7),
+              gradient: badge.gradient,
+              borderRadius: BorderRadius.circular(13),
+              boxShadow: [
+                BoxShadow(
+                  color: badge.color.withValues(alpha: 0.28),
+                  blurRadius: 7,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            child: Text(
-              type.length > 4 ? type.substring(0, 4) : type,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                color: fileColor,
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  badge.icon,
+                  color: Colors.white,
+                  size: 19,
+                ),
+                Text(
+                  badge.label,
+                  style: const TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
             ),
           ),
           title: Text(
@@ -593,80 +1212,447 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 14,
-              color: Color(0xFF202A3B),
+              fontWeight: FontWeight.w900,
+              fontSize: 13.5,
+              color: AppColors.midnight,
+              fontFamily: 'Cairo',
+              height: 1.25,
             ),
           ),
-          subtitle: Text(
-            _resourceMeta(item),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11.5, color: Color(0xFF667085)),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (subjectName != null && subjectName.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: widget.accentColor.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.menu_book_rounded,
+                          size: 11,
+                          color: widget.accentColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          subjectName,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: widget.accentColor,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (uploaderName != null && uploaderName.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.slate100,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.person_rounded,
+                          size: 11,
+                          color: AppColors.slate500,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          uploaderName,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.slate600,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
-          trailing: IconButton(
-            tooltip: 'تحميل الملف',
-            onPressed: () => _run(() => widget.onDownload(item)),
-            icon: Icon(Icons.download_rounded, color: widget.accentColor),
+          trailing: isDownloading
+              ? SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: widget.accentColor,
+                      ),
+                    ),
+                  ),
+                )
+              : IconButton(
+                  tooltip: 'تحميل الملف',
+                  onPressed: () => _handleDownload(item),
+                  style: IconButton.styleFrom(
+                    backgroundColor:
+                        widget.accentColor.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: Icon(
+                    Icons.download_rounded,
+                    color: widget.accentColor,
+                    size: 20,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _resourceGridTile(LibraryJson item) {
+    final rawType = item['file_type']?.toString() ?? 'FILE';
+    final badge = _fileBadgeInfo(rawType);
+    final id = _id(item['id']);
+    final isDownloading = _downloadingId != null && _downloadingId == id;
+    final subjectName = _map(item['subject'])['name']?.toString();
+    final uploaderName = _map(item['uploader'])['name']?.toString();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.slate200),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.midnight.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      gradient: badge.gradient,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: badge.color.withValues(alpha: 0.28),
+                          blurRadius: 7,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(badge.icon, color: Colors.white, size: 18),
+                        Text(
+                          badge.label,
+                          style: const TextStyle(
+                            fontSize: 7.5,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (uploaderName != null && uploaderName.isNotEmpty)
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.slate100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          uploaderName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.slate600,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                item['title']?.toString() ?? 'ملف',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                  color: AppColors.midnight,
+                  fontFamily: 'Cairo',
+                  height: 1.25,
+                ),
+              ),
+              if (subjectName != null && subjectName.isNotEmpty)
+                Text(
+                  subjectName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: widget.accentColor,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+              const SizedBox(height: 4),
+              SizedBox(
+                width: double.infinity,
+                height: 32,
+                child: FilledButton.icon(
+                  onPressed:
+                      isDownloading ? null : () => _handleDownload(item),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: widget.accentColor,
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: isDownloading
+                      ? const SizedBox(
+                          width: 13,
+                          height: 13,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.download_rounded, size: 15),
+                  label: Text(
+                    isDownloading ? 'جاري التحميل...' : 'تحميل',
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Cairo',
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  String _resourceMeta(LibraryJson item) {
-    final parts = <String>[
-      if (_map(item['subject'])['name'] != null)
-        _map(item['subject'])['name'].toString(),
-      if (_map(item['uploader'])['name'] != null)
-        _map(item['uploader'])['name'].toString(),
-    ];
-    return parts.isEmpty ? 'مورد تعليمي' : parts.join(' · ');
+  ({Color color, Gradient gradient, IconData icon, String label})
+      _fileBadgeInfo(String rawType) {
+    final type = rawType.toUpperCase().trim();
+    if (type == 'PDF') {
+      return (
+        color: const Color(0xFFE11D48),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF43F5E), Color(0xFFBE123C)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        icon: Icons.picture_as_pdf_rounded,
+        label: 'PDF',
+      );
+    }
+    if (type == 'PPT' || type == 'PPTX') {
+      return (
+        color: const Color(0xFFEA580C),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFB923C), Color(0xFFC2410C)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        icon: Icons.slideshow_rounded,
+        label: 'PPTX',
+      );
+    }
+    if (type == 'DOC' || type == 'DOCX') {
+      return (
+        color: const Color(0xFF2563EB),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF60A5FA), Color(0xFF1D4ED8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        icon: Icons.description_rounded,
+        label: 'DOCX',
+      );
+    }
+    if (type == 'XLS' || type == 'XLSX') {
+      return (
+        color: const Color(0xFF059669),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF34D399), Color(0xFF047857)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        icon: Icons.table_chart_rounded,
+        label: 'XLSX',
+      );
+    }
+    if (type == 'ZIP' || type == 'RAR' || type == '7Z') {
+      return (
+        color: const Color(0xFF7C3AED),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFA78BFA), Color(0xFF6D28D9)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        icon: Icons.folder_zip_rounded,
+        label: 'ZIP',
+      );
+    }
+    return (
+      color: AppColors.slate600,
+      gradient: const LinearGradient(
+        colors: [AppColors.slate500, AppColors.slate700],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      icon: Icons.insert_drive_file_rounded,
+      label: type.length > 4
+          ? type.substring(0, 4)
+          : (type.isEmpty ? 'FILE' : type),
+    );
+  }
+
+  ({Color color, IconData icon, String label}) _nodeBadgeInfo(
+    String? type,
+    bool empty,
+  ) {
+    if (empty) {
+      return (
+        color: AppColors.slate400,
+        icon: Icons.folder_open_rounded,
+        label: _nodeTypeLabel(type),
+      );
+    }
+    return switch (type) {
+      'major' => (
+        color: const Color(0xFF7C3AED),
+        icon: Icons.school_rounded,
+        label: 'تخصص',
+      ),
+      'level' => (
+        color: const Color(0xFF0284C7),
+        icon: Icons.stairs_rounded,
+        label: 'مستوى دراسي',
+      ),
+      'term' || 'semester' => (
+        color: const Color(0xFFD97706),
+        icon: Icons.calendar_month_rounded,
+        label: 'فصل دراسي',
+      ),
+      'subject' => (
+        color: widget.accentColor,
+        icon: Icons.menu_book_rounded,
+        label: 'مادة دراسية',
+      ),
+      'section' => (
+        color: const Color(0xFF0F766E),
+        icon: Icons.folder_copy_rounded,
+        label: 'قسم محتوى',
+      ),
+      _ => (
+        color: widget.accentColor,
+        icon: Icons.folder_rounded,
+        label: 'مجلد',
+      ),
+    };
   }
 
   Widget _loadingState() => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 22, 16, 96),
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
     child: Column(
       children: List.generate(
-        6,
+        5,
         (index) => Container(
           height: 74,
-          margin: const EdgeInsets.only(bottom: 9),
-          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFE7EBF0)),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.slate200),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.midnight.withValues(alpha: 0.02),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEDF1F5),
-                  borderRadius: BorderRadius.circular(7),
+                  color: AppColors.slate100,
+                  borderRadius: BorderRadius.circular(13),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    FractionallySizedBox(
-                      widthFactor: index.isEven ? .62 : .78,
-                      child: Container(
-                        height: 11,
-                        color: const Color(0xFFE8ECF1),
+                    Container(
+                      height: 12,
+                      width: index.isEven ? 160 : 210,
+                      decoration: BoxDecoration(
+                        color: AppColors.slate200,
+                        borderRadius: BorderRadius.circular(6),
                       ),
                     ),
-                    const SizedBox(height: 9),
-                    FractionallySizedBox(
-                      widthFactor: .38,
-                      child: Container(
-                        height: 8,
-                        color: const Color(0xFFF0F2F5),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 9,
+                      width: 90,
+                      decoration: BoxDecoration(
+                        color: AppColors.slate100,
+                        borderRadius: BorderRadius.circular(5),
                       ),
                     ),
                   ],
@@ -708,82 +1694,208 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     );
   }
 
-  Widget _emptyState() => Center(
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(28, 40, 28, 96),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: const BoxDecoration(
-              color: Color(0xFFEAEEF3),
-              shape: BoxShape.circle,
+  Widget _emptyState() {
+    final canUpload = _managementActions().contains('upload');
+    final canCreate = _managementActions().contains('create');
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(28, 40, 28, 96),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: widget.accentColor.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: widget.accentColor.withValues(alpha: 0.15),
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(
+                Icons.folder_open_rounded,
+                size: 38,
+                color: widget.accentColor,
+              ),
             ),
-            child: const Icon(
-              Icons.folder_open_rounded,
-              size: 31,
-              color: Color(0xFF7A8699),
+            const SizedBox(height: 18),
+            const Text(
+              'هذا القسم فارغ حالياً',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: AppColors.midnight,
+                fontFamily: 'Cairo',
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'هذا القسم فارغ حالياً',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF273247),
+            const SizedBox(height: 6),
+            const Text(
+              'لا توجد مجلدات أو ملفات تعليمية متاحة في هذا المسار حالياً.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.45,
+                color: AppColors.slate500,
+                fontFamily: 'Cairo',
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'ستظهر الملفات هنا عند إضافتها إلى هذا المسار.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12.5,
-              height: 1.5,
-              color: Color(0xFF7A8699),
+            const SizedBox(height: 18),
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                if (canUpload)
+                  FilledButton.icon(
+                    onPressed: _showUpload,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: widget.accentColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(Icons.cloud_upload_rounded, size: 18),
+                    label: const Text(
+                      'رفع ملف هنا',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  )
+                else if (canCreate)
+                  FilledButton.icon(
+                    onPressed: _showCreateNode,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: widget.accentColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(Icons.create_new_folder_rounded, size: 18),
+                    label: const Text(
+                      'إنشاء قسم جديد',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: _load,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: widget.accentColor,
+                    side: BorderSide(
+                      color: widget.accentColor.withValues(alpha: 0.3),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text(
+                    'تحديث',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
-          TextButton.icon(
-            onPressed: _load,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('تحديث'),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _errorState() => Center(
     child: Padding(
       padding: const EdgeInsets.all(28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.cloud_off_rounded,
-            size: 48,
-            color: Color(0xFFB42318),
-          ),
-          const SizedBox(height: 10),
-          Text(_error.toString(), textAlign: TextAlign.center),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: _load,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('إعادة المحاولة'),
-          ),
-        ],
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.danger.withValues(alpha: 0.2)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.danger.withValues(alpha: 0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.danger.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.cloud_off_rounded,
+                size: 30,
+                color: AppColors.danger,
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'تعذر تحميل المحتوى',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                color: AppColors.midnight,
+                fontFamily: 'Cairo',
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _error.toString().replaceAll('ApiException: ', ''),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.slate500,
+                fontFamily: 'Cairo',
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _load,
+              style: FilledButton.styleFrom(
+                backgroundColor: widget.accentColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text(
+                'إعادة المحاولة',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
 
   Future<void> _showCreateNode() async {
-    final title = await _textDialog('قسم جديد', 'اسم القسم');
+    final title = await _textBottomSheet(
+      title: 'إنشاء قسم جديد',
+      hint: 'اسم القسم أو المجلد',
+      icon: Icons.create_new_folder_rounded,
+    );
     final spaceId = _id(_context['library_space_id']);
     if (title == null || spaceId == null || widget.onCreateNode == null) return;
     await _run(
@@ -798,10 +1910,11 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
 
   Future<void> _showEditNode() async {
     final nodeId = _id(_context['current_node_id']);
-    final title = await _textDialog(
-      'تعديل القسم',
-      'اسم القسم',
+    final title = await _textBottomSheet(
+      title: 'تعديل اسم القسم',
+      hint: 'اسم القسم',
       initial: _context['current_node_title']?.toString(),
+      icon: Icons.edit_note_rounded,
     );
     if (title == null || nodeId == null || widget.onUpdateNode == null) return;
     await _run(() => widget.onUpdateNode!(nodeId, title), reload: true);
@@ -810,31 +1923,20 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   Future<void> _confirmDelete() async {
     final nodeId = _id(_context['current_node_id']);
     if (nodeId == null || widget.onDeleteNode == null) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showMoeenConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('حذف القسم'),
-        content: const Text(
-          'سيختفي القسم وفروعه من المكتبة. هل تريد المتابعة؟',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFB42318),
-            ),
-            child: const Text('حذف'),
-          ),
-        ],
-      ),
+      title: 'حذف القسم',
+      message:
+          'سيتم حذف هذا القسم وفروعه نهائياً من المكتبة. هل تريد المتابعة؟',
+      confirmLabel: 'حذف القسم',
+      cancelLabel: 'إلغاء',
+      danger: true,
+      icon: Icons.delete_forever_rounded,
     );
-    if (confirmed != true) return;
-    final deleted = await _run(() => widget.onDeleteNode!(nodeId));
-    if (deleted && mounted) _navigate(_parentNodeKey());
+    if (confirmed && mounted) {
+      final deleted = await _run(() => widget.onDeleteNode!(nodeId));
+      if (deleted && mounted) _navigate(_parentNodeKey());
+    }
   }
 
   String _parentNodeKey() {
@@ -849,72 +1951,275 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     final description = TextEditingController();
     PlatformFile? file;
     String visibility = 'batch';
-    final accepted = await showDialog<bool>(
+
+    final accepted = await showMoeenBottomSheet<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: const Text('رفع ملف'),
-          content: SingleChildScrollView(
+      title: 'رفع ملف تعليمي',
+      icon: Icons.cloud_upload_rounded,
+      color: widget.accentColor,
+      child: StatefulBuilder(
+        builder: (ctx, setLocal) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 TextField(
                   controller: title,
-                  decoration: const InputDecoration(labelText: 'عنوان الملف'),
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.midnight,
+                    fontFamily: 'Cairo',
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'عنوان الملف *',
+                    labelStyle: const TextStyle(
+                      color: AppColors.slate500,
+                      fontSize: 12.5,
+                      fontFamily: 'Cairo',
+                    ),
+                    prefixIcon: Icon(
+                      Icons.title_rounded,
+                      color: widget.accentColor,
+                      size: 20,
+                    ),
+                    filled: true,
+                    fillColor: AppColors.slate50,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.slate200),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.slate200),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: widget.accentColor,
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 TextField(
                   controller: description,
                   maxLines: 2,
-                  decoration: const InputDecoration(labelText: 'وصف اختياري'),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.midnight,
+                    fontFamily: 'Cairo',
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'وصف اختياري',
+                    labelStyle: const TextStyle(
+                      color: AppColors.slate500,
+                      fontSize: 12.5,
+                      fontFamily: 'Cairo',
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.notes_rounded,
+                      color: AppColors.slate400,
+                      size: 20,
+                    ),
+                    filled: true,
+                    fillColor: AppColors.slate50,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.slate200),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.slate200),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: widget.accentColor,
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: visibility,
-                  decoration: const InputDecoration(labelText: 'الظهور'),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.midnight,
+                    fontFamily: 'Cairo',
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'نطاق الظهور',
+                    labelStyle: const TextStyle(
+                      color: AppColors.slate500,
+                      fontSize: 12.5,
+                      fontFamily: 'Cairo',
+                    ),
+                    prefixIcon: Icon(
+                      Icons.visibility_rounded,
+                      color: widget.accentColor,
+                      size: 20,
+                    ),
+                    filled: true,
+                    fillColor: AppColors.slate50,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.slate200),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.slate200),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: widget.accentColor,
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
                   items: const [
-                    DropdownMenuItem(value: 'batch', child: Text('الدفعة')),
-                    DropdownMenuItem(value: 'college', child: Text('الكلية')),
+                    DropdownMenuItem(value: 'batch', child: Text('الدفعة فقط')),
+                    DropdownMenuItem(
+                      value: 'college',
+                      child: Text('الكلية كاملة'),
+                    ),
                     DropdownMenuItem(value: 'everyone', child: Text('الجميع')),
                   ],
                   onChanged: (value) =>
                       setLocal(() => visibility = value ?? 'batch'),
                 ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () async {
+                const SizedBox(height: 14),
+                InkWell(
+                  onTap: () async {
                     final picked = await FilePicker.platform.pickFiles(
                       withData: false,
                     );
                     if (picked != null && picked.files.isNotEmpty) {
-                      setLocal(() => file = picked.files.first);
+                      setLocal(() {
+                        file = picked.files.first;
+                        if (title.text.trim().isEmpty) {
+                          title.text = file!.name;
+                        }
+                      });
                     }
                   },
-                  icon: const Icon(Icons.attach_file_rounded),
-                  label: Text(
-                    file?.name ?? 'اختيار الملف',
-                    overflow: TextOverflow.ellipsis,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: file != null
+                          ? widget.accentColor.withValues(alpha: 0.08)
+                          : AppColors.slate50,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: file != null
+                            ? widget.accentColor.withValues(alpha: 0.4)
+                            : AppColors.slate200,
+                        style: BorderStyle.solid,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: file != null
+                                ? widget.accentColor.withValues(alpha: 0.15)
+                                : AppColors.slate200,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            file != null
+                                ? Icons.file_present_rounded
+                                : Icons.attach_file_rounded,
+                            color: file != null
+                                ? widget.accentColor
+                                : AppColors.slate600,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                file?.name ?? 'اضغط لاختيار ملف من جهازك',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: file != null
+                                      ? widget.accentColor
+                                      : AppColors.slate600,
+                                  fontFamily: 'Cairo',
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                file != null
+                                    ? '${(file!.size / (1024 * 1024)).toStringAsFixed(2)} MB'
+                                    : 'يدعم PDF، Word، عروض، والمستندات',
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  color: AppColors.slate400,
+                                  fontFamily: 'Cairo',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (file != null)
+                          IconButton(
+                            onPressed: () => setLocal(() => file = null),
+                            icon: const Icon(
+                              Icons.cancel_rounded,
+                              color: AppColors.slate400,
+                              size: 20,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                FilledButton(
+                  onPressed: () {
+                    if (title.text.trim().isNotEmpty && file?.path != null) {
+                      Navigator.pop(ctx, true);
+                    }
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: widget.accentColor,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'تأكيد الرفع',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      fontFamily: 'Cairo',
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(
-                ctx,
-                title.text.trim().isNotEmpty && file?.path != null,
-              ),
-              child: const Text('رفع'),
-            ),
-          ],
         ),
       ),
     );
+
     if (accepted == true && file != null) {
       await _run(
         () => widget.onUpload!(
@@ -931,39 +2236,88 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     description.dispose();
   }
 
-  Future<String?> _textDialog(
-    String title,
-    String label, {
+  Future<String?> _textBottomSheet({
+    required String title,
+    required String hint,
     String? initial,
+    required IconData icon,
   }) async {
     final controller = TextEditingController(text: initial ?? '');
-    final value = await showDialog<String>(
+    final result = await showMoeenBottomSheet<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 150,
-          decoration: InputDecoration(labelText: label),
+      title: title,
+      icon: icon,
+      color: widget.accentColor,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: 150,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.midnight,
+                fontFamily: 'Cairo',
+              ),
+              decoration: InputDecoration(
+                labelText: hint,
+                labelStyle: const TextStyle(
+                  color: AppColors.slate500,
+                  fontSize: 12.5,
+                  fontFamily: 'Cairo',
+                ),
+                filled: true,
+                fillColor: AppColors.slate50,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.slate200),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.slate200),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: widget.accentColor,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () {
+                final text = controller.text.trim();
+                if (text.isNotEmpty) Navigator.pop(context, text);
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: widget.accentColor,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'حفظ',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final text = controller.text.trim();
-              if (text.isNotEmpty) Navigator.pop(ctx, text);
-            },
-            child: const Text('حفظ'),
-          ),
-        ],
       ),
     );
     controller.dispose();
-    return value;
+    return result;
   }
 
   Future<void> _reorder(int index, String direction) async {
@@ -1039,31 +2393,5 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     'subject' => 'مادة دراسية',
     'section' => 'قسم محتوى',
     _ => 'مجلد',
-  };
-
-  Color _fileTypeColor(String type) {
-    final normalized = type.toLowerCase();
-    if (normalized == 'pdf') return const Color(0xFFC2414B);
-    if (normalized == 'ppt' || normalized == 'pptx') {
-      return const Color(0xFFC7662E);
-    }
-    if (normalized == 'doc' || normalized == 'docx') {
-      return const Color(0xFF3568B5);
-    }
-    if (normalized == 'xls' || normalized == 'xlsx') {
-      return const Color(0xFF2E7D5B);
-    }
-    if (normalized == 'zip' || normalized == 'rar') {
-      return const Color(0xFF7655A6);
-    }
-    return const Color(0xFF526071);
-  }
-
-  IconData _nodeIcon(String? type) => switch (type) {
-    'major' => Icons.school_rounded,
-    'level' => Icons.stairs_rounded,
-    'term' || 'semester' => Icons.calendar_month_rounded,
-    'subject' => Icons.menu_book_rounded,
-    _ => Icons.folder_rounded,
   };
 }

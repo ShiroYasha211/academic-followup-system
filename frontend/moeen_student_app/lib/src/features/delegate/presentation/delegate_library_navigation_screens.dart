@@ -42,6 +42,28 @@ class _DelegateLibraryBrowser extends StatelessWidget {
           ? 'محتوى منظم حسب المستوى والفصل والمادة'
           : 'أدر ملفات دفعتك ضمن الأقسام الممنوحة لك',
       accentColor: shared ? AppColors.royalBlue : const Color(0xFF0F766E),
+      gradient: shared
+          ? const LinearGradient(
+              colors: [
+                AppColors.midnight,
+                AppColors.royalBlueDark,
+                AppColors.royalBlue,
+              ],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            )
+          : const LinearGradient(
+              colors: [
+                Color(0xFF134E4A),
+                Color(0xFF0F766E),
+                Color(0xFF14B8A6),
+              ],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            ),
+      heroIcon: shared
+          ? Icons.library_books_rounded
+          : Icons.folder_special_rounded,
       load: (node, search, page) => repository.libraryNavigation(
         type: type,
         node: node,
@@ -97,9 +119,42 @@ class _DelegateLibraryBrowser extends StatelessWidget {
     );
     if (context.mounted && saved != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم تحميل الملف بنجاح.'),
-          backgroundColor: AppColors.success,
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(
+                Icons.check_circle_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'تم حفظ $fileName بنجاح',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF0F766E),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          action: SnackBarAction(
+            label: 'فتح الملف',
+            textColor: AppColors.gold,
+            onPressed: () async {
+              try {
+                await OpenFilex.open(saved);
+              } catch (_) {}
+            },
+          ),
         ),
       );
     }
