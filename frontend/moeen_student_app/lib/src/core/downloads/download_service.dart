@@ -10,6 +10,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../network/api_exception.dart';
+import '../notifications/push_notification_service.dart';
 
 enum DownloadEventType { started, progress, completed, failed }
 
@@ -40,14 +41,10 @@ class DownloadService {
   static Future<void> initialize() async {
     if (_initialized) return;
     try {
-      const android = AndroidInitializationSettings('ic_notification');
-      const settings = InitializationSettings(android: android);
-      await _notifications.initialize(settings);
-      final androidPlugin = _notifications
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >();
-      await androidPlugin?.requestNotificationsPermission();
+      // Share initialization so downloads do not replace notification tap handlers.
+      await PushNotificationService.initialize().timeout(
+        const Duration(seconds: 8),
+      );
     } catch (_) {
       // Downloads must remain available even if local notifications cannot start.
     } finally {

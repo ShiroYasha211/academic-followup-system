@@ -12,6 +12,8 @@ import 'models/financial_ledger.dart';
 import 'models/card_generation_models.dart';
 import 'models/student_dashboard.dart';
 import 'models/subscription_models.dart';
+import '../../auth/logic/auth_controller.dart';
+import 'flashcard_local_store.dart';
 
 final studentDashboardRepositoryProvider = Provider<StudentDashboardRepository>(
   (ref) {
@@ -48,6 +50,11 @@ final studentContentRepositoryProvider = Provider<StudentContentRepository>((
   return StudentContentRepository(
     ref.watch(authenticatedApiClientProvider),
     ref.watch(offlineCacheServiceProvider),
+    cacheScope: ref.watch(authControllerProvider).valueOrNull == null
+        ? 'signed_out'
+        : FlashcardLocalStore.keyFor(
+            ref.watch(authControllerProvider).valueOrNull!,
+          ),
   );
 });
 
@@ -161,7 +168,12 @@ class CardGenerationRepository {
 }
 
 class StudentContentRepository {
-  const StudentContentRepository(this._api, this._cache);
+  const StudentContentRepository(
+    this._api,
+    this._cache, {
+    this.cacheScope = 'signed_out',
+  });
+  final String cacheScope;
 
   final ApiClient _api;
   final OfflineCacheService _cache;
@@ -828,7 +840,7 @@ class StudentContentRepository {
   Future<Map<String, dynamic>> flashcards() async {
     return _cachedMap(
       cache: _cache,
-      key: 'student.flashcards',
+      key: '$cacheScope.student.flashcards',
       load: () async => _data(await _api.get('/student/flashcards')),
     );
   }
@@ -836,7 +848,7 @@ class StudentContentRepository {
   Future<Map<String, dynamic>> flashcardDetails(int id) async {
     return _cachedMap(
       cache: _cache,
-      key: 'student.flashcard.$id',
+      key: '$cacheScope.student.flashcard.$id',
       load: () async => _data(await _api.get('/student/flashcards/$id')),
     );
   }
@@ -844,7 +856,7 @@ class StudentContentRepository {
   Future<Map<String, dynamic>> flashcardReview(int id) async {
     return _cachedMap(
       cache: _cache,
-      key: 'student.flashcard_review.$id',
+      key: '$cacheScope.student.flashcard_review.$id',
       load: () async => _data(await _api.get('/student/flashcards/$id/review')),
     );
   }
@@ -852,18 +864,24 @@ class StudentContentRepository {
   Future<Map<String, dynamic>> flashcardDailyQueue() async {
     return _cachedMap(
       cache: _cache,
-      key: 'student.flashcard_daily_queue',
+      key: '$cacheScope.student.flashcard_daily_queue',
       load: () async =>
           _data(await _api.get('/student/flashcards/daily-queue')),
     );
   }
 
-  Future<Map<String, dynamic>> flashcardOneLineNotifications() async {
+  Future<Map<String, dynamic>> flashcardOneLineNotifications({
+    bool reschedule = false,
+  }) async {
     return _cachedMap(
       cache: _cache,
-      key: 'student.flashcard_one_line_notifications',
-      load: () async =>
-          _data(await _api.get('/student/flashcards/one-line-notifications')),
+      key: '$cacheScope.student.flashcard_one_line_notifications',
+      load: () async => _data(
+        await _api.get(
+          '/student/flashcards/one-line-notifications',
+          queryParameters: {'days': 3, if (reschedule) 'reschedule': 1},
+        ),
+      ),
     );
   }
 
@@ -965,7 +983,7 @@ class StudentContentRepository {
   Future<Map<String, dynamic>> flashcardSettings() async {
     return _cachedMap(
       cache: _cache,
-      key: 'student.flashcards.settings',
+      key: '$cacheScope.student.flashcards.settings',
       load: () async => _data(await _api.get('/student/flashcards/settings')),
     );
   }
@@ -973,7 +991,7 @@ class StudentContentRepository {
   Future<Map<String, dynamic>> flashcardUpcoming() async {
     return _cachedMap(
       cache: _cache,
-      key: 'student.flashcards.upcoming',
+      key: '$cacheScope.student.flashcards.upcoming',
       load: () async => _data(await _api.get('/student/flashcards/upcoming')),
     );
   }
@@ -981,7 +999,7 @@ class StudentContentRepository {
   Future<Map<String, dynamic>> flashcardHistory() async {
     return _cachedMap(
       cache: _cache,
-      key: 'student.flashcards.history',
+      key: '$cacheScope.student.flashcards.history',
       load: () async => _data(await _api.get('/student/flashcards/history')),
     );
   }
@@ -989,7 +1007,7 @@ class StudentContentRepository {
   Future<Map<String, dynamic>> flashcardDifficulty() async {
     return _cachedMap(
       cache: _cache,
-      key: 'student.flashcards.difficulty',
+      key: '$cacheScope.student.flashcards.difficulty',
       load: () async => _data(await _api.get('/student/flashcards/difficulty')),
     );
   }
@@ -997,7 +1015,7 @@ class StudentContentRepository {
   Future<Map<String, dynamic>> flashcardAnalytics() async {
     return _cachedMap(
       cache: _cache,
-      key: 'student.flashcards.analytics',
+      key: '$cacheScope.student.flashcards.analytics',
       load: () async => _data(await _api.get('/student/flashcards/analytics')),
     );
   }

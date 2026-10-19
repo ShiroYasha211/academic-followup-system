@@ -9,6 +9,7 @@ class SessionStorage {
   final FlutterSecureStorage _storage;
 
   static const _tokenKey = 'auth_token';
+  static const _userIdKey = 'auth_user_id';
   static const _workspaceKey = 'workspace';
   static const _roleKey = 'role';
   static const _nameKey = 'name';
@@ -22,6 +23,7 @@ class SessionStorage {
   Future<void> save(AuthSession session) async {
     await Future.wait([
       _storage.write(key: _tokenKey, value: session.token),
+      _storage.write(key: _userIdKey, value: session.userId?.toString()),
       _storage.write(key: _workspaceKey, value: session.workspace.name),
       _storage.write(key: _roleKey, value: session.role),
       _storage.write(key: _nameKey, value: session.name),
@@ -79,6 +81,7 @@ class SessionStorage {
 
     return AuthSession(
       token: token!,
+      userId: int.tryParse(await _storage.read(key: _userIdKey) ?? ''),
       workspace: AuthWorkspace.values.firstWhere(
         (item) => item.name == workspace,
         orElse: () => AuthWorkspace.student,
@@ -98,6 +101,7 @@ class SessionStorage {
   Future<void> clear() async {
     await Future.wait([
       _storage.delete(key: _tokenKey),
+      _storage.delete(key: _userIdKey),
       _storage.delete(key: _workspaceKey),
       _storage.delete(key: _roleKey),
       _storage.delete(key: _nameKey),

@@ -600,9 +600,21 @@ class _OneLineShotNotificationPanel extends ConsumerWidget {
         final localState = snapshot.data ?? const FlashcardLocalState();
         final localScheduled = localState.oneLineScheduleDate == _todayKey()
             ? localState.oneLineScheduledItems
+                  .where(
+                    (item) =>
+                        text(item, 'scheduled_at').startsWith(_todayKey()),
+                  )
+                  .toList()
             : const <Map<String, dynamic>>[];
         final scheduled = _sortedOneLineSchedule(
-          localScheduled.isNotEmpty ? localScheduled : sourceScheduled,
+          localScheduled.isNotEmpty
+              ? localScheduled
+              : sourceScheduled
+                    .where(
+                      (item) =>
+                          text(item, 'scheduled_at').startsWith(_todayKey()),
+                    )
+                    .toList(),
         );
         final next = _nextOneLineScheduleItem(scheduled);
 
@@ -699,7 +711,7 @@ class _OneLineShotNotificationPanel extends ConsumerWidget {
                   if (offline) _ShotTinyPill('من آخر نسخة محفوظة'),
                   _ShotTinyPill(
                     localScheduled.isNotEmpty
-                        ? 'جدول فعلي محفوظ'
+                        ? 'حالة الجدولة على الجهاز'
                         : enabled
                         ? 'الجدولة تلقائية'
                         : 'متوقف',
@@ -759,9 +771,18 @@ class _OneLineManualRescheduleButtonState
 
     setState(() => _rescheduling = true);
     try {
+      await PushNotificationService.requestOneLineNotificationPermissions();
       final count = await ref
           .read(oneLineNotificationSchedulerProvider)
           .sync(force: true);
+      final saved = await ref.read(flashcardLocalStoreProvider).load();
+      final failed = saved.oneLineScheduledItems
+          .where(
+            (item) =>
+                item['schedule_status'] == 'failed' ||
+                item['schedule_status'] == 'blocked',
+          )
+          .length;
       ref.invalidate(_flashcardOneLineNotificationsProvider);
       if (!mounted) return;
 
@@ -771,10 +792,12 @@ class _OneLineManualRescheduleButtonState
         SnackBar(
           content: Text(
             count > 0
-                ? 'تمت إعادة جدولة $count إشعار One Line لليوم.'
-                : 'تم تحديث جدول One Line، ولا توجد إشعارات قادمة الآن.',
+                ? 'تم التحقق من جدولة $count إشعار قادم.${failed > 0 ? ' تعذرت جدولة $failed إشعارات.' : ''}'
+                : failed > 0
+                ? 'لم تكتمل الجدولة. تحقق من سماح الإشعارات وأعد المحاولة.'
+                : 'تم تحديث الجدول، ولا توجد مواعيد قادمة ضمن الإعدادات الحالية.',
           ),
-          backgroundColor: AppColors.success,
+          backgroundColor: failed > 0 ? AppColors.warning : AppColors.success,
           behavior: SnackBarBehavior.floating,
         ),
       );

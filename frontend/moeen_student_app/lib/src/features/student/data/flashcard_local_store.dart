@@ -3,13 +3,40 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:crypto/crypto.dart';
+
+import '../../auth/logic/auth_controller.dart';
+import '../../auth/data/auth_session.dart';
 
 final flashcardLocalStoreProvider = Provider<FlashcardLocalStore>((ref) {
-  return const FlashcardLocalStore();
+  final session = ref.watch(authControllerProvider).valueOrNull;
+  return FlashcardLocalStore(
+    accountKey: session == null
+        ? 'signed_out'
+        : FlashcardLocalStore.keyFor(session),
+  );
 });
 
 class FlashcardLocalStore {
-  const FlashcardLocalStore();
+  const FlashcardLocalStore({this.accountKey = 'signed_out'});
+
+  final String accountKey;
+  static String keyFor(AuthSession session) => session.userId != null
+      ? 'user_${session.userId}'
+      : sha256.convert(utf8.encode(session.token)).toString();
+
+  Future<T> withScheduleLock<T>(Future<T> Function() operation) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File('${dir.path}/moeen_flashcards/schedule.lock');
+    await file.parent.create(recursive: true);
+    final handle = await file.open(mode: FileMode.append);
+    try {
+      await handle.lock(FileLock.blockingExclusive);
+      return await operation();
+    } finally {
+      await handle.close();
+    }
+  }
 
   Future<FlashcardLocalState> load() async {
     final file = await _file();
@@ -203,14 +230,31 @@ class FlashcardLocalStore {
   }
 
   Future<void> cacheOneLineNotifications(Map<String, dynamic> data) async {
-    final state = await load();
-    await save(state.copyWith(oneLineNotifications: _offlineSnapshot(data)));
+    final current = await loadOneLineNotifications();
+    final oldTime = DateTime.tryParse(
+      current?['generated_at']?.toString() ?? '',
+    );
+    final newTime = DateTime.tryParse(data['generated_at']?.toString() ?? '');
+    if (oldTime != null && newTime != null && oldTime.isAfter(newTime)) return;
+    final dir = await getApplicationDocumentsDirectory();
+    await _writeJsonAtomically(
+      File('${dir.path}/moeen_flashcards/$accountKey/one_line_source.json'),
+      _offlineSnapshot(data),
+    );
   }
 
   Future<Map<String, dynamic>?> loadOneLineNotifications() async {
-    final data = (await load()).oneLineNotifications;
-    if (data == null) return null;
-    return _markOffline(data);
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File(
+      '${dir.path}/moeen_flashcards/$accountKey/one_line_source.json',
+    );
+    if (!await file.exists()) return null;
+    try {
+      final data = jsonDecode(await file.readAsString());
+      return data is Map<String, dynamic> ? _markOffline(data) : null;
+    } on FormatException {
+      return null;
+    }
   }
 
   Future<void> saveOneLineScheduleState({
@@ -222,15 +266,6 @@ class FlashcardLocalStore {
       date: date,
       signature: signature,
       items: items,
-    );
-    final state = await load();
-    await save(
-      state.copyWith(
-        oneLineScheduleDate: date,
-        oneLineScheduleSignature: signature,
-        oneLineScheduleSyncedAt: DateTime.now().toUtc().toIso8601String(),
-        oneLineScheduledItems: items,
-      ),
     );
   }
 
@@ -327,12 +362,14 @@ class FlashcardLocalStore {
 
   Future<File> _file() async {
     final dir = await getApplicationDocumentsDirectory();
-    return File('${dir.path}/moeen_flashcards/state.json');
+    return File('${dir.path}/moeen_flashcards/$accountKey/state.json');
   }
 
   Future<File> _oneLineScheduleFile() async {
     final dir = await getApplicationDocumentsDirectory();
-    return File('${dir.path}/moeen_flashcards/one_line_schedule.json');
+    return File(
+      '${dir.path}/moeen_flashcards/$accountKey/one_line_schedule.json',
+    );
   }
 
   Future<void> _saveOneLineScheduleSnapshot({
@@ -341,16 +378,28 @@ class FlashcardLocalStore {
     required List<Map<String, dynamic>> items,
   }) async {
     final file = await _oneLineScheduleFile();
+    await _writeJsonAtomically(file, {
+      'date': date,
+      'signature': signature,
+      'synced_at': DateTime.now().toUtc().toIso8601String(),
+      'items': items,
+    });
+  }
+
+  Future<void> _writeJsonAtomically(
+    File file,
+    Map<String, dynamic> data,
+  ) async {
     await file.parent.create(recursive: true);
-    await file.writeAsString(
-      jsonEncode({
-        'date': date,
-        'signature': signature,
-        'synced_at': DateTime.now().toUtc().toIso8601String(),
-        'items': items,
-      }),
-      flush: true,
+    final temporary = File(
+      '${file.path}.${DateTime.now().microsecondsSinceEpoch}.tmp',
     );
+    try {
+      await temporary.writeAsString(jsonEncode(data), flush: true);
+      await temporary.rename(file.path);
+    } finally {
+      if (await temporary.exists()) await temporary.delete();
+    }
   }
 
   Future<FlashcardLocalState> _withPersistedOneLineSchedule(

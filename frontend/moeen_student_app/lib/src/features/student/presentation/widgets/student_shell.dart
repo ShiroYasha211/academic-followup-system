@@ -1224,57 +1224,63 @@ class _DrawerTile extends StatelessWidget {
     final label = item.index == 12 ? 'المكتبة المشتركة' : item.label;
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
-      decoration: BoxDecoration(
+      child: Material(
         color: selected
             ? StudentBrandColors.primary.withValues(alpha: 0.08)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
-      ),
-      child: ListTile(
-        onTap: onTap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        leading: Icon(
-          item.icon,
-          color: selected ? StudentBrandColors.primary : AppColors.slate500,
-          size: 22,
-        ),
-        title: Text(
-          _drawerLabel(item),
-          style: TextStyle(
-            color: selected ? StudentBrandColors.primary : AppColors.midnight,
-            fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-            fontSize: 14,
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          onTap: onTap,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-        ),
-        trailing: badgeCount > 0
-            ? Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.danger,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  badgeCount.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
+          leading: Icon(
+            item.icon,
+            color: selected ? StudentBrandColors.primary : AppColors.slate500,
+            size: 22,
+          ),
+          title: Text(
+            _drawerLabel(item),
+            style: TextStyle(
+              color: selected ? StudentBrandColors.primary : AppColors.midnight,
+              fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+          trailing: badgeCount > 0
+              ? Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                   ),
-                ),
-              )
-            : (blockedBySecondaryDevice
-                  ? const Icon(
-                      Icons.phone_locked_rounded,
-                      size: 16,
-                      color: AppColors.slate300,
-                    )
-                  : (item.requiresSubscription && !isSubscribed
-                        ? const Icon(
-                            Icons.lock_rounded,
-                            size: 16,
-                            color: AppColors.slate300,
-                          )
-                        : null)),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    badgeCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                )
+              : (blockedBySecondaryDevice
+                    ? const Icon(
+                        Icons.phone_locked_rounded,
+                        size: 16,
+                        color: AppColors.slate300,
+                      )
+                    : (item.requiresSubscription && !isSubscribed
+                          ? const Icon(
+                              Icons.lock_rounded,
+                              size: 16,
+                              color: AppColors.slate300,
+                            )
+                          : null)),
+        ),
       ),
     );
   }

@@ -455,24 +455,28 @@ String _oneLineExactScheduleLabel(Map<String, dynamic> item) {
       '${scheduledAt.year.toString().padLeft(4, '0')}-'
       '${scheduledAt.month.toString().padLeft(2, '0')}-'
       '${scheduledAt.day.toString().padLeft(2, '0')}';
-  return '$date • ${_formatFlashcardTime12(scheduledAt)}';
+  final precision = item['precision'] == 'approximate' ? ' • موعد تقريبي' : '';
+  return '$date • ${_formatFlashcardTime12(scheduledAt)}$precision';
 }
 
 String _oneLineScheduleStatus(Map<String, dynamic> item) {
+  if (item['schedule_status'] == 'blocked') return 'الإشعارات غير مسموحة';
+  if (item['schedule_status'] == 'failed') return 'تعذرت الجدولة';
+  if (item['schedule_status'] != 'scheduled') return 'غير متحقق';
   final scheduledAt = _parseFlashcardDateTime(text(item, 'scheduled_at'));
   if (scheduledAt == null) return 'غير محدد';
   final now = DateTime.now();
   final diff = scheduledAt.difference(now);
-  if (diff.inMinutes.abs() <= 1) return 'الآن';
-  if (scheduledAt.isBefore(now)) return 'مر';
+  if (diff.inSeconds.abs() <= 60) return 'حان الموعد';
+  if (scheduledAt.isBefore(now)) return 'مر الموعد';
   return 'قادم';
 }
 
 Color _oneLineScheduleStatusColor(String status) {
   return switch (status) {
     'قادم' => AppColors.info,
-    'الآن' => AppColors.success,
-    'مر' => AppColors.slate500,
+    'حان الموعد' => AppColors.success,
+    'مر الموعد' => AppColors.slate500,
     _ => AppColors.warning,
   };
 }

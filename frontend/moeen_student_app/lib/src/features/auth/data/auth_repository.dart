@@ -115,6 +115,7 @@ class AuthRepository {
     final isPracticalDelegate = user['is_practical_delegate'] == true;
     return AuthSession(
       token: data['token'].toString(),
+      userId: int.tryParse(user['id'].toString()),
       workspace: role == 'delegate' && !isPracticalDelegate
           ? AuthWorkspace.delegate
           : AuthWorkspace.student,
@@ -138,6 +139,7 @@ class AuthRepository {
     final user = data['user'] as Map<String, dynamic>;
     return AuthSession(
       token: data['token'].toString(),
+      userId: int.tryParse(user['id'].toString()),
       workspace: AuthWorkspace.delegate,
       role: _roleValue(user['role']),
       name: user['name'].toString(),

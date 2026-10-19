@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/notifications/push_notification_service.dart';
 import '../../../core/providers.dart';
 import '../../../core/network/api_client.dart';
 import '../data/auth_repository.dart';
 import '../data/auth_session.dart';
+import '../../student/logic/one_line_background_tasks.dart';
+import '../../student/logic/one_line_notification_scheduler.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(
@@ -27,6 +30,7 @@ final authControllerProvider =
 class AuthController extends AsyncNotifier<AuthSession?> {
   Timer? _permissionSyncTimer;
   bool _permissionSyncRunning = false;
+  int _sessionVersion = 0;
 
   @override
   Future<AuthSession?> build() async {
@@ -41,6 +45,7 @@ class AuthController extends AsyncNotifier<AuthSession?> {
   }
 
   Future<AuthSession> _refreshPermissions(AuthSession session) async {
+    final version = _sessionVersion;
     try {
       final endpoint = session.workspace == AuthWorkspace.delegate
           ? '/delegate/me'
@@ -54,6 +59,7 @@ class AuthController extends AsyncNotifier<AuthSession?> {
                 .toList()
           : null;
       if (permissions == null) return session;
+      if (version != _sessionVersion) return session;
 
       final updated = session.copyWith(permissions: permissions);
       await ref.read(sessionStorageProvider).save(updated);
@@ -77,10 +83,14 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     final session = state.valueOrNull;
     if (session == null) return;
 
+    final version = _sessionVersion;
     _permissionSyncRunning = true;
     try {
       final updated = await _refreshPermissions(session);
-      if (!_samePermissions(session.permissions, updated.permissions)) {
+      if (version == _sessionVersion &&
+          state.valueOrNull?.token == session.token &&
+          state.valueOrNull?.workspace == session.workspace &&
+          !_samePermissions(session.permissions, updated.permissions)) {
         state = AsyncData(updated);
       }
     } finally {
@@ -97,6 +107,7 @@ class AuthController extends AsyncNotifier<AuthSession?> {
   }
 
   Future<void> login({required String login, required String password}) async {
+    _sessionVersion++;
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final session = await ref
@@ -105,20 +116,28 @@ class AuthController extends AsyncNotifier<AuthSession?> {
       final refreshed = await _refreshPermissions(session);
       await ref.read(sessionStorageProvider).save(refreshed);
       _startPermissionSync(refreshed);
-      await PushNotificationService.registerDevice(refreshed);
+      unawaited(PushNotificationService.registerDevice(refreshed));
       return refreshed;
     });
   }
 
   Future<void> logout() async {
+    _sessionVersion++;
     _permissionSyncTimer?.cancel();
     _permissionSyncTimer = null;
     final session = state.valueOrNull;
+    ref.read(oneLineNotificationSchedulerProvider).dispose();
+    await ref.read(sessionStorageProvider).clear();
+    state = const AsyncData(null);
+    try {
+      await OneLineBackgroundTasks.stop();
+    } catch (error, stackTrace) {
+      debugPrint('One Line session cleanup failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
     if (session != null) {
       await PushNotificationService.unregisterDevice(session);
     }
-    await ref.read(sessionStorageProvider).clear();
-    state = const AsyncData(null);
   }
 
   Future<void> updateEmail(String email) async {
@@ -144,9 +163,14 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     }
 
     final updated = session.copyWith(workspace: workspace);
+    _sessionVersion++;
+    if (workspace == AuthWorkspace.delegate) {
+      ref.read(oneLineNotificationSchedulerProvider).dispose();
+      await OneLineBackgroundTasks.stop();
+    }
     await ref.read(sessionStorageProvider).save(updated);
     _startPermissionSync(updated);
-    await PushNotificationService.registerDevice(updated);
+    unawaited(PushNotificationService.registerDevice(updated));
     state = AsyncData(updated);
     unawaited(refreshPermissionsNow());
     return updated;

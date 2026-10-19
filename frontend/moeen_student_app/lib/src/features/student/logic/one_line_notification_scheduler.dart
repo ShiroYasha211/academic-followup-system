@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,185 +10,151 @@ import '../data/student_repositories.dart';
 
 final oneLineNotificationSchedulerProvider =
     Provider<OneLineNotificationScheduler>((ref) {
-      return OneLineNotificationScheduler(
+      final scheduler = OneLineNotificationScheduler(
         ref.watch(studentContentRepositoryProvider),
         ref.watch(flashcardLocalStoreProvider),
       );
+      ref.onDispose(scheduler.dispose);
+      return scheduler;
     });
 
 class OneLineNotificationScheduler {
-  OneLineNotificationScheduler(this._repository, this._store);
+  OneLineNotificationScheduler(
+    this._repository,
+    this._store, {
+    Future<List<Map<String, dynamic>>> Function(List<Map<String, dynamic>>)?
+    reconcile,
+    Future<void> Function()? cancel,
+    DateTime Function()? now,
+    Future<bool> Function()? isCurrentSession,
+  }) : _reconcile =
+           reconcile ??
+           ((items) =>
+               PushNotificationService.reconcileOneLineShotNotifications(
+                 items: items,
+               )),
+       _cancel =
+           cancel ?? PushNotificationService.cancelOneLineShotNotifications,
+       _now = now ?? DateTime.now,
+       _isCurrentSession = isCurrentSession ?? (() async => true);
 
   final StudentContentRepository _repository;
   final FlashcardLocalStore _store;
-  bool _running = false;
+  final Future<List<Map<String, dynamic>>> Function(List<Map<String, dynamic>>)
+  _reconcile;
+  final Future<void> Function() _cancel;
+  final DateTime Function() _now;
+  final Future<bool> Function() _isCurrentSession;
+  static Future<void> _tail = Future.value();
+  bool _disposed = false;
 
-  Future<int> sync({Map<String, dynamic>? data, bool force = false}) async {
-    if (_running) return 0;
-    _running = true;
-    try {
-      final currentState = await _store.load();
-      final today = _dateKey(DateTime.now());
-      if (!force &&
-          currentState.oneLineScheduleDate == today &&
-          currentState.oneLineScheduleSignature != null) {
-        return currentState.oneLineScheduledItems.length;
-      }
+  void dispose() => _disposed = true;
 
-      final source = data ?? await _loadNotificationData();
-      if (source == null) return 0;
+  Future<int> sync({Map<String, dynamic>? data, bool force = false}) {
+    return runExclusive(
+      () => _store.withScheduleLock(() => _sync(data, force)),
+    );
+  }
 
+  static Future<T> runExclusive<T>(Future<T> Function() action) {
+    final operation = _tail.then((_) => action());
+    _tail = operation.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    return operation;
+  }
+
+  Future<int> _sync(Map<String, dynamic>? data, bool force) async {
+    if (_disposed) return 0;
+    var source = force
+        ? await _loadNotificationData(force: true)
+        : data ?? await _loadNotificationData();
+    if (_disposed || source == null || !await _isCurrentSession()) return 0;
+    final cached = await _store.loadOneLineNotifications();
+    final cachedAt = DateTime.tryParse(
+      cached?['generated_at']?.toString() ?? '',
+    );
+    final sourceAt = DateTime.tryParse(
+      source['generated_at']?.toString() ?? '',
+    );
+    if (cached != null &&
+        cachedAt != null &&
+        sourceAt != null &&
+        cachedAt.isAfter(sourceAt)) {
+      source = cached;
+    }
+    final now = _now();
+    final settings = _map(source['settings']);
+    final state = await _store.load();
+    final enabled =
+        settings['one_line_notifications_enabled'] != false &&
+        settings['one_line_notifications_enabled'] != 0;
+    if (!enabled) {
+      await _cancel();
       await _store.cacheOneLineNotifications(source);
-
-      final date = source['date']?.toString() ?? today;
-      final settings = _map(source['settings']);
-      final enabled = _boolValue(
-        settings['one_line_notifications_enabled'],
-        fallback: true,
-      );
-      final items = _scheduledItems(source);
-      final signature = _scheduleSignature(settings, items);
-      final state = await _store.load();
-
-      if (!force &&
-          state.oneLineScheduleDate == date &&
-          state.oneLineScheduleSignature != null) {
-        return state.oneLineScheduledItems.length;
-      }
-
-      if (!enabled) {
-        if (force ||
-            state.oneLineScheduleDate != date ||
-            state.oneLineScheduleSignature != signature ||
-            state.oneLineScheduledItems.isNotEmpty) {
-          await PushNotificationService.cancelOneLineShotNotifications();
-          await _store.saveOneLineScheduleState(
-            date: date,
-            signature: signature,
-            items: const [],
-          );
-        }
-        return 0;
-      }
-
-      if (!force &&
-          state.oneLineScheduleDate == date &&
-          state.oneLineScheduleSignature == signature) {
-        return state.oneLineScheduledItems.length;
-      }
-
-      if (items.isEmpty) {
-        await PushNotificationService.cancelOneLineShotNotifications();
-        await _store.saveOneLineScheduleState(
-          date: date,
-          signature: signature,
-          items: const [],
-        );
-        return 0;
-      }
-
-      final scheduledCount =
-          await PushNotificationService.scheduleOneLineShotNotifications(
-            items: items,
-          );
       await _store.saveOneLineScheduleState(
-        date: date,
-        signature: signature,
-        items: items,
+        date: _dateKey(now),
+        signature: 'disabled',
+        items: [],
       );
-      return scheduledCount;
-    } finally {
-      _running = false;
+      return 0;
     }
+    final items = <Map<String, dynamic>>[];
+    final perDay = <String, int>{};
+    for (final item in _maps(source['items'] ?? source['queue'])) {
+      final raw = item['scheduled_at']?.toString() ?? '';
+      final at = DateTime.tryParse(raw);
+      if (at == null || raw.length < 10) continue;
+      final day = raw.substring(0, 10);
+      final index = perDay.update(day, (value) => value + 1, ifAbsent: () => 0);
+      if (index >= 100)
+        throw StateError('One Line daily schedule exceeds 100 items');
+      if (!at.isAfter(now)) continue;
+      final daySlot =
+          DateTime.parse('${day}T00:00:00Z').millisecondsSinceEpoch ~/
+          Duration.millisecondsPerDay %
+          4;
+      items.add({...item, 'notification_id': 64100 + daySlot * 100 + index});
+    }
+    if (_disposed || !await _isCurrentSession()) return 0;
+    final accepted = await _reconcile(items);
+    if (_disposed) return 0;
+    final elapsed = state.oneLineScheduledItems.where((item) {
+      final at = DateTime.tryParse(item['scheduled_at']?.toString() ?? '');
+      return at != null &&
+          !at.isAfter(now) &&
+          at.toLocal().year == now.year &&
+          at.toLocal().month == now.month &&
+          at.toLocal().day == now.day;
+    }).toList();
+    await _store.cacheOneLineNotifications(source);
+    await _store.saveOneLineScheduleState(
+      date: _dateKey(now),
+      signature: jsonEncode(items),
+      items: [...elapsed, ...accepted],
+    );
+    return accepted
+        .where((item) => item['schedule_status'] == 'scheduled')
+        .length;
   }
 
-  Future<Map<String, dynamic>?> _loadNotificationData() async {
+  Future<Map<String, dynamic>?> _loadNotificationData({
+    bool force = false,
+  }) async {
     try {
-      return await _repository.flashcardOneLineNotifications();
+      return await _repository.flashcardOneLineNotifications(reschedule: force);
     } on ApiException catch (error) {
-      if (!error.isOffline) rethrow;
-      return _store.loadOneLineNotifications();
-    } catch (_) {
+      if (!error.isOffline || force) rethrow;
       return _store.loadOneLineNotifications();
     }
   }
 }
 
-List<Map<String, dynamic>> _scheduledItems(Map<String, dynamic> data) {
-  final rawItems = data.containsKey('items') ? data['items'] : data['queue'];
-  final now = DateTime.now();
-  return _list(rawItems).map(_map).where((item) {
-    final scheduledAt = DateTime.tryParse(
-      item['scheduled_at']?.toString() ?? '',
-    )?.toLocal();
-    if (scheduledAt == null) return false;
-    if (scheduledAt.isBefore(now.subtract(const Duration(minutes: 5)))) {
-      return false;
-    }
-    final body = (item['notification_body'] ?? item['front_content'] ?? '')
-        .toString()
-        .trim();
-    return body.isNotEmpty;
-  }).toList();
-}
-
-String _scheduleSignature(
-  Map<String, dynamic> settings,
-  List<Map<String, dynamic>> items,
-) {
-  final relevantSettings = {
-    'enabled': _boolValue(
-      settings['one_line_notifications_enabled'],
-      fallback: true,
-    ),
-    'limit': settings['one_line_daily_limit'] ?? settings['daily_card_limit'],
-    'frequency':
-        settings['one_line_frequency_minutes'] ??
-        settings['smart_review_frequency_minutes'],
-    'active_from':
-        settings['one_line_active_from_time'] ?? settings['active_from_time'],
-    'active_to':
-        settings['one_line_active_to_time'] ?? settings['active_to_time'],
-    'quiet_start': settings['one_line_quiet_start'] ?? settings['quiet_start'],
-    'quiet_end': settings['one_line_quiet_end'] ?? settings['quiet_end'],
-  };
-
-  final stableItems = items.map((item) {
-    return {
-      'item_id': item['item_id'] ?? item['id'],
-      'pack_id': item['pack_id'],
-      'title':
-          item['notification_title'] ??
-          item['notification_subtitle'] ??
-          item['pack_title'],
-      'body': item['notification_body'] ?? item['front_content'],
-    };
-  }).toList();
-
-  return jsonEncode({'settings': relevantSettings, 'items': stableItems});
-}
-
-Map<String, dynamic> _map(Object? value) {
-  if (value is! Map) return const {};
-  return value.map((key, value) => MapEntry(key.toString(), value));
-}
-
-List<Object?> _list(Object? value) {
-  if (value is List) return value;
-  return const [];
-}
-
-bool _boolValue(Object? value, {bool fallback = false}) {
-  if (value is bool) return value;
-  if (value is num) return value != 0;
-  final normalized = value?.toString().toLowerCase().trim();
-  if (normalized == 'true' || normalized == '1') return true;
-  if (normalized == 'false' || normalized == '0') return false;
-  return fallback;
-}
-
-String _dateKey(DateTime date) {
-  return '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
-}
+Map<String, dynamic> _map(Object? value) =>
+    value is Map ? Map<String, dynamic>.from(value) : {};
+List<Map<String, dynamic>> _maps(Object? value) => value is List
+    ? value
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList()
+    : [];
+String _dateKey(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';

@@ -25,7 +25,8 @@ class PushNotificationService {
       FlutterLocalNotificationsPlugin();
   static const int _flashcardReviewNotificationId = 64021;
   static const int _oneLineShotNotificationBaseId = 64100;
-  static const int _oneLineShotNotificationSlots = 64;
+  static const int _oneLineShotNotificationSlots = 400;
+  static bool backgroundMode = false;
   static final StreamController<String> _navigationController =
       StreamController<String>.broadcast();
   static final StreamController<Map<String, dynamic>> _refreshController =
@@ -42,6 +43,7 @@ class PushNotificationService {
   static bool _initialized = false;
   static Future<void>? _initializing;
   static StreamSubscription<String>? _tokenRefreshSubscription;
+  static int _tokenRegistrationVersion = 0;
   static String? _pendingNavigationPath;
 
   static Stream<String> get navigationRequests => _navigationController.stream;
@@ -118,13 +120,18 @@ class PushNotificationService {
             AndroidFlutterLocalNotificationsPlugin
           >();
       await androidPlugin?.createNotificationChannel(_channel);
-      await androidPlugin?.requestNotificationsPermission();
+      if (!backgroundMode)
+        await androidPlugin?.requestNotificationsPermission();
     } catch (e, s) {
       debugPrint('Failed to initialize local notifications: $e\n$s');
     }
 
     // Initialize Firebase (wrapped in try-catch to keep app functional if FCM fails)
     try {
+      if (backgroundMode) {
+        _initialized = true;
+        return;
+      }
       await Firebase.initializeApp();
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
@@ -161,17 +168,32 @@ class PushNotificationService {
   }
 
   static Future<void> registerDevice(AuthSession session) async {
-    await initialize();
+    final version = ++_tokenRegistrationVersion;
+    try {
+      await initialize().timeout(const Duration(seconds: 8));
+      if (version != _tokenRegistrationVersion) return;
 
-    final token = await _messaging.getToken();
-    if (token == null || token.isEmpty) return;
+      await _tokenRefreshSubscription?.cancel();
+      if (version != _tokenRegistrationVersion) return;
+      _tokenRefreshSubscription = _messaging.onTokenRefresh.listen(
+        (newToken) =>
+            unawaited(_sendTokenToBackend(session: session, token: newToken)),
+        onError: (Object error, StackTrace stackTrace) {
+          debugPrint('FCM token refresh failed: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        },
+      );
 
-    await _sendTokenToBackend(session: session, token: token);
-
-    await _tokenRefreshSubscription?.cancel();
-    _tokenRefreshSubscription = _messaging.onTokenRefresh.listen((newToken) {
-      unawaited(_sendTokenToBackend(session: session, token: newToken));
-    });
+      final token = await _messaging.getToken().timeout(
+        const Duration(seconds: 10),
+      );
+      if (version != _tokenRegistrationVersion) return;
+      if (token == null || token.isEmpty) return;
+      await _sendTokenToBackend(session: session, token: token);
+    } catch (error, stackTrace) {
+      debugPrint('FCM device registration deferred: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   static Future<void> scheduleFlashcardSmartReview({
@@ -246,112 +268,179 @@ class PushNotificationService {
   static Future<int> scheduleOneLineShotNotifications({
     required List<Map<String, dynamic>> items,
   }) async {
-    try {
-      await initialize();
-      await cancelOneLineShotNotifications();
+    final result = await reconcileOneLineShotNotifications(items: items);
+    return result
+        .where((item) => item['schedule_status'] == 'scheduled')
+        .length;
+  }
 
-      final now = DateTime.now();
-      var scheduled = 0;
-      for (final item in items.take(_oneLineShotNotificationSlots)) {
-        final scheduledAt = DateTime.tryParse(
-          item['scheduled_at']?.toString() ?? '',
-        );
-        if (scheduledAt == null) continue;
-        final normalizedScheduledAt = scheduledAt.isAfter(now)
-            ? scheduledAt
-            : now.add(const Duration(seconds: 10));
-
-        final body = (item['notification_body'] ?? item['front_content'] ?? '')
-            .toString()
-            .trim();
-        if (body.isEmpty) continue;
-
-        final title =
-            (item['notification_title'] ??
-                    item['notification_subtitle'] ??
-                    item['pack_title'] ??
-                    'تذكير One Line')
-                .toString()
-                .trim();
-        final notificationId = _oneLineShotNotificationBaseId + scheduled;
-        final payload = jsonEncode({
-          'screen': 'one_line_shot',
-          'target_screen': 'one_line_shot',
-          'type': 'one_line_shot',
-          'pack_id': item['pack_id'],
-          'item_id': item['item_id'] ?? item['id'],
+  static Future<List<Map<String, dynamic>>> reconcileOneLineShotNotifications({
+    required List<Map<String, dynamic>> items,
+  }) async {
+    await initialize().timeout(const Duration(seconds: 15));
+    final android = _localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    final enabled = await android?.areNotificationsEnabled() ?? false;
+    final exact = await android?.canScheduleExactNotifications() ?? false;
+    final pending = {
+      for (final item
+          in await _localNotifications.pendingNotificationRequests())
+        item.id: item,
+    };
+    final desiredIds = items
+        .map((item) => item['notification_id'] as int)
+        .toSet();
+    for (final id in pending.keys) {
+      if (id >= _oneLineShotNotificationBaseId &&
+          id < _oneLineShotNotificationBaseId + _oneLineShotNotificationSlots &&
+          !desiredIds.contains(id)) {
+        await _localNotifications.cancel(id);
+      }
+    }
+    final result = <Map<String, dynamic>>[];
+    for (final item in items) {
+      final id = item['notification_id'] as int;
+      final at = DateTime.parse(item['scheduled_at'].toString());
+      if (!at.isAfter(DateTime.now())) continue;
+      final title =
+          (item['notification_title'] ?? item['pack_title'] ?? 'One Line')
+              .toString();
+      final body = (item['notification_body'] ?? item['front_content'] ?? '')
+          .toString()
+          .trim();
+      if (!enabled || body.isEmpty) {
+        await _localNotifications.cancel(id);
+        result.add({
+          ...item,
+          'schedule_status': enabled ? 'failed' : 'blocked',
         });
-
-        final notificationDetails = NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channel.id,
-            _channel.name,
-            channelDescription: _channel.description,
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: 'ic_notification',
-            styleInformation: BigTextStyleInformation(body),
-          ),
-        );
-        final fireAt = tz.TZDateTime.from(
-          normalizedScheduledAt.toLocal(),
-          tz.local,
-        );
-
+        continue;
+      }
+      final precision = exact ? 'exact' : 'approximate';
+      String payloadFor(String mode) => jsonEncode({
+        'screen': 'one_line_shot',
+        'pack_id': item['pack_id'],
+        'item_id': item['item_id'],
+        'scheduled_at': item['scheduled_at'],
+        'body': body,
+        'title': title,
+        'precision': mode,
+      });
+      final payload = payloadFor(precision);
+      if (pending[id]?.payload == payload) {
+        result.add({
+          ...item,
+          'schedule_status': 'scheduled',
+          'precision': precision,
+        });
+        continue;
+      }
+      final details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channel.id,
+          _channel.name,
+          channelDescription: _channel.description,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: 'ic_notification',
+          styleInformation: BigTextStyleInformation(body),
+        ),
+      );
+      var actualPrecision = precision;
+      try {
+        Future<void> schedule(AndroidScheduleMode mode) =>
+            _localNotifications.zonedSchedule(
+              id,
+              title,
+              body,
+              tz.TZDateTime.from(at, tz.local),
+              details,
+              androidScheduleMode: mode,
+              uiLocalNotificationDateInterpretation:
+                  UILocalNotificationDateInterpretation.absoluteTime,
+              payload: payloadFor(actualPrecision),
+            );
         try {
-          await _localNotifications.zonedSchedule(
-            notificationId,
-            title.isEmpty ? 'تذكير One Line' : title,
-            body,
-            fireAt,
-            notificationDetails,
-            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-            payload: payload,
+          await schedule(
+            exact
+                ? AndroidScheduleMode.exactAllowWhileIdle
+                : AndroidScheduleMode.inexactAllowWhileIdle,
           );
         } catch (error) {
-          debugPrint(
-            'Failed to schedule exact One Line Shot alarm, trying inexact: $error',
-          );
-          await _localNotifications.zonedSchedule(
-            notificationId,
-            title.isEmpty ? 'تذكير One Line' : title,
-            body,
-            fireAt,
-            notificationDetails,
-            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-            payload: payload,
-          );
+          if (!exact) rethrow;
+          actualPrecision = 'approximate';
+          await schedule(AndroidScheduleMode.inexactAllowWhileIdle);
         }
-        scheduled++;
+        result.add({
+          ...item,
+          'schedule_status': 'scheduled',
+          'precision': actualPrecision,
+        });
+      } catch (error, stackTrace) {
+        debugPrint('One Line schedule failed for $id: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        result.add({...item, 'schedule_status': 'failed'});
       }
-
-      return scheduled;
-    } catch (error, stackTrace) {
-      debugPrint('Failed to schedule One Line Shot notifications: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      return 0;
     }
+    final confirmed = (await _localNotifications.pendingNotificationRequests())
+        .map((item) => item.id)
+        .toSet();
+    return result
+        .map(
+          (item) =>
+              item['schedule_status'] == 'scheduled' &&
+                  !confirmed.contains(item['notification_id'])
+              ? {...item, 'schedule_status': 'failed'}
+              : item,
+        )
+        .toList();
   }
 
   static Future<void> cancelOneLineShotNotifications() async {
     try {
-      await initialize();
-      for (var i = 0; i < _oneLineShotNotificationSlots; i++) {
-        await _localNotifications.cancel(_oneLineShotNotificationBaseId + i);
+      await initialize().timeout(const Duration(seconds: 15));
+      final ids = <int>{
+        for (final item
+            in await _localNotifications.pendingNotificationRequests())
+          item.id,
+        for (final item in await _localNotifications.getActiveNotifications())
+          if (item.id != null) item.id!,
+      };
+      for (final id in ids) {
+        if (id >= _oneLineShotNotificationBaseId &&
+            id <
+                _oneLineShotNotificationBaseId +
+                    _oneLineShotNotificationSlots) {
+          await _localNotifications.cancel(id);
+        }
       }
     } catch (error, stackTrace) {
       debugPrint('Failed to cancel One Line Shot notifications: $error');
       debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  static Future<void> requestOneLineNotificationPermissions() async {
+    await initialize();
+    final android = _localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    await android?.requestNotificationsPermission();
+    if (await android?.canScheduleExactNotifications() == false) {
+      await android?.requestExactAlarmsPermission();
     }
   }
 
   static Future<void> unregisterDevice(AuthSession session) async {
+    ++_tokenRegistrationVersion;
     try {
-      final token = await _messaging.getToken();
+      final token = await _messaging.getToken().timeout(
+        const Duration(seconds: 10),
+      );
       if (token == null || token.isEmpty) return;
 
       await ApiClient(token: session.token).delete(

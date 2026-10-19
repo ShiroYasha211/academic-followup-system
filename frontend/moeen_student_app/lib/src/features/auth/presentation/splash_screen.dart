@@ -12,6 +12,10 @@ import '../data/auth_session.dart';
 import '../logic/auth_controller.dart';
 import 'login_screen.dart';
 
+final splashNotificationsProvider = FutureProvider<void>((ref) {
+  return PushNotificationService.initialize();
+});
+
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
@@ -67,9 +71,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   Future<void> _initializeNotificationsSafely() async {
     try {
-      await PushNotificationService.initialize().timeout(
-        const Duration(seconds: 8),
-      );
+      await ref
+          .read(splashNotificationsProvider.future)
+          .timeout(const Duration(seconds: 8));
     } catch (error, stackTrace) {
       debugPrint('Splash notification initialization skipped: $error');
       debugPrintStack(stackTrace: stackTrace);

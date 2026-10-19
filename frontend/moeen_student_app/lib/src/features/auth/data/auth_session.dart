@@ -12,9 +12,11 @@ class AuthSession {
     this.email,
     this.deviceType,
     this.isPrimaryDevice,
+    this.userId,
   });
 
   final String token;
+  final int? userId;
   final AuthWorkspace workspace;
   final String role;
   final String name;
@@ -57,6 +59,7 @@ class AuthSession {
   }) {
     return AuthSession(
       token: token ?? this.token,
+      userId: userId,
       workspace: workspace ?? this.workspace,
       role: role ?? this.role,
       name: name ?? this.name,

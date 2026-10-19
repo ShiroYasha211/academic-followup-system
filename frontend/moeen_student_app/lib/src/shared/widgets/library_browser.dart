@@ -109,10 +109,13 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   LibraryJson get _resources => _map(_data?['resources']);
   int get _resourceTotal =>
       _id(_map(_resources['pagination'])['total']) ?? _resourceItems.length;
-  int get _availableFiles => _children.fold<int>(
-    _resourceTotal,
-    (total, item) => total + (_id(item['items_count']) ?? 0),
-  );
+  int? get _availableFiles {
+    if (_children.any((item) => _id(item['items_count']) == null)) return null;
+    return _children.fold<int>(
+      _resourceTotal,
+      (total, item) => total + (_id(item['items_count']) ?? 0),
+    );
+  }
 
   bool _can(String key) => _capabilities[key] == true;
   int? _id(Object? value) => int.tryParse(value?.toString() ?? '');
@@ -172,11 +175,11 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                           sliver: SliverGrid(
                             gridDelegate:
                                 const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 10,
-                              crossAxisSpacing: 10,
-                              childAspectRatio: 1.15,
-                            ),
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 10,
+                                  crossAxisSpacing: 10,
+                                  childAspectRatio: 1.15,
+                                ),
                             delegate: SliverChildBuilderDelegate(
                               (context, index) =>
                                   _nodeGridTile(_children[index], index),
@@ -210,11 +213,11 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                           sliver: SliverGrid(
                             gridDelegate:
                                 const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 10,
-                              crossAxisSpacing: 10,
-                              childAspectRatio: 0.82,
-                            ),
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 10,
+                                  crossAxisSpacing: 10,
+                                  childAspectRatio: 0.82,
+                                ),
                             delegate: SliverChildBuilderDelegate(
                               (context, index) =>
                                   _resourceGridTile(_resourceItems[index]),
@@ -274,7 +277,8 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   }
 
   Widget _header() {
-    final gradient = widget.gradient ??
+    final gradient =
+        widget.gradient ??
         LinearGradient(
           colors: [
             widget.accentColor,
@@ -346,11 +350,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                             width: 1.2,
                           ),
                         ),
-                        child: Icon(
-                          icon,
-                          color: Colors.white,
-                          size: 25,
-                        ),
+                        child: Icon(icon, color: Colors.white, size: 25),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -382,7 +382,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                       ),
                     ],
                   ),
-                  if (_data != null) ...[
+                  if (_data != null && _availableFiles != null) ...[
                     const SizedBox(height: 14),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -628,7 +628,11 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
         backgroundColor: widget.accentColor,
         elevation: 6,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        icon: const Icon(Icons.cloud_upload_rounded, color: Colors.white, size: 22),
+        icon: const Icon(
+          Icons.cloud_upload_rounded,
+          color: Colors.white,
+          size: 22,
+        ),
         label: const Text(
           'رفع ملف',
           style: TextStyle(
@@ -809,7 +813,10 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: widget.accentColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
@@ -896,8 +903,8 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   Widget _nodeListTile(LibraryJson item, int index) {
     final key = item['key']?.toString() ?? '';
     final type = item['type']?.toString();
-    final itemsCount = _id(item['items_count']) ?? 0;
-    final empty = item['is_empty'] == true || itemsCount == 0;
+    final itemsCount = _id(item['items_count']);
+    final empty = itemsCount == 0;
     final badge = _nodeBadgeInfo(type, empty);
     final canReorder =
         _can('can_reorder_sections') &&
@@ -937,11 +944,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
               color: badge.color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(
-              badge.icon,
-              color: badge.color,
-              size: 24,
-            ),
+            child: Icon(badge.icon, color: badge.color, size: 24),
           ),
           title: Text(
             item['title']?.toString() ?? 'قسم',
@@ -977,19 +980,21 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  _itemsLabel(itemsCount),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight:
-                        itemsCount > 0 ? FontWeight.w800 : FontWeight.w600,
-                    color: itemsCount > 0
-                        ? widget.accentColor
-                        : AppColors.slate400,
-                    fontFamily: 'Cairo',
+                if (itemsCount != null) const SizedBox(width: 6),
+                if (itemsCount != null)
+                  Text(
+                    _itemsLabel(itemsCount),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: itemsCount > 0
+                          ? FontWeight.w800
+                          : FontWeight.w600,
+                      color: itemsCount > 0
+                          ? widget.accentColor
+                          : AppColors.slate400,
+                      fontFamily: 'Cairo',
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -1032,8 +1037,8 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   Widget _nodeGridTile(LibraryJson item, int index) {
     final key = item['key']?.toString() ?? '';
     final type = item['type']?.toString();
-    final itemsCount = _id(item['items_count']) ?? 0;
-    final empty = item['is_empty'] == true || itemsCount == 0;
+    final itemsCount = _id(item['items_count']);
+    final empty = itemsCount == 0;
     final badge = _nodeBadgeInfo(type, empty);
 
     return Container(
@@ -1074,35 +1079,32 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                         color: badge.color.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
-                        badge.icon,
-                        color: badge.color,
-                        size: 21,
-                      ),
+                      child: Icon(badge.icon, color: badge.color, size: 21),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: itemsCount > 0
-                            ? widget.accentColor.withValues(alpha: 0.1)
-                            : AppColors.slate100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _itemsLabel(itemsCount),
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
+                    if (itemsCount != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
                           color: itemsCount > 0
-                              ? widget.accentColor
-                              : AppColors.slate500,
-                          fontFamily: 'Cairo',
+                              ? widget.accentColor.withValues(alpha: 0.1)
+                              : AppColors.slate100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _itemsLabel(itemsCount),
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            color: itemsCount > 0
+                                ? widget.accentColor
+                                : AppColors.slate500,
+                            fontFamily: 'Cairo',
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -1190,11 +1192,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  badge.icon,
-                  color: Colors.white,
-                  size: 19,
-                ),
+                Icon(badge.icon, color: Colors.white, size: 19),
                 Text(
                   badge.label,
                   style: const TextStyle(
@@ -1309,8 +1307,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                   tooltip: 'تحميل الملف',
                   onPressed: () => _handleDownload(item),
                   style: IconButton.styleFrom(
-                    backgroundColor:
-                        widget.accentColor.withValues(alpha: 0.1),
+                    backgroundColor: widget.accentColor.withValues(alpha: 0.1),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1443,8 +1440,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                 width: double.infinity,
                 height: 32,
                 child: FilledButton.icon(
-                  onPressed:
-                      isDownloading ? null : () => _handleDownload(item),
+                  onPressed: isDownloading ? null : () => _handleDownload(item),
                   style: FilledButton.styleFrom(
                     backgroundColor: widget.accentColor,
                     padding: EdgeInsets.zero,
@@ -1480,7 +1476,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   }
 
   ({Color color, Gradient gradient, IconData icon, String label})
-      _fileBadgeInfo(String rawType) {
+  _fileBadgeInfo(String rawType) {
     final type = rawType.toUpperCase().trim();
     if (type == 'PDF') {
       return (
@@ -2283,10 +2279,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(
-                    color: widget.accentColor,
-                    width: 1.5,
-                  ),
+                  borderSide: BorderSide(color: widget.accentColor, width: 1.5),
                 ),
               ),
             ),

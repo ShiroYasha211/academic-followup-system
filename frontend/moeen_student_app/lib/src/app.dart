@@ -12,6 +12,7 @@ import 'features/auth/logic/auth_controller.dart';
 import 'features/auth/data/auth_session.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/student/logic/one_line_notification_scheduler.dart';
+import 'features/student/logic/one_line_background_tasks.dart';
 import 'features/student/logic/student_controllers.dart';
 import 'features/student/presentation/student_content_screens.dart';
 import 'features/student/presentation/widgets/student_shell.dart';
@@ -98,9 +99,19 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp>
   Future<void> _syncOneLineNotifications({bool force = false}) async {
     try {
       final session = await ref.read(authControllerProvider.future);
-      if (session == null || session.isDelegate) return;
+      if (!mounted || session == null || session.isDelegate) return;
+      try {
+        await OneLineBackgroundTasks.register();
+      } catch (error, stackTrace) {
+        debugPrint('One Line background task registration failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+      if (!mounted) return;
       await ref.read(oneLineNotificationSchedulerProvider).sync(force: force);
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      debugPrint('One Line refresh failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   Future<void> _openNotificationPath(String path) async {
