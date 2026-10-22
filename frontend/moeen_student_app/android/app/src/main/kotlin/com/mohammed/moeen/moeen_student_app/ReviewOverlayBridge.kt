@@ -11,6 +11,7 @@ import android.util.Log
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
+import org.json.JSONObject
 import java.time.LocalDate
 import java.util.UUID
 
@@ -87,6 +88,7 @@ internal object ReviewOverlayBridge {
             "pending" to pending,
             "message" to message,
             "seen_ids" to seen,
+            "seen_keys" to (current?.let { seenKeys(context, it.account) } ?: emptyList<String>()),
         )
     }
 
@@ -104,6 +106,17 @@ internal object ReviewOverlayBridge {
         val ids = (seen(context, account) + item).distinct()
         check(prefs(context).edit().putString("seen_day_$account", LocalDate.now().toString())
             .putString("seen_$account", JSONArray(ids).toString()).commit()) { "Cannot persist review state" }
+    }
+
+    fun seenKeys(context: Context, account: String): List<String> = synchronized(journalLock) {
+        if (prefs(context).getString("seen_day_$account", "") != LocalDate.now().toString()) return@synchronized emptyList()
+        val values = JSONArray(prefs(context).getString("seen_keys_$account", "[]"))
+        (0 until values.length()).map { values.getString(it) }
+    }
+
+    fun releaseInApp() {
+        inAppPrompt = false
+        promptLease = null
     }
 
     fun acknowledge(context: Context, account: String, eventId: String) = synchronized(journalLock) {
@@ -132,7 +145,7 @@ internal object ReviewOverlayBridge {
                     require(uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null) { "HTTPS is required" }
                     if (session?.account != account) {
                         activity.stopService(Intent(activity, FloatingReviewService::class.java))
-                        inAppPrompt = false
+                        releaseInApp()
                         message = ""
                     }
                     session = ReviewSession(account, token, baseUrl.trimEnd('/'))
@@ -143,6 +156,16 @@ internal object ReviewOverlayBridge {
                     result.success(null)
                 }
                 "status" -> result.success(status(activity))
+                "updateQueue" -> {
+                    val current = session
+                    if (current != null && call.argument<String>("account") == current.account) {
+                        val data = JSONObject(call.argument<Map<String, Any?>>("data") ?: error("Missing queue"))
+                        require(data.optJSONArray("queue") != null && data.optJSONObject("settings") != null)
+                        prefs(activity).edit().putString("queue_${current.account}", data.toString()).apply()
+                        FloatingReviewService.instance?.updateQueue(current, data)
+                    }
+                    result.success(null)
+                }
                 "setMode" -> {
                     val current = session ?: error("Sign in first")
                     val mode = call.arguments as? String
@@ -180,7 +203,7 @@ internal object ReviewOverlayBridge {
                     starting = false
                     activity.stopService(Intent(activity, FloatingReviewService::class.java))
                     session = null
-                    inAppPrompt = false
+                    releaseInApp()
                     result.success(null)
                 }
                 "endSession" -> {
@@ -207,7 +230,7 @@ internal object ReviewOverlayBridge {
                 }
                 "beginInApp" -> {
                     val force = call.argument<Boolean>("force") == true
-                    val allowed = !quizBlocked && !inAppPrompt && (force ||
+                    val allowed = appVisible && !activity.isFinishing && !activity.isDestroyed && !quizBlocked && !inAppPrompt && (force ||
                         (mode(activity) != "notificationOnly" && FloatingReviewService.instance?.isSnoozed() != true))
                     if (allowed) {
                         inAppPrompt = true
@@ -217,13 +240,23 @@ internal object ReviewOverlayBridge {
                     result.success(if (allowed) promptLease else null)
                 }
                 "endInApp" -> {
-                    if (call.arguments == promptLease) { inAppPrompt = false; promptLease = null }
+                    if (call.arguments == promptLease) {
+                        releaseInApp()
+                        FloatingReviewService.instance?.reevaluate()
+                    }
                     result.success(null)
                 }
                 "completed" -> {
-                    val item = (call.arguments as? Number)?.toInt() ?: error("Missing item")
-                    session?.let { completed(activity, it.account, item) }
-                    FloatingReviewService.instance?.holdUntilNextReview()
+                    val item = (call.arguments as? Number)?.toInt() ?: call.argument<Int>("item_id") ?: error("Missing item")
+                    val key = if (call.arguments is Map<*, *>) call.argument<String>("review_key") else null
+                    session?.let {
+                        synchronized(journalLock) {
+                            val keys = (seenKeys(activity, it.account) + listOfNotNull(key)).distinct()
+                            completed(activity, it.account, item)
+                            check(prefs(activity).edit().putString("seen_keys_${it.account}", JSONArray(keys).toString()).commit())
+                        }
+                    }
+                    FloatingReviewService.instance?.reviewCompleted()
                     result.success(null)
                 }
                 "snooze" -> { FloatingReviewService.instance?.holdUntilNextReview(); result.success(null) }

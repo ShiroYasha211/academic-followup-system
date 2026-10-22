@@ -21,6 +21,7 @@ class FloatingReviewStatus {
     this.pending = 0,
     this.message = '',
     this.seenIds = const [],
+    this.seenKeys = const [],
   });
 
   final bool supported;
@@ -31,6 +32,7 @@ class FloatingReviewStatus {
   final int pending;
   final String message;
   final List<int> seenIds;
+  final List<String> seenKeys;
 
   factory FloatingReviewStatus.fromMap(Map<dynamic, dynamic> data) {
     final mode = ReviewDisplayMode.values.firstWhere(
@@ -48,6 +50,9 @@ class FloatingReviewStatus {
       seenIds: (data['seen_ids'] as List? ?? const [])
           .whereType<num>()
           .map((id) => id.toInt())
+          .toList(),
+      seenKeys: (data['seen_keys'] as List? ?? const [])
+          .whereType<String>()
           .toList(),
     );
   }
@@ -133,10 +138,13 @@ class FloatingReview {
     }
   }
 
-  static Future<void> completed(int itemId) async {
+  static Future<void> completed(int itemId, {String? reviewKey}) async {
     if (!supportedPlatform) return;
     try {
-      await _channel.invokeMethod<void>('completed', itemId);
+      await _channel.invokeMethod<void>('completed', {
+        'item_id': itemId,
+        if (reviewKey != null) 'review_key': reviewKey,
+      });
     } on MissingPluginException {
       debugPrint('Floating review is not installed in this build.');
     }
@@ -144,6 +152,17 @@ class FloatingReview {
 
   static Future<void> snooze() async {
     if (supportedPlatform) await _channel.invokeMethod<void>('snooze');
+  }
+
+  static Future<void> updateQueue(
+    String account,
+    Map<String, dynamic> data,
+  ) async {
+    if (!supportedPlatform) return;
+    await _channel.invokeMethod<void>('updateQueue', {
+      'account': account,
+      'data': data,
+    });
   }
 
   static Future<void> synchronize(

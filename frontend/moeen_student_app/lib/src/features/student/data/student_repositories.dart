@@ -870,6 +870,10 @@ class StudentContentRepository {
     );
   }
 
+  Future<Map<String, dynamic>> restartFlashcardDailyQueue() async {
+    return _data(await _api.post('/student/flashcards/daily-queue/restart'));
+  }
+
   Future<Map<String, dynamic>> flashcardOneLineNotifications({
     bool reschedule = false,
   }) async {

@@ -33,6 +33,7 @@ import '../data/flashcard_local_store.dart';
 import '../data/student_repositories.dart';
 import '../logic/one_line_notification_scheduler.dart';
 import '../logic/floating_review.dart';
+import '../logic/smart_review_queue.dart';
 import '../data/tree_farm_local_store.dart';
 import '../logic/student_controllers.dart';
 import 'student_subscription_screen.dart';
@@ -289,6 +290,7 @@ final _flashcardDailyQueueProvider =
             .watch(studentContentRepositoryProvider)
             .flashcardDailyQueue();
         await store.cacheDailyQueue(data);
+        await FloatingReview.updateQueue(store.accountKey, data);
         return data;
       } on ApiException catch (error) {
         if (!error.isOffline) rethrow;

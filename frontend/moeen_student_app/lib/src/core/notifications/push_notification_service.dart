@@ -24,6 +24,8 @@ class PushNotificationService {
   static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
   static const int _flashcardReviewNotificationId = 64021;
+  static const int _reviewBaseId = 64600;
+  static const int _reviewSlots = 100;
   static const int _oneLineShotNotificationBaseId = 64100;
   static const int _oneLineShotNotificationSlots = 400;
   static bool backgroundMode = false;
@@ -198,6 +200,8 @@ class PushNotificationService {
 
   static Future<void> scheduleFlashcardSmartReview({
     required Duration delay,
+    int notificationId = _flashcardReviewNotificationId,
+    Map<String, dynamic>? item,
   }) async {
     try {
       await initialize();
@@ -217,7 +221,7 @@ class PushNotificationService {
 
       try {
         await _localNotifications.zonedSchedule(
-          _flashcardReviewNotificationId,
+          notificationId,
           'مراجعة الكروت',
           'لديك كرت جاهز للمراجعة الآن.',
           tz.TZDateTime.now(tz.local).add(delay),
@@ -228,6 +232,9 @@ class PushNotificationService {
           payload: jsonEncode({
             'screen': 'flashcard_review',
             'type': 'flashcard_review',
+            if (item != null) 'item_id': item['item_id'] ?? item['id'],
+            if (item != null) 'review_key': item['review_key'],
+            if (item != null) 'scheduled_at': item['scheduled_at'],
           }),
         );
       } catch (error) {
@@ -235,7 +242,7 @@ class PushNotificationService {
           'Failed to schedule exact review alarm, trying inexact: $error',
         );
         await _localNotifications.zonedSchedule(
-          _flashcardReviewNotificationId,
+          notificationId,
           'مراجعة الكروت',
           'لديك كرت جاهز للمراجعة الآن.',
           tz.TZDateTime.now(tz.local).add(delay),
@@ -246,6 +253,9 @@ class PushNotificationService {
           payload: jsonEncode({
             'screen': 'flashcard_review',
             'type': 'flashcard_review',
+            if (item != null) 'item_id': item['item_id'] ?? item['id'],
+            if (item != null) 'review_key': item['review_key'],
+            if (item != null) 'scheduled_at': item['scheduled_at'],
           }),
         );
       }
@@ -255,13 +265,98 @@ class PushNotificationService {
     }
   }
 
-  static Future<void> cancelFlashcardSmartReview() async {
+  static Future<void> cancelFlashcardSmartReview({
+    bool legacyOnly = false,
+  }) async {
     try {
       await initialize();
       await _localNotifications.cancel(_flashcardReviewNotificationId);
+      if (!legacyOnly) {
+        final ids = {
+          for (final item
+              in await _localNotifications.pendingNotificationRequests())
+            item.id,
+          for (final item in await _localNotifications.getActiveNotifications())
+            item.id,
+        };
+        for (final id in ids.whereType<int>()) {
+          if (id >= _reviewBaseId && id < _reviewBaseId + _reviewSlots) {
+            await _localNotifications.cancel(id);
+          }
+        }
+      }
     } catch (error, stackTrace) {
       debugPrint('Failed to cancel flashcard review notification: $error');
       debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  static Future<void> syncFlashcardReviewNotifications(
+    List<Map<String, dynamic>> items,
+  ) async {
+    await initialize();
+    final now = DateTime.now();
+    final future = items
+        .where((item) {
+          final at = DateTime.tryParse(item['scheduled_at']?.toString() ?? '');
+          return at != null && at.isAfter(now);
+        })
+        .take(_reviewSlots)
+        .toList();
+    final pending = await _localNotifications.pendingNotificationRequests();
+    String key(Map<dynamic, dynamic> item) =>
+        '${item['review_key'] ?? item['item_id']}@${item['scheduled_at']}';
+    Map<dynamic, dynamic> decode(String? payload) {
+      try {
+        final value = jsonDecode(payload ?? '{}');
+        if (value is Map) return value;
+      } on FormatException {
+        // Replace obsolete reminders from an older application version.
+      }
+      return {};
+    }
+
+    final wanted = {for (final item in future) key(item): item};
+    final retained = <String>{};
+    final occupied = <int>{};
+    for (final notice in pending) {
+      if (notice.id < _reviewBaseId ||
+          notice.id >= _reviewBaseId + _reviewSlots)
+        continue;
+      final identity = key(decode(notice.payload));
+      if (wanted.containsKey(identity) && retained.add(identity)) {
+        occupied.add(notice.id);
+      } else {
+        await _localNotifications.cancel(notice.id);
+      }
+    }
+    final waiting = {for (final item in items) key(item)};
+    for (final notice in await _localNotifications.getActiveNotifications()) {
+      final id = notice.id;
+      if (id == null ||
+          id < _reviewBaseId ||
+          id >= _reviewBaseId + _reviewSlots)
+        continue;
+      if (!waiting.contains(key(decode(notice.payload)))) {
+        await _localNotifications.cancel(id);
+      } else {
+        occupied.add(id);
+      }
+    }
+    for (final item in future) {
+      if (retained.contains(key(item))) continue;
+      final free = List.generate(
+        _reviewSlots,
+        (index) => _reviewBaseId + index,
+      ).where((id) => !occupied.contains(id)).firstOrNull;
+      if (free == null) break;
+      occupied.add(free);
+      final at = DateTime.parse(item['scheduled_at'].toString());
+      await scheduleFlashcardSmartReview(
+        delay: at.difference(DateTime.now()),
+        notificationId: free,
+        item: item,
+      );
     }
   }
 
@@ -571,6 +666,16 @@ class PushNotificationService {
     }
 
     final packId = data['pack_id']?.toString();
+    final reviewKey = data['review_key']?.toString();
+    final reviewItem = data['item_id']?.toString();
+    if (targetScreen == 'flashcard_review' &&
+        reviewKey != null &&
+        reviewItem != null) {
+      return Uri(
+        path: '/student/flashcards/quick-review',
+        queryParameters: {'item': reviewItem, 'review': reviewKey},
+      ).toString();
+    }
     if ((targetScreen == 'flashcard_assignment' ||
             targetScreen == 'flashcard_review' ||
             targetScreen == 'flashcards') &&

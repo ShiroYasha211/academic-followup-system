@@ -21,6 +21,7 @@ class FlashcardLocalStore {
   const FlashcardLocalStore({this.accountKey = 'signed_out'});
 
   final String accountKey;
+  static final _updates = <String, Future<void>>{};
   static String keyFor(AuthSession session) => session.userId != null
       ? 'user_${session.userId}'
       : sha256.convert(utf8.encode(session.token)).toString();
@@ -57,16 +58,34 @@ class FlashcardLocalStore {
 
   Future<void> save(FlashcardLocalState state) async {
     final file = await _file();
-    await file.parent.create(recursive: true);
-    await file.writeAsString(jsonEncode(state.toJson()), flush: true);
+    await _writeJsonAtomically(file, state.toJson());
+  }
+
+  Future<void> updateState(
+    FlashcardLocalState Function(FlashcardLocalState) change,
+  ) {
+    final operation = (_updates[accountKey] ?? Future<void>.value()).then((
+      _,
+    ) async {
+      await save(change(await load()));
+    });
+    final tail = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    _updates[accountKey] = tail;
+    tail.then((_) {
+      if (identical(_updates[accountKey], tail)) _updates.remove(accountKey);
+    });
+    return operation;
   }
 
   Future<void> addPendingProgress({
     required int itemId,
     required String responseLevel,
     String? clientEventId,
-  }) async {
-    final state = await load();
+    String? reviewKey,
+  }) => updateState((state) {
     final today = _dateKey(DateTime.now());
     final pending = [
       ...state.pendingProgress,
@@ -75,35 +94,44 @@ class FlashcardLocalStore {
         'response_level': responseLevel,
         'recorded_at': DateTime.now().toUtc().toIso8601String(),
         if (clientEventId != null) 'client_event_id': clientEventId,
+        if (reviewKey != null) 'review_key': reviewKey,
       },
     ];
     final seenIds = state.smartReviewSeenDate == today
         ? {...state.smartReviewSeenItemIds}
         : <int>{};
     seenIds.add(itemId);
-    await save(
-      state.copyWith(
-        pendingProgress: pending,
-        smartReviewSeenDate: today,
-        smartReviewSeenItemIds: seenIds.toList(),
-      ),
+    return state.copyWith(
+      pendingProgress: pending,
+      smartReviewSeenDate: today,
+      smartReviewSeenItemIds: seenIds.toList(),
+      smartReviewCompletedKeys: [
+        if (state.smartReviewSeenDate == today)
+          ...state.smartReviewCompletedKeys,
+        if (reviewKey != null) reviewKey,
+      ],
     );
-  }
+  });
 
-  Future<void> markSmartReviewItemCompletedToday(int itemId) async {
-    final state = await load();
+  Future<void> markSmartReviewItemCompletedToday(
+    int itemId, {
+    String? reviewKey,
+  }) => updateState((state) {
     final today = _dateKey(DateTime.now());
     final seenIds = state.smartReviewSeenDate == today
         ? {...state.smartReviewSeenItemIds}
         : <int>{};
     seenIds.add(itemId);
-    await save(
-      state.copyWith(
-        smartReviewSeenDate: today,
-        smartReviewSeenItemIds: seenIds.toList(),
-      ),
+    return state.copyWith(
+      smartReviewSeenDate: today,
+      smartReviewSeenItemIds: seenIds.toList(),
+      smartReviewCompletedKeys: {
+        if (state.smartReviewSeenDate == today)
+          ...state.smartReviewCompletedKeys,
+        if (reviewKey != null) reviewKey,
+      }.toList(),
     );
-  }
+  });
 
   Future<bool> canShowSmartReview() async {
     final state = await load();
@@ -116,24 +144,23 @@ class FlashcardLocalStore {
     return true;
   }
 
-  Future<void> markSmartReviewShown() async {
-    final state = await load();
+  Future<void> markSmartReviewShown() => updateState((state) {
     final today = _dateKey(DateTime.now());
     final count = state.smartReviewShownDate == today
         ? state.smartReviewShownCount + 1
         : 1;
-    await save(
-      state.copyWith(smartReviewShownDate: today, smartReviewShownCount: count),
+    return state.copyWith(
+      smartReviewShownDate: today,
+      smartReviewShownCount: count,
     );
-  }
+  });
 
-  Future<void> snoozeSmartReview() async {
-    final state = await load();
+  Future<void> snoozeSmartReview() => updateState((state) {
     final snoozeUntil = DateTime.now()
         .add(Duration(minutes: state.smartReviewSnoozeMinutes))
         .toIso8601String();
-    await save(state.copyWith(smartReviewSnoozeUntil: snoozeUntil));
-  }
+    return state.copyWith(smartReviewSnoozeUntil: snoozeUntil);
+  });
 
   Future<void> updateSmartReviewSettings({
     bool? enabled,
@@ -142,27 +169,24 @@ class FlashcardLocalStore {
     bool? autoRestart,
     bool markTouched = true,
     bool clearSnooze = false,
-  }) async {
-    final state = await load();
+  }) => updateState((state) {
     final touched =
         enabled != null ||
         dailyLimit != null ||
         snoozeMinutes != null ||
         autoRestart != null;
-    await save(
-      state.copyWith(
-        smartReviewEnabled: enabled,
-        smartReviewDailyLimit: dailyLimit,
-        smartReviewSnoozeMinutes: snoozeMinutes,
-        smartReviewAutoRestart: autoRestart,
-        smartReviewSettingsUpdatedAt: markTouched && touched
-            ? DateTime.now().toUtc().toIso8601String()
-            : null,
-        clearSmartReviewSettingsUpdatedAt: !markTouched,
-        clearSmartReviewSnoozeUntil: clearSnooze || (markTouched && touched),
-      ),
+    return state.copyWith(
+      smartReviewEnabled: enabled,
+      smartReviewDailyLimit: dailyLimit,
+      smartReviewSnoozeMinutes: snoozeMinutes,
+      smartReviewAutoRestart: autoRestart,
+      smartReviewSettingsUpdatedAt: markTouched && touched
+          ? DateTime.now().toUtc().toIso8601String()
+          : null,
+      clearSmartReviewSettingsUpdatedAt: !markTouched,
+      clearSmartReviewSnoozeUntil: clearSnooze || (markTouched && touched),
     );
-  }
+  });
 
   Future<void> applyServerSmartReviewSettings(
     Map<String, dynamic> data, {
@@ -190,28 +214,8 @@ class FlashcardLocalStore {
     return state.smartReviewSeenItemIds.toSet();
   }
 
-  Future<void> restartTodayReview() async {
-    final state = await load();
-    final now = DateTime.now();
-    await save(
-      state.copyWith(
-        dailyReviewRestartDate: _dateKey(now),
-        dailyReviewRestartStartedAt: now.toIso8601String(),
-        smartReviewSeenDate: _dateKey(now),
-        smartReviewSeenItemIds: const [],
-        smartReviewSnoozeUntil: now.toIso8601String(),
-      ),
-    );
-  }
-
-  bool isDailyReviewRestartActive(FlashcardLocalState state) {
-    return state.smartReviewAutoRestart ||
-        state.dailyReviewRestartDate == _dateKey(DateTime.now());
-  }
-
   Future<void> cacheHome(Map<String, dynamic> data) async {
-    final state = await load();
-    await save(state.copyWith(home: _offlineSnapshot(data)));
+    await updateState((state) => state.copyWith(home: _offlineSnapshot(data)));
   }
 
   Future<Map<String, dynamic>?> loadHome() async {
@@ -220,10 +224,17 @@ class FlashcardLocalStore {
     return _markOffline(data);
   }
 
-  Future<void> cacheDailyQueue(Map<String, dynamic> data) async {
-    final state = await load();
-    await save(state.copyWith(dailyQueue: _offlineSnapshot(data)));
-  }
+  Future<void> cacheDailyQueue(Map<String, dynamic> data) =>
+      updateState((state) {
+        final upgraded =
+            data['review_schedule_version'] == 2 &&
+            state.dailyQueue?['review_schedule_version'] != 2;
+        return state.copyWith(
+          dailyQueue: _offlineSnapshot(data),
+          clearSmartReviewSnoozeUntil: upgraded,
+          clearDailyReviewRestart: upgraded,
+        );
+      });
 
   Future<Map<String, dynamic>?> loadDailyQueue() async {
     final data = (await load()).dailyQueue;
@@ -272,8 +283,9 @@ class FlashcardLocalStore {
   }
 
   Future<void> cacheUpcoming(Map<String, dynamic> data) async {
-    final state = await load();
-    await save(state.copyWith(upcoming: _offlineSnapshot(data)));
+    await updateState(
+      (state) => state.copyWith(upcoming: _offlineSnapshot(data)),
+    );
   }
 
   Future<Map<String, dynamic>?> loadUpcoming() async {
@@ -283,8 +295,9 @@ class FlashcardLocalStore {
   }
 
   Future<void> cacheHistory(Map<String, dynamic> data) async {
-    final state = await load();
-    await save(state.copyWith(history: _offlineSnapshot(data)));
+    await updateState(
+      (state) => state.copyWith(history: _offlineSnapshot(data)),
+    );
   }
 
   Future<Map<String, dynamic>?> loadHistory() async {
@@ -294,8 +307,9 @@ class FlashcardLocalStore {
   }
 
   Future<void> cacheDifficulty(Map<String, dynamic> data) async {
-    final state = await load();
-    await save(state.copyWith(difficulty: _offlineSnapshot(data)));
+    await updateState(
+      (state) => state.copyWith(difficulty: _offlineSnapshot(data)),
+    );
   }
 
   Future<Map<String, dynamic>?> loadDifficulty() async {
@@ -305,8 +319,9 @@ class FlashcardLocalStore {
   }
 
   Future<void> cacheAnalytics(Map<String, dynamic> data) async {
-    final state = await load();
-    await save(state.copyWith(analytics: _offlineSnapshot(data)));
+    await updateState(
+      (state) => state.copyWith(analytics: _offlineSnapshot(data)),
+    );
   }
 
   Future<Map<String, dynamic>?> loadAnalytics() async {
@@ -316,8 +331,9 @@ class FlashcardLocalStore {
   }
 
   Future<void> cacheSettings(Map<String, dynamic> data) async {
-    final state = await load();
-    await save(state.copyWith(settings: _offlineSnapshot(data)));
+    await updateState(
+      (state) => state.copyWith(settings: _offlineSnapshot(data)),
+    );
   }
 
   Future<Map<String, dynamic>?> loadSettings() async {
@@ -327,9 +343,8 @@ class FlashcardLocalStore {
   }
 
   Future<void> cachePackDetails(int packId, Map<String, dynamic> data) async {
-    final state = await load();
-    await save(
-      state.copyWith(
+    await updateState(
+      (state) => state.copyWith(
         packDetails: {
           ...state.packDetails,
           packId.toString(): _offlineSnapshot(data),
@@ -345,9 +360,8 @@ class FlashcardLocalStore {
   }
 
   Future<void> cachePackReview(int packId, Map<String, dynamic> data) async {
-    final state = await load();
-    await save(
-      state.copyWith(
+    await updateState(
+      (state) => state.copyWith(
         packReviews: {
           ...state.packReviews,
           packId.toString(): _offlineSnapshot(data),
@@ -457,6 +471,7 @@ class FlashcardLocalState {
     this.dailyReviewRestartStartedAt,
     this.smartReviewSeenDate,
     this.smartReviewSeenItemIds = const [],
+    this.smartReviewCompletedKeys = const [],
   });
 
   final List<Map<String, dynamic>> pendingProgress;
@@ -486,6 +501,7 @@ class FlashcardLocalState {
   final String? dailyReviewRestartStartedAt;
   final String? smartReviewSeenDate;
   final List<int> smartReviewSeenItemIds;
+  final List<String> smartReviewCompletedKeys;
 
   factory FlashcardLocalState.fromJson(Map<String, dynamic> json) {
     return FlashcardLocalState(
@@ -524,6 +540,10 @@ class FlashcardLocalState {
           ?.toString(),
       smartReviewSeenDate: json['smart_review_seen_date']?.toString(),
       smartReviewSeenItemIds: _intList(json['smart_review_seen_item_ids']),
+      smartReviewCompletedKeys:
+          (json['smart_review_completed_keys'] as List? ?? [])
+              .whereType<String>()
+              .toList(),
     );
   }
 
@@ -555,6 +575,7 @@ class FlashcardLocalState {
     String? dailyReviewRestartStartedAt,
     String? smartReviewSeenDate,
     List<int>? smartReviewSeenItemIds,
+    List<String>? smartReviewCompletedKeys,
     bool clearSmartReviewSnoozeUntil = false,
     bool clearSmartReviewSettingsUpdatedAt = false,
     bool clearDailyReviewRestart = false,
@@ -603,6 +624,8 @@ class FlashcardLocalState {
       smartReviewSeenDate: smartReviewSeenDate ?? this.smartReviewSeenDate,
       smartReviewSeenItemIds:
           smartReviewSeenItemIds ?? this.smartReviewSeenItemIds,
+      smartReviewCompletedKeys:
+          smartReviewCompletedKeys ?? this.smartReviewCompletedKeys,
     );
   }
 
@@ -645,6 +668,7 @@ class FlashcardLocalState {
       if (smartReviewSeenDate != null)
         'smart_review_seen_date': smartReviewSeenDate,
       'smart_review_seen_item_ids': smartReviewSeenItemIds,
+      'smart_review_completed_keys': smartReviewCompletedKeys,
     };
   }
 }

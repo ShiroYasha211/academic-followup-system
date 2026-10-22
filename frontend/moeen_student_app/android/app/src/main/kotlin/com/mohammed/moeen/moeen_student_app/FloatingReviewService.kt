@@ -49,6 +49,7 @@ class FloatingReviewService : Service() {
         private const val NOTIFICATION = 64030
         private const val REMINDER = 64031
         private const val STOP = "moeen.review.STOP"
+        private const val OPEN = "moeen.review.OPEN"
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -58,13 +59,15 @@ class FloatingReviewService : Service() {
     private var bubble: FloatingReviewBubbleView? = null
     private var currentItem = 0
     private var currentAnswered = false
-    private var snapshot: JSONObject? = null
+    @Volatile private var snapshot: JSONObject? = null
+    @Volatile private var queueRevision = 0L
     @Volatile private var connection: HttpURLConnection? = null
     @Volatile private var stopped = false
     @Volatile private var lastFetch = 0L
     @Volatile private var nextPrompt = 0L
     private var receiverRegistered = false
     private var ownerAccount: String? = null
+    private val evaluation = Runnable { reevaluate() }
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) { hideQuestion() }
     }
@@ -89,6 +92,7 @@ class FloatingReviewService : Service() {
         else registerReceiver(screenReceiver, filter)
         receiverRegistered = true
         worker.scheduleWithFixedDelay({ refresh() }, 0, 20, TimeUnit.SECONDS)
+        reevaluate()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -97,6 +101,7 @@ class FloatingReviewService : Service() {
             ReviewOverlayBridge.starting = false
             stopSelf()
         } else if (ReviewOverlayBridge.session == null) stopSelf()
+        else if (intent?.action == OPEN) ReviewOverlayBridge.session?.let { openNext(it, intent.getStringExtra("review_key")) }
         return START_NOT_STICKY
     }
 
@@ -138,7 +143,12 @@ class FloatingReviewService : Service() {
         if (stopped || session.account != ownerAccount) return
         try {
             flushAnswers(session)
+        } catch (error: Exception) {
+            Log.w("MoeenReview", "Answer synchronization deferred: ${error.javaClass.simpleName}")
+        }
+        try {
             if (System.currentTimeMillis() - lastFetch >= TimeUnit.MINUTES.toMillis(5)) {
+                val revision = queueRevision
                 val (code, response) = request(session, "/student/flashcards/daily-queue")
                 if (code == 401 || code == 403) {
                     ReviewOverlayBridge.message = "انتهت صلاحية الجلسة. افتح معين وسجّل الدخول مجدداً."
@@ -149,10 +159,12 @@ class FloatingReviewService : Service() {
                 if (ReviewOverlayBridge.session != session || stopped) return
                 val next = response.getJSONObject("data")
                 require(next.optJSONArray("queue") != null && next.optJSONObject("settings") != null) { "Invalid review queue" }
-                snapshot = next
-                ReviewOverlayBridge.prefs(this).edit().putString("queue_${session.account}", snapshot.toString()).apply()
-                lastFetch = System.currentTimeMillis()
-                ReviewOverlayBridge.message = ""
+                handler.post {
+                    if (queueRevision == revision && ReviewOverlayBridge.session == session && !stopped) {
+                        updateQueue(session, next)
+                        ReviewOverlayBridge.message = ""
+                    }
+                }
             }
         } catch (error: Exception) {
             if (!stopped) {
@@ -169,8 +181,40 @@ class FloatingReviewService : Service() {
             Log.w("MoeenReview", "Cannot read cached review: ${error.javaClass.simpleName}")
         }
         handler.post {
-            if (!stopped && ReviewOverlayBridge.session == session) evaluate(session)
+            if (!stopped && ReviewOverlayBridge.session == session) reevaluate()
         }
+    }
+
+    internal fun updateQueue(session: ReviewSession, data: JSONObject) {
+        if (session != ReviewOverlayBridge.session || session.account != ownerAccount || stopped) return
+        if (data.optInt("review_schedule_version") >= 2 &&
+            ReviewOverlayBridge.prefs(this).getInt("review_version_${session.account}", 0) < 2) {
+            nextPrompt = 0
+            ReviewOverlayBridge.prefs(this).edit().remove("snooze_${session.account}")
+                .putInt("review_version_${session.account}", 2).apply()
+        }
+        snapshot = data
+        queueRevision++
+        lastFetch = System.currentTimeMillis()
+        ReviewOverlayBridge.prefs(this).edit().putString("queue_${session.account}", data.toString()).apply()
+        reevaluate()
+    }
+
+    internal fun reevaluate() {
+        if (Looper.myLooper() != Looper.getMainLooper()) { handler.post { reevaluate() }; return }
+        handler.removeCallbacks(evaluation)
+        if (stopped) return
+        ReviewOverlayBridge.session?.let { evaluate(it) }
+        val now = System.currentTimeMillis()
+        var delay = 20_000L
+        val queue = snapshot?.optJSONArray("queue")
+        if (queue != null) for (index in 0 until queue.length()) {
+            val at = try { OffsetDateTime.parse(queue.getJSONObject(index).optString("scheduled_at")).toInstant().toEpochMilli() }
+                catch (_: Exception) { continue }
+            if (at > now) delay = minOf(delay, at - now)
+        }
+        if (nextPrompt > now) delay = minOf(delay, nextPrompt - now)
+        handler.postDelayed(evaluation, maxOf(100L, delay))
     }
 
     private fun flushAnswers(session: ReviewSession) {
@@ -268,11 +312,14 @@ class FloatingReviewService : Service() {
         if (!settings.optBoolean("smart_review_enabled", true)) return emptyList()
         val queue = data.optJSONArray("queue") ?: return emptyList()
         val seen = ReviewOverlayBridge.seen(this, session.account).toSet()
+        val seenKeys = ReviewOverlayBridge.seenKeys(this, session.account).toSet()
         val due = linkedMapOf<Int, JSONObject>()
         for (index in 0 until queue.length()) {
             val item = queue.optJSONObject(index) ?: continue
             if (item.optInt("item_id") <= 0 || item.optString("front_content").isBlank()) continue
-            if (item.optString("item_type") != "mcq" || item.optInt("item_id") in seen) continue
+            val key = item.optString("review_key")
+            if (item.optString("item_type") != "mcq" ||
+                (if (key.isBlank()) item.optInt("item_id") in seen else key in seenKeys)) continue
             val options = item.optJSONArray("options") ?: continue
             if (options.length() !in 2..6 || item.optInt("correct_option", -1) !in 0 until options.length()) continue
             val at = try { OffsetDateTime.parse(item.optString("scheduled_at")) } catch (_: Exception) { continue }
@@ -283,9 +330,9 @@ class FloatingReviewService : Service() {
         return due.values.toList()
     }
 
-    private fun openNext(session: ReviewSession) {
+    private fun openNext(session: ReviewSession, reviewKey: String? = null) {
         if (!canDisplay(session) || !Settings.canDrawOverlays(this)) { hideQuestion(); return }
-        val item = dueItems(session).firstOrNull()
+        val item = dueItems(session).firstOrNull { reviewKey == null || it.optString("review_key") == reviewKey }
         hideQuestion()
         if (item != null) showQuestion(session, item, snapshot?.optJSONObject("settings") ?: JSONObject())
         else (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).cancel(REMINDER)
@@ -298,7 +345,7 @@ class FloatingReviewService : Service() {
         return if (hour in 0..23 && min in 0..59) hour * 60 + min else null
     }
 
-    private fun inWindow(value: Int, start: Int, end: Int) = if (start <= end) value in start..end else value >= start || value <= end
+    private fun inWindow(value: Int, start: Int, end: Int) = start == end || if (start < end) value in start..end else value >= start || value <= end
 
     private fun allowedTime(settings: JSONObject, current: Int): Boolean {
         val start = minute(settings.optString("active_from_time"))
@@ -321,16 +368,20 @@ class FloatingReviewService : Service() {
         val day = LocalDate.now().toString()
         val previous = if (prefs.getString("notice_day_${session.account}", "") == day)
             prefs.getStringSet("notice_ids_${session.account}", emptySet()).orEmpty() else emptySet()
-        val ids = due.map { it.getInt("item_id").toString() }.toSet()
+        val ids = due.map { it.optString("review_key").ifBlank { it.getInt("item_id").toString() } }.toSet()
         if (ids.all { it in previous }) {
             val existing = notifications.activeNotifications.firstOrNull { it.id == REMINDER } ?: return
             if (existing.notification.number == due.size) return
         }
         if (fallback) ReviewOverlayBridge.message = "إذن الظهور غير متاح؛ تُستخدم تذكيرات عادية."
+        val open = if (fallback) openApp() else PendingIntent.getService(this, 1,
+            Intent(this, FloatingReviewService::class.java).setAction(OPEN)
+                .putExtra("review_key", due.first().optString("review_key")),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notice = Notification.Builder(this, READY_CHANNEL).setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("لديك كرت جاهز للمراجعة")
             .setContentText(if (due.size == 1) "بطاقة واحدة بانتظارك" else "${due.size} بطاقات بانتظارك")
-            .setNumber(due.size).setOnlyAlertOnce(true).setContentIntent(openApp()).setAutoCancel(true).build()
+            .setNumber(due.size).setOnlyAlertOnce(true).setContentIntent(open).setAutoCancel(true).build()
         try {
             notifications.notify(REMINDER, notice)
             prefs.edit().putString("notice_day_${session.account}", day)
@@ -458,12 +509,15 @@ class FloatingReviewService : Service() {
                         val pending = ReviewOverlayBridge.pending(this, session.account)
                         pending.put(JSONObject().put("client_event_id", UUID.randomUUID().toString())
                             .put("item_id", item.getInt("item_id"))
+                            .put("review_key", item.optString("review_key"))
                             .put("response_level", if (index == correct) "easy" else "hard"))
                         val ids = (ReviewOverlayBridge.seen(this, session.account) + item.getInt("item_id")).distinct()
+                        val keys = (ReviewOverlayBridge.seenKeys(this, session.account) + item.optString("review_key")).filter { it.isNotBlank() }.distinct()
                         check(ReviewOverlayBridge.prefs(this).edit()
                             .putString("answers_${session.account}", pending.toString())
                             .putString("seen_day_${session.account}", LocalDate.now().toString())
-                            .putString("seen_${session.account}", JSONArray(ids).toString()).commit())
+                            .putString("seen_${session.account}", JSONArray(ids).toString())
+                            .putString("seen_keys_${session.account}", JSONArray(keys).toString()).commit())
                     }
                     panel.showAnswer(index, index == correct,
                         if (index == correct) "إجابة صحيحة · حُفظت للمزامنة" else "الإجابة الصحيحة: ${options.getString(correct)} · حُفظت للمزامنة")
@@ -540,6 +594,12 @@ class FloatingReviewService : Service() {
     internal fun holdUntilNextReview() {
         defer(snapshot?.optJSONObject("settings") ?: JSONObject())
         hideQuestion()
+    }
+
+    internal fun reviewCompleted() {
+        reevaluate()
+        lastFetch = 0
+        if (!stopped) worker.execute { refresh() }
     }
 
     internal fun isSnoozed() = System.currentTimeMillis() < nextPrompt

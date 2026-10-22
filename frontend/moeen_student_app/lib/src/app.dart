@@ -122,6 +122,8 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp>
         debugPrintStack(stackTrace: stackTrace);
       }
       if (!mounted) return;
+      await scheduleStudentFlashcardSmartReviewNotification(ref);
+      if (!mounted) return;
       await ref.read(oneLineNotificationSchedulerProvider).sync(force: force);
     } catch (error, stackTrace) {
       debugPrint('One Line refresh failed: $error');
@@ -139,13 +141,21 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp>
         router.go(LoginScreen.route);
         return;
       }
-      if (path == StudentFlashcardsScreen.quickReviewRoute) {
-        final shown = await showStudentFlashcardSmartReviewPrompt(
-          context: context,
-          ref: ref,
-          force: true,
-        );
+      final uri = Uri.tryParse(path);
+      if (uri?.path == StudentFlashcardsScreen.quickReviewRoute) {
+        final navigatorContext = rootNavigatorKey.currentContext;
+        final shown =
+            navigatorContext != null &&
+            await showStudentFlashcardSmartReviewPrompt(
+              context: navigatorContext,
+              ref: ref,
+              force: true,
+              reviewKey: uri?.queryParameters['review'],
+              itemId: int.tryParse(uri?.queryParameters['item'] ?? ''),
+            );
         if (shown) return;
+        router.go(StudentFlashcardsScreen.route);
+        return;
       }
       router.go(path);
     } catch (_) {

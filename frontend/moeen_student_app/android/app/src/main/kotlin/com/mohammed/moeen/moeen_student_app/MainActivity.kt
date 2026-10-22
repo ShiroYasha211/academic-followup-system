@@ -79,6 +79,8 @@ class MainActivity : FlutterActivity() {
 
     override fun onStop() {
         ReviewOverlayBridge.appVisible = false
+        ReviewOverlayBridge.releaseInApp()
+        FloatingReviewService.instance?.reevaluate()
         super.onStop()
     }
 

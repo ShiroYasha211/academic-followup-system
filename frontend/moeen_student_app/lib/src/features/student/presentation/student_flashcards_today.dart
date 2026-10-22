@@ -105,7 +105,7 @@ class _StudentFlashcardsTodayScreenState
                       reviewed: reviewedToday.length,
                       completedToday: completedToday,
                       autoRestart: localState.smartReviewAutoRestart,
-                      onRestart: reviewedToday.isEmpty
+                      onRestart: reviewedToday.isEmpty || queue.isNotEmpty
                           ? null
                           : () => _restartTodayReview(),
                       onToggleAutoRestart: (value) =>
@@ -202,13 +202,29 @@ class _StudentFlashcardsTodayScreenState
   }
 
   Future<void> _restartTodayReview() async {
-    await ref.read(flashcardLocalStoreProvider).restartTodayReview();
+    try {
+      final store = ref.read(flashcardLocalStoreProvider);
+      final data = await ref
+          .read(studentContentRepositoryProvider)
+          .restartFlashcardDailyQueue();
+      await store.cacheDailyQueue(data);
+      await FloatingReview.updateQueue(store.accountKey, data);
+    } on ApiException catch (error) {
+      if (mounted)
+        await showMoeenInfoDialog(
+          context: context,
+          title: 'تعذر إعادة المراجعة',
+          message: error.message,
+        );
+      return;
+    }
     if (!mounted) return;
     ref.invalidate(_flashcardDailyQueueProvider);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('تمت إعادة تفعيل كروت اليوم.')),
     );
     setState(() {});
+    unawaited(_scheduleNextSmartReviewNotification(ref));
   }
 
   Future<void> _setAutoRestartReview(bool value) async {

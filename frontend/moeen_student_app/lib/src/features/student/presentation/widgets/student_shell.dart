@@ -129,6 +129,8 @@ class _StudentShellState extends ConsumerState<StudentShell>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed)
+        return;
       _refreshBadges();
       _maybeShowFlashcardPrompt();
     });
@@ -146,15 +148,6 @@ class _StudentShellState extends ConsumerState<StudentShell>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.hidden) {
-      final session = ref.read(authControllerProvider).valueOrNull;
-      if (StudentFeatureFlags.showOneLineShot &&
-          session?.isSecondaryDevice != true) {
-        unawaited(scheduleStudentFlashcardSmartReviewNotification(ref));
-      }
-    }
     if (state == AppLifecycleState.resumed) {
       _refreshBadges();
       _maybeShowFlashcardPrompt();
@@ -181,7 +174,10 @@ class _StudentShellState extends ConsumerState<StudentShell>
 
   Future<void> _maybeShowFlashcardPrompt() async {
     if (!StudentFeatureFlags.showOneLineShot) return;
-    if (!mounted || _flashcardPromptOpen) return;
+    if (!mounted ||
+        _flashcardPromptOpen ||
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed)
+      return;
     final path = GoRouterState.of(context).uri.path;
     if (path == StudentFlashcardsScreen.quickReviewRoute ||
         path.endsWith('/review') ||
@@ -191,7 +187,9 @@ class _StudentShellState extends ConsumerState<StudentShell>
     _flashcardPromptOpen = true;
     try {
       await Future<void>.delayed(const Duration(milliseconds: 650));
-      if (!mounted) return;
+      if (!mounted ||
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed)
+        return;
       await showStudentFlashcardSmartReviewPrompt(context: context, ref: ref);
     } finally {
       _flashcardPromptOpen = false;

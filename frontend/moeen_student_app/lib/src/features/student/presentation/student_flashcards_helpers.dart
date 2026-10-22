@@ -9,7 +9,10 @@ Future<int> _syncFlashcardPendingProgress(WidgetRef ref) async {
   if (state.pendingProgress.isEmpty) return 0;
 
   final repo = ref.read(studentContentRepositoryProvider);
-  final remaining = <Map<String, dynamic>>[];
+  final completed = <String>{};
+  String identity(Map<String, dynamic> entry) =>
+      entry['client_event_id']?.toString() ??
+      '${entry['item_id']}:${entry['recorded_at']}';
   var synced = 0;
 
   for (final entry in state.pendingProgress) {
@@ -23,12 +26,19 @@ Future<int> _syncFlashcardPendingProgress(WidgetRef ref) async {
         clientEventId: entry['client_event_id']?.toString(),
       );
       synced++;
+      completed.add(identity(entry));
     } catch (_) {
-      remaining.add(entry);
+      // Keep failed entries and any answers added while this request was in flight.
     }
   }
 
-  await store.save(state.copyWith(pendingProgress: remaining));
+  await store.updateState(
+    (latest) => latest.copyWith(
+      pendingProgress: latest.pendingProgress
+          .where((entry) => !completed.contains(identity(entry)))
+          .toList(),
+    ),
+  );
   return synced;
 }
 
@@ -146,19 +156,29 @@ List<Map<String, dynamic>> _oneLineShotNotificationItems(
       .toList();
 }
 
-Future<void> _scheduleNextSmartReviewNotification(WidgetRef ref) async {
-  await PushNotificationService.cancelFlashcardSmartReview();
-  final floating = await FloatingReview.status();
+Future<void> _smartReviewSyncTail = Future<void>.value();
 
+Future<void> _scheduleNextSmartReviewNotification(WidgetRef ref) {
   final store = ref.read(flashcardLocalStoreProvider);
-  final state = await store.load();
-  if (!state.smartReviewEnabled) return;
+  final repository = ref.read(studentContentRepositoryProvider);
+  final operation = _smartReviewSyncTail.then(
+    (_) => _syncSmartReviewQueue(store, repository),
+  );
+  _smartReviewSyncTail = operation.catchError((Object error, StackTrace stack) {
+    debugPrint('Smart review synchronization deferred: $error');
+  });
+  return _smartReviewSyncTail;
+}
+
+Future<void> _syncSmartReviewQueue(
+  FlashcardLocalStore store,
+  StudentContentRepository repository,
+) async {
+  await PushNotificationService.cancelFlashcardSmartReview(legacyOnly: true);
 
   Map<String, dynamic>? data;
   try {
-    data = await ref
-        .read(studentContentRepositoryProvider)
-        .flashcardDailyQueue();
+    data = await repository.flashcardDailyQueue();
     await store.cacheDailyQueue(data);
   } on ApiException catch (error) {
     if (!error.isOffline) return;
@@ -167,85 +187,18 @@ Future<void> _scheduleNextSmartReviewNotification(WidgetRef ref) async {
     data = await store.loadDailyQueue();
   }
   if (data == null) return;
-
+  await FloatingReview.updateQueue(store.accountKey, data);
+  final floating = await FloatingReview.status();
+  final state = await store.load();
   final queue = _todayPendingReviewItems(
     data,
     state,
   ).where((item) => !floating.running || _itemType(item) != 'mcq').toList();
-  if (queue.isEmpty) return;
-
-  final settings = asMap(data['settings']);
-  final frequency = number(
-    settings,
-    'smart_review_frequency_minutes',
-    fallback: state.smartReviewSnoozeMinutes,
-  ).toInt();
-  var delay = _delayForSmartReviewItem(
-    _nextSmartReviewScheduleItem(queue),
-    frequency > 0 ? frequency : state.smartReviewSnoozeMinutes,
-  );
-
-  final snoozeUntil = DateTime.tryParse(
-    state.smartReviewSnoozeUntil ?? '',
-  )?.toLocal();
-  if (snoozeUntil != null) {
-    final snoozeDelay = snoozeUntil.difference(DateTime.now());
-    if (snoozeDelay > delay) delay = snoozeDelay;
-  }
-  if (delay <= Duration.zero) delay = const Duration(seconds: 10);
-
-  await PushNotificationService.scheduleFlashcardSmartReview(delay: delay);
+  await PushNotificationService.syncFlashcardReviewNotifications(queue);
 }
 
 Future<void> scheduleStudentFlashcardSmartReviewNotification(WidgetRef ref) {
   return _scheduleNextSmartReviewNotification(ref);
-}
-
-Duration _delayForSmartReviewItem(Map<String, dynamic> item, int frequency) {
-  final frequencyDelay = Duration(minutes: frequency);
-  final scheduledAt = _parseFlashcardDateTime(text(item, 'scheduled_at'));
-  if (scheduledAt != null) {
-    final scheduledDelay = scheduledAt.difference(DateTime.now());
-    if (scheduledDelay.isNegative) {
-      return _boolValueFallback(item, 'available_now', true)
-          ? const Duration(seconds: 10)
-          : frequencyDelay;
-    }
-    return scheduledDelay.inSeconds < 10
-        ? const Duration(seconds: 10)
-        : scheduledDelay;
-  }
-  final scheduled = _minutesFromTime(text(item, 'scheduled_time'));
-  if (scheduled == null) return frequencyDelay;
-
-  final now = DateTime.now();
-  final nowMinutes = (now.hour * 60) + now.minute;
-  final diffMinutes = scheduled - nowMinutes;
-  if (diffMinutes < 0) {
-    return _boolValueFallback(item, 'available_now', true)
-        ? const Duration(seconds: 10)
-        : frequencyDelay;
-  }
-
-  final scheduledDelay = Duration(minutes: diffMinutes);
-  return scheduledDelay.inSeconds < 10
-      ? const Duration(seconds: 10)
-      : scheduledDelay;
-}
-
-Map<String, dynamic> _nextSmartReviewScheduleItem(
-  List<Map<String, dynamic>> items,
-) {
-  final sorted = [...items];
-  sorted.sort((first, second) {
-    final firstDate = _parseFlashcardDateTime(text(first, 'scheduled_at'));
-    final secondDate = _parseFlashcardDateTime(text(second, 'scheduled_at'));
-    if (firstDate == null && secondDate == null) return 0;
-    if (firstDate == null) return 1;
-    if (secondDate == null) return -1;
-    return firstDate.compareTo(secondDate);
-  });
-  return sorted.first;
 }
 
 int? _minutesFromTime(String value) {
@@ -261,53 +214,8 @@ List<Map<String, dynamic>> _todayPendingReviewItems(
   FlashcardLocalState state, {
   bool availableOnly = false,
 }) {
-  final seen = state.smartReviewSeenDate == _todayKey()
-      ? state.smartReviewSeenItemIds.toSet()
-      : <int>{};
-  final settings = asMap(data['settings']);
-  final pending = asList(data['queue'])
-      .map(asMap)
-      .map((item) {
-        return _withRuntimeAvailability(item, settings);
-      })
-      .where((item) {
-        if (_isOneLineShotItem(item)) return false;
-        if (seen.contains(_flashcardItemId(item))) return false;
-        if (availableOnly && !_boolValueFallback(item, 'available_now', true)) {
-          return false;
-        }
-        return true;
-      })
-      .toList();
-  if (pending.isNotEmpty) return pending;
-
-  final shouldRestart =
-      state.smartReviewAutoRestart ||
-      state.dailyReviewRestartDate == _todayKey();
-  if (!shouldRestart) return const [];
-
-  final reviewed = _todayReviewedItems(data);
-  final rescheduledReviewed = _rescheduleRestartReviewItems(reviewed, state);
-  final rescheduledRemaining = rescheduledReviewed
-      .where(
-        (item) =>
-            !_isOneLineShotItem(item) && !seen.contains(_flashcardItemId(item)),
-      )
-      .toList();
-  if (rescheduledRemaining.isNotEmpty) {
-    return availableOnly
-        ? rescheduledRemaining
-              .where((item) => _boolValueFallback(item, 'available_now', true))
-              .toList()
-        : rescheduledRemaining;
-  }
-  if (!state.smartReviewAutoRestart) return const [];
-  final filteredRestarted = rescheduledReviewed
-      .where((item) => !_isOneLineShotItem(item))
-      .toList();
-  if (!availableOnly) return filteredRestarted;
-  return filteredRestarted
-      .where((item) => _boolValueFallback(item, 'available_now', true))
+  return SmartReviewQueue.pending(data, state, availableOnly: availableOnly)
+      .map((item) => _withRuntimeAvailability(item, asMap(data['settings'])))
       .toList();
 }
 
@@ -354,57 +262,6 @@ bool _minuteInWindow(int minute, int start, int end) {
 
 List<Map<String, dynamic>> _todayReviewedItems(Map<String, dynamic> data) {
   return asList(data['reviewed_today']).map(asMap).toList();
-}
-
-List<Map<String, dynamic>> _rescheduleRestartReviewItems(
-  List<Map<String, dynamic>> items,
-  FlashcardLocalState state,
-) {
-  if (items.isEmpty) return const [];
-  final now = DateTime.now();
-  final restartAnchor = state.dailyReviewRestartDate == _todayKey()
-      ? DateTime.tryParse(state.dailyReviewRestartStartedAt ?? '')
-      : null;
-  final autoRestartAnchor = restartAnchor == null
-      ? _latestReviewedAt(items)
-      : null;
-  var cursor = (restartAnchor ?? autoRestartAnchor ?? now).copyWith(
-    second: 0,
-    millisecond: 0,
-    microsecond: 0,
-  );
-  return items.map((item) {
-    final scheduledAt = cursor;
-    final frequency = number(
-      item,
-      'pack_frequency_minutes',
-      fallback: state.smartReviewSnoozeMinutes,
-    ).toInt();
-    cursor = cursor.add(
-      Duration(
-        minutes: frequency > 0 ? frequency : state.smartReviewSnoozeMinutes,
-      ),
-    );
-
-    return {
-      ...item,
-      'restart_review': true,
-      'scheduled_at': scheduledAt.toIso8601String(),
-      'scheduled_time': _formatFlashcardTime24(scheduledAt),
-      'scheduled_time_label': _formatFlashcardTime12(scheduledAt),
-      'available_now': !scheduledAt.isAfter(now),
-    };
-  }).toList();
-}
-
-DateTime? _latestReviewedAt(List<Map<String, dynamic>> items) {
-  DateTime? latest;
-  for (final item in items) {
-    final value = DateTime.tryParse(text(item, 'reviewed_at'));
-    if (value == null) continue;
-    if (latest == null || value.isAfter(latest)) latest = value;
-  }
-  return latest;
 }
 
 String _formatFlashcardTime24(DateTime value) {

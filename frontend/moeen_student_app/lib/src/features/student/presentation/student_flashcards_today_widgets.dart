@@ -439,7 +439,16 @@ class _TodayReviewCard extends ConsumerWidget {
           if (itemId > 0) {
             await ref
                 .read(flashcardLocalStoreProvider)
-                .markSmartReviewItemCompletedToday(itemId);
+                .markSmartReviewItemCompletedToday(
+                  itemId,
+                  reviewKey: item['review_key']?.toString(),
+                );
+            await FloatingReview.completed(
+              itemId,
+              reviewKey: item['review_key']?.toString(),
+            );
+            if (!context.mounted) return;
+            unawaited(_scheduleNextSmartReviewNotification(ref));
             ref.invalidate(_flashcardDailyQueueProvider);
           }
         },
@@ -599,7 +608,10 @@ class _FlashcardsTodaySection extends StatelessWidget {
   Widget build(BuildContext context) {
     final visibleQueue = queue.take(4).toList();
     final availableCount = availableQueue.length;
-    final upcomingCount = (queue.length - availableCount).clamp(0, queue.length);
+    final upcomingCount = (queue.length - availableCount).clamp(
+      0,
+      queue.length,
+    );
     final grouped = <String, int>{};
     for (final item in queue) {
       final title = text(item, 'pack_title', fallback: 'حزمة');

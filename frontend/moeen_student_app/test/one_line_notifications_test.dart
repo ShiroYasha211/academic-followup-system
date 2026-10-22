@@ -137,4 +137,39 @@ void main() {
       expect(pending.values.single['payload'], contains('approximate'));
     },
   );
+
+  test(
+    'Review notifications retain the intended occurrence and never replay overdue cards',
+    () async {
+      final future = {
+        'item_id': 20,
+        'review_key': 'cycle-2:20',
+        'scheduled_at': DateTime.now()
+            .add(const Duration(minutes: 30))
+            .toIso8601String(),
+      };
+      final overdue = {
+        'item_id': 10,
+        'review_key': 'cycle-1:10',
+        'scheduled_at': DateTime.now()
+            .subtract(const Duration(minutes: 1))
+            .toIso8601String(),
+      };
+      await PushNotificationService.syncFlashcardReviewNotifications([
+        overdue,
+        future,
+      ]);
+      expect(pending, hasLength(1));
+      expect(pending.values.single['payload'], contains('cycle-2:20'));
+      expect(pending.values.single['payload'], contains('20'));
+      await PushNotificationService.syncFlashcardReviewNotifications([
+        overdue,
+        future,
+      ]);
+      expect(calls, 1);
+      await PushNotificationService.syncFlashcardReviewNotifications([overdue]);
+      expect(pending, isEmpty);
+      expect(calls, 1);
+    },
+  );
 }

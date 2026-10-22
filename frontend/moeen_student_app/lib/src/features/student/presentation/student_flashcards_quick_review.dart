@@ -20,6 +20,7 @@ class _StudentFlashcardQuickReviewScreenState
   int _mediumCount = 0;
   int _hardCount = 0;
   Color? _flashColor;
+  List<Map<String, dynamic>>? _sessionQueue;
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +35,10 @@ class _StudentFlashcardQuickReviewScreenState
           return FutureBuilder<FlashcardLocalState>(
             future: ref.read(flashcardLocalStoreProvider).load(),
             builder: (context, snapshot) {
-              final queue = _todayPendingReviewItems(
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final queue = _sessionQueue ??= _todayPendingReviewItems(
                 data,
                 snapshot.data ?? const FlashcardLocalState(),
                 availableOnly: true,
@@ -239,6 +243,7 @@ class _StudentFlashcardQuickReviewScreenState
   ) async {
     if (_recording) return;
     final itemId = _flashcardItemId(item);
+    final reviewKey = item['review_key']?.toString();
     if (itemId <= 0) return;
 
     final flashColor = switch (level) {
@@ -256,20 +261,27 @@ class _StudentFlashcardQuickReviewScreenState
 
     setState(() => _recording = true);
     var savedOffline = false;
+    final store = ref.read(flashcardLocalStoreProvider);
+    final repository = ref.read(studentContentRepositoryProvider);
+    final connectivity = ref.read(connectivityServiceProvider);
     try {
-      final isOnline = await ref.read(connectivityServiceProvider).isOnline();
+      final isOnline = await connectivity.isOnline();
       if (!isOnline) {
-        await ref
-            .read(flashcardLocalStoreProvider)
-            .addPendingProgress(itemId: itemId, responseLevel: level);
+        await store.addPendingProgress(
+          itemId: itemId,
+          responseLevel: level,
+          reviewKey: reviewKey,
+        );
         savedOffline = true;
       } else {
-        await ref
-            .read(studentContentRepositoryProvider)
-            .recordFlashcardProgress(itemId: itemId, responseLevel: level);
-        await ref
-            .read(flashcardLocalStoreProvider)
-            .markSmartReviewItemCompletedToday(itemId);
+        await repository.recordFlashcardProgress(
+          itemId: itemId,
+          responseLevel: level,
+        );
+        await store.markSmartReviewItemCompletedToday(
+          itemId,
+          reviewKey: reviewKey,
+        );
       }
     } on ApiException catch (error) {
       if (!error.isOffline) {
@@ -285,17 +297,21 @@ class _StudentFlashcardQuickReviewScreenState
         if (mounted) setState(() => _recording = false);
         return;
       }
-      await ref
-          .read(flashcardLocalStoreProvider)
-          .addPendingProgress(itemId: itemId, responseLevel: level);
+      await store.addPendingProgress(
+        itemId: itemId,
+        responseLevel: level,
+        reviewKey: reviewKey,
+      );
       savedOffline = true;
     } catch (_) {
-      await ref
-          .read(flashcardLocalStoreProvider)
-          .addPendingProgress(itemId: itemId, responseLevel: level);
+      await store.addPendingProgress(
+        itemId: itemId,
+        responseLevel: level,
+        reviewKey: reviewKey,
+      );
       savedOffline = true;
     }
-    await FloatingReview.completed(itemId);
+    await FloatingReview.completed(itemId, reviewKey: reviewKey);
     if (!mounted) return;
     setState(() {
       _recording = false;

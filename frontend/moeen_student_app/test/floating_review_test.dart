@@ -159,4 +159,17 @@ void main() {
       );
     }
   });
+
+  test(
+    'Queue handoff and completion carry the same occurrence without requesting snooze',
+    () async {
+      await FloatingReview.updateQueue('user_7', {'queue': [], 'settings': {}});
+      expect(calls.last.method, 'updateQueue');
+      expect((calls.last.arguments as Map)['account'], 'user_7');
+      await FloatingReview.completed(20, reviewKey: 'cycle-2:20');
+      expect(calls.last.method, 'completed');
+      expect(calls.last.arguments, {'item_id': 20, 'review_key': 'cycle-2:20'});
+      expect(calls.where((call) => call.method == 'snooze'), isEmpty);
+    },
+  );
 }
