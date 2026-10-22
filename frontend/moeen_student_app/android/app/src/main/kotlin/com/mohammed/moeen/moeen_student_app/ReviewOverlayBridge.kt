@@ -1,11 +1,13 @@
 package com.mohammed.moeen.moeen_student_app
 
 import android.app.Activity
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
@@ -27,6 +29,50 @@ internal object ReviewOverlayBridge {
 
     fun prefs(context: Context) = context.getSharedPreferences("moeen_review_overlay", Context.MODE_PRIVATE)
     fun mode(context: Context) = session?.let { prefs(context).getString("mode_${it.account}", "inApp") } ?: "inApp"
+    fun autoStart(context: Context) = session?.let { prefs(context).getBoolean("auto_start_${it.account}", false) } ?: false
+
+    fun disableAutoStart(context: Context, account: String) {
+        check(prefs(context).edit().putBoolean("auto_start_$account", false).commit())
+    }
+
+    private fun start(activity: Activity) {
+        check(Build.VERSION.SDK_INT >= 26 && appVisible && !quizBlocked && !activity.isFinishing && !activity.isDestroyed) {
+            "Open the app outside an exam to start"
+        }
+        check(session != null && mode(activity) == "floating") { "Select floating mode first" }
+        check(Settings.canDrawOverlays(activity)) { "Overlay permission is required" }
+        check((activity.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).areNotificationsEnabled()) {
+            "Notification permission is required"
+        }
+        if (starting || FloatingReviewService.instance != null) return
+        starting = true
+        try {
+            activity.startForegroundService(Intent(activity, FloatingReviewService::class.java))
+            message = ""
+        } catch (error: Exception) {
+            starting = false
+            throw error
+        }
+    }
+
+    private fun resumeIfEnabled(activity: Activity) {
+        if (!autoStart(activity) || mode(activity) != "floating" || !appVisible || quizBlocked ||
+            activity.isFinishing || activity.isDestroyed) return
+        if (!Settings.canDrawOverlays(activity)) {
+            message = "يلزم السماح بالظهور فوق التطبيقات لاستئناف المراجعة."
+            return
+        }
+        if (!(activity.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).areNotificationsEnabled()) {
+            message = "يلزم السماح بالإشعارات لاستئناف المراجعة."
+            return
+        }
+        try {
+            start(activity)
+        } catch (error: Exception) {
+            Log.w("MoeenReview", "Automatic resume unavailable: ${error.javaClass.simpleName}")
+            message = "تعذر استئناف المراجعة العائمة. حاول تشغيلها من الإعدادات."
+        }
+    }
 
     fun status(context: Context): Map<String, Any> {
         val current = session
@@ -37,6 +83,7 @@ internal object ReviewOverlayBridge {
             "permission" to Settings.canDrawOverlays(context),
             "mode" to (mode(context) ?: "inApp"),
             "running" to (starting || FloatingReviewService.instance != null),
+            "auto_start" to autoStart(context),
             "pending" to pending,
             "message" to message,
             "seen_ids" to seen,
@@ -89,6 +136,10 @@ internal object ReviewOverlayBridge {
                         message = ""
                     }
                     session = ReviewSession(account, token, baseUrl.trimEnd('/'))
+                    // Allow an old account's service to finish stopping before resuming.
+                    activity.window.decorView.post {
+                        if (session?.account == account) resumeIfEnabled(activity)
+                    }
                     result.success(null)
                 }
                 "status" -> result.success(status(activity))
@@ -97,7 +148,23 @@ internal object ReviewOverlayBridge {
                     val mode = call.arguments as? String
                     require(mode in listOf("inApp", "floating", "notificationOnly"))
                     check(prefs(activity).edit().putString("mode_${current.account}", mode).commit())
-                    if (mode != "floating") activity.stopService(Intent(activity, FloatingReviewService::class.java))
+                    if (mode != "floating") {
+                        starting = false
+                        activity.stopService(Intent(activity, FloatingReviewService::class.java))
+                    } else {
+                        resumeIfEnabled(activity)
+                    }
+                    result.success(null)
+                }
+                "setAutoStart" -> {
+                    val current = session ?: error("Sign in first")
+                    val enabled = call.arguments as? Boolean ?: error("Missing automatic review setting")
+                    check(prefs(activity).edit().putBoolean("auto_start_${current.account}", enabled).commit())
+                    if (enabled) resumeIfEnabled(activity)
+                    else {
+                        starting = false
+                        activity.stopService(Intent(activity, FloatingReviewService::class.java))
+                    }
                     result.success(null)
                 }
                 "permission" -> {
@@ -106,11 +173,7 @@ internal object ReviewOverlayBridge {
                     result.success(null)
                 }
                 "start" -> {
-                    check(Build.VERSION.SDK_INT >= 26 && appVisible && !quizBlocked) { "Open the app outside an exam to start" }
-                    check(session != null && mode(activity) == "floating") { "Select floating mode first" }
-                    check(Settings.canDrawOverlays(activity)) { "Overlay permission is required" }
-                    starting = true
-                    activity.startForegroundService(Intent(activity, FloatingReviewService::class.java))
+                    start(activity)
                     result.success(null)
                 }
                 "stop" -> {
@@ -121,6 +184,7 @@ internal object ReviewOverlayBridge {
                     result.success(null)
                 }
                 "endSession" -> {
+                    session?.let { disableAutoStart(activity, it.account) }
                     starting = false
                     activity.stopService(Intent(activity, FloatingReviewService::class.java))
                     result.success(null)

@@ -8,6 +8,7 @@ import android.graphics.drawable.RippleDrawable
 import android.os.Build
 import android.content.res.ColorStateList
 import android.text.TextUtils
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -66,6 +67,7 @@ internal class FloatingReviewCardView(
     }
 
     private fun icon(codePoint: Int, size: Float, color: Int) = text(String(Character.toChars(codePoint)), size, color, symbols).apply {
+        setTextSize(TypedValue.COMPLEX_UNIT_DIP, size)
         gravity = Gravity.CENTER
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
     }
@@ -216,5 +218,10 @@ internal class FloatingReviewCardView(
             background = shape(tint(ERROR, 20), 12)
             visibility = VISIBLE
         }
+    }
+
+    fun showCompletion(remaining: Int, onContinue: () -> Unit) {
+        footer.text = if (remaining > 0) "التالي · $remaining" else "إنهاء المراجعة"
+        footer.setOnClickListener { onContinue() }
     }
 }

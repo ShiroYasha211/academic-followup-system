@@ -63,11 +63,12 @@ class _FloatingReviewSettingsState
     try {
       await action();
       await _refresh();
-    } on PlatformException {
+    } on PlatformException catch (error) {
       if (mounted)
         setState(
-          () => _error =
-              'تعذر تشغيل المراجعة. تحقق من الإذن ووجودك خارج الاختبار.',
+          () => _error = error.code == 'notifications_disabled'
+              ? 'يلزم السماح بالإشعارات لتشغيل المراجعة العائمة.'
+              : 'تعذر تشغيل المراجعة. تحقق من الإذن ووجودك خارج الاختبار.',
         );
     } on ApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
@@ -132,6 +133,25 @@ class _FloatingReviewSettingsState
         ),
         if (status.mode == ReviewDisplayMode.floating) ...[
           const SizedBox(height: 12),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('تفعيل المراجعة العائمة تلقائياً'),
+            value: status.autoStart,
+            onChanged: _busy
+                ? null
+                : (enabled) => _act(() async {
+                    if (enabled) {
+                      final allowed =
+                          await PushNotificationService.requestReviewNotificationPermission();
+                      if (!allowed)
+                        throw PlatformException(code: 'notifications_disabled');
+                      if (!mounted) return;
+                    }
+                    await FloatingReview.setAutoStart(enabled);
+                    if (!mounted) return;
+                    await _scheduleNextSmartReviewNotification(ref);
+                  }),
+          ),
           Row(
             children: [
               Icon(
@@ -143,7 +163,9 @@ class _FloatingReviewSettingsState
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  status.running
+                  !status.permission
+                      ? 'تحتاج إذن الظهور فوق التطبيقات'
+                      : status.running
                       ? 'جلسة المراجعة نشطة'
                       : 'جلسة المراجعة متوقفة',
                 ),

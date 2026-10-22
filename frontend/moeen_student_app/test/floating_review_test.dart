@@ -59,6 +59,7 @@ void main() {
               'permission': false,
               'mode': 'floating',
               'running': false,
+              'auto_start': true,
               'pending': 1,
               'seen_ids': [5],
             };
@@ -78,8 +79,32 @@ void main() {
       expect(status.supported, isTrue);
       expect(status.permission, isFalse);
       expect(status.running, isFalse);
+      expect(status.autoStart, isTrue);
       expect(status.mode, ReviewDisplayMode.floating);
       expect(status.seenIds, [5]);
+    },
+  );
+
+  test('Older status responses do not opt accounts into automatic review', () {
+    expect(FloatingReviewStatus.fromMap({'running': true}).autoStart, isFalse);
+    expect(const FloatingReviewStatus().autoStart, isFalse);
+  });
+
+  test(
+    'Automatic review preference is sent independently of session state',
+    () async {
+      await FloatingReview.setAutoStart(true);
+      expect(calls.last.method, 'setAutoStart');
+      expect(calls.last.arguments, isTrue);
+      await FloatingReview.setAutoStart(false);
+      expect(calls.last.method, 'setAutoStart');
+      expect(calls.last.arguments, isFalse);
+      await FloatingReview.endSession();
+      expect(calls.last.method, 'endSession');
+      calls.clear();
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      await FloatingReview.setAutoStart(true);
+      expect(calls, isEmpty);
     },
   );
 

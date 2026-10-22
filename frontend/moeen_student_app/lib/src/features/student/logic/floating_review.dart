@@ -16,6 +16,7 @@ class FloatingReviewStatus {
     this.supported = false,
     this.permission = false,
     this.running = false,
+    this.autoStart = false,
     this.mode = ReviewDisplayMode.inApp,
     this.pending = 0,
     this.message = '',
@@ -25,6 +26,7 @@ class FloatingReviewStatus {
   final bool supported;
   final bool permission;
   final bool running;
+  final bool autoStart;
   final ReviewDisplayMode mode;
   final int pending;
   final String message;
@@ -39,6 +41,7 @@ class FloatingReviewStatus {
       supported: data['supported'] == true,
       permission: data['permission'] == true,
       running: data['running'] == true,
+      autoStart: data['auto_start'] == true,
       mode: mode,
       pending: (data['pending'] as num?)?.toInt() ?? 0,
       message: data['message']?.toString() ?? '',
@@ -88,6 +91,11 @@ class FloatingReview {
 
   static Future<void> start() async {
     if (supportedPlatform) await _channel.invokeMethod<void>('start');
+  }
+
+  static Future<void> setAutoStart(bool enabled) async {
+    if (supportedPlatform)
+      await _channel.invokeMethod<void>('setAutoStart', enabled);
   }
 
   static Future<void> stop() async {

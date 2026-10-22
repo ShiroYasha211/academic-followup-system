@@ -12,6 +12,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
+import android.graphics.Rect
+import android.animation.ValueAnimator
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -23,6 +25,9 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.view.WindowInsets
+import android.view.ViewConfiguration
+import android.view.animation.DecelerateInterpolator
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -40,6 +45,7 @@ class FloatingReviewService : Service() {
         @Volatile internal var instance: FloatingReviewService? = null
             private set
         private const val CHANNEL = "moeen_floating_review"
+        private const val READY_CHANNEL = "moeen_review_ready"
         private const val NOTIFICATION = 64030
         private const val REMINDER = 64031
         private const val STOP = "moeen.review.STOP"
@@ -49,7 +55,9 @@ class FloatingReviewService : Service() {
     private val worker = Executors.newSingleThreadScheduledExecutor()
     private lateinit var windows: WindowManager
     private var window: View? = null
+    private var bubble: FloatingReviewBubbleView? = null
     private var currentItem = 0
+    private var currentAnswered = false
     private var snapshot: JSONObject? = null
     @Volatile private var connection: HttpURLConnection? = null
     @Volatile private var stopped = false
@@ -65,10 +73,12 @@ class FloatingReviewService : Service() {
         super.onCreate()
         instance = this
         ownerAccount = ReviewOverlayBridge.session?.account
+        nextPrompt = ReviewOverlayBridge.prefs(this).getLong("snooze_${ownerAccount}", 0L)
         ReviewOverlayBridge.starting = false
         windows = getSystemService(WINDOW_SERVICE) as WindowManager
         val notifications = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notifications.createNotificationChannel(NotificationChannel(CHANNEL, "المراجعة العائمة", NotificationManager.IMPORTANCE_LOW))
+        notifications.createNotificationChannel(NotificationChannel(READY_CHANNEL, "بطاقات جاهزة للمراجعة", NotificationManager.IMPORTANCE_DEFAULT))
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(NOTIFICATION, sessionNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
@@ -82,7 +92,11 @@ class FloatingReviewService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == STOP || ReviewOverlayBridge.session == null) stopSelf()
+        if (intent?.action == STOP) {
+            ownerAccount?.let { ReviewOverlayBridge.disableAutoStart(this, it) }
+            ReviewOverlayBridge.starting = false
+            stopSelf()
+        } else if (ReviewOverlayBridge.session == null) stopSelf()
         return START_NOT_STICKY
     }
 
@@ -91,6 +105,8 @@ class FloatingReviewService : Service() {
     override fun dump(fd: FileDescriptor, writer: PrintWriter, args: Array<out String>) {
         writer.println("Floating review: visible=${ReviewOverlayBridge.appVisible}, exam=${ReviewOverlayBridge.quizBlocked}, inApp=${ReviewOverlayBridge.inAppPrompt}, window=${window != null}")
         writer.println("Session: configured=${ReviewOverlayBridge.session != null}, ownerMatches=${ReviewOverlayBridge.session?.account == ownerAccount}, stopped=$stopped, snoozed=${isSnoozed()}")
+        writer.println("Automatic: enabled=${ReviewOverlayBridge.autoStart(this)}")
+        writer.println("Bubble: visible=${bubble != null}, due=${ReviewOverlayBridge.session?.let { dueItems(it).size } ?: 0}, answered=$currentAnswered")
         val queue = snapshot?.optJSONArray("queue")
         writer.println("Queue: count=${queue?.length() ?: 0}, lastFetch=$lastFetch, permission=${Settings.canDrawOverlays(this)}")
         writer.println("Settings: enabled=${snapshot?.optJSONObject("settings")?.optBoolean("smart_review_enabled", true)}")
@@ -206,41 +222,73 @@ class FloatingReviewService : Service() {
     }
 
     private fun evaluate(session: ReviewSession) {
-        if (session.account != ownerAccount) { hideQuestion(); return }
+        if (!canDisplay(session)) { hideQuestion(); return }
+        val due = dueItems(session)
+        if (due.isEmpty()) {
+            hideBubble()
+            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).cancel(REMINDER)
+            if (!currentAnswered) removeCard()
+            else (window as? FloatingReviewCardView)?.showCompletion(0) { openNext(session) }
+            return
+        }
+        if (System.currentTimeMillis() < nextPrompt) { hideQuestion(); return }
+        if (!Settings.canDrawOverlays(this)) {
+            hideQuestion()
+            announceReady(session, due, fallback = true)
+            return
+        }
+        if (window != null) {
+            if (currentAnswered) {
+                (window as? FloatingReviewCardView)?.showCompletion(due.size) { openNext(session) }
+                return
+            }
+            if (due.any { it.optInt("item_id") == currentItem }) return
+            removeCard()
+        }
+        showBubble(session, due.size)
+        announceReady(session, due)
+    }
+
+    private fun canDisplay(session: ReviewSession): Boolean {
+        if (stopped || session != ReviewOverlayBridge.session || session.account != ownerAccount) return false
         val power = getSystemService(POWER_SERVICE) as PowerManager
         val locked = (getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked
-        if (ReviewOverlayBridge.appVisible || ReviewOverlayBridge.quizBlocked || ReviewOverlayBridge.inAppPrompt || locked || !power.isInteractive) {
-            hideQuestion()
-            return
-        }
-        val data = snapshot ?: return
-        val settings = data.optJSONObject("settings") ?: return
-        if (!settings.optBoolean("smart_review_enabled", true)) {
-            hideQuestion()
-            return
-        }
-        val queue = data.optJSONArray("queue") ?: return
-        if (!Settings.canDrawOverlays(this)) hideQuestion()
-        val anchor = queue.optJSONObject(0)?.optString("scheduled_at")
-        val current = try { OffsetDateTime.now(OffsetDateTime.parse(anchor).offset) } catch (_: Exception) { null }
-        if (current != null && !allowedTime(settings, current.hour * 60 + current.minute)) { hideQuestion(); return }
-        if (window != null || System.currentTimeMillis() < nextPrompt) return
+        val settings = snapshot?.optJSONObject("settings") ?: return false
+        if (!settings.optBoolean("smart_review_enabled", true)) return false
+        val anchor = snapshot?.optJSONArray("queue")?.optJSONObject(0)?.optString("scheduled_at")
+        val now = try { OffsetDateTime.now(OffsetDateTime.parse(anchor).offset) } catch (_: Exception) { OffsetDateTime.now() }
+        return allowedTime(settings, now.hour * 60 + now.minute) &&
+            !ReviewOverlayBridge.appVisible && !ReviewOverlayBridge.quizBlocked &&
+            !ReviewOverlayBridge.inAppPrompt && !locked && power.isInteractive
+    }
+
+    private fun dueItems(session: ReviewSession): List<JSONObject> {
+        val data = snapshot ?: return emptyList()
+        val settings = data.optJSONObject("settings") ?: return emptyList()
+        if (!settings.optBoolean("smart_review_enabled", true)) return emptyList()
+        val queue = data.optJSONArray("queue") ?: return emptyList()
         val seen = ReviewOverlayBridge.seen(this, session.account).toSet()
+        val due = linkedMapOf<Int, JSONObject>()
         for (index in 0 until queue.length()) {
             val item = queue.optJSONObject(index) ?: continue
             if (item.optInt("item_id") <= 0 || item.optString("front_content").isBlank()) continue
             if (item.optString("item_type") != "mcq" || item.optInt("item_id") in seen) continue
+            val options = item.optJSONArray("options") ?: continue
+            if (options.length() !in 2..6 || item.optInt("correct_option", -1) !in 0 until options.length()) continue
             val at = try { OffsetDateTime.parse(item.optString("scheduled_at")) } catch (_: Exception) { continue }
             val now = OffsetDateTime.now(at.offset)
             if (at.toLocalDate() != now.toLocalDate() || at.isAfter(now) || !allowedTime(settings, now.hour * 60 + now.minute)) continue
-            if (!Settings.canDrawOverlays(this)) {
-                fallback()
-                defer(settings)
-                return
-            }
-            showQuestion(session, item, settings)
-            return
+            due.putIfAbsent(item.getInt("item_id"), item)
         }
+        return due.values.toList()
+    }
+
+    private fun openNext(session: ReviewSession) {
+        if (!canDisplay(session) || !Settings.canDrawOverlays(this)) { hideQuestion(); return }
+        val item = dueItems(session).firstOrNull()
+        hideQuestion()
+        if (item != null) showQuestion(session, item, snapshot?.optJSONObject("settings") ?: JSONObject())
+        else (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).cancel(REMINDER)
     }
 
     private fun minute(value: String): Int? {
@@ -263,6 +311,31 @@ class FloatingReviewService : Service() {
 
     private fun defer(settings: JSONObject) {
         nextPrompt = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(settings.optLong("smart_review_frequency_minutes", 30).coerceIn(1, 1440))
+        ownerAccount?.let { ReviewOverlayBridge.prefs(this).edit().putLong("snooze_$it", nextPrompt).apply() }
+    }
+
+    private fun announceReady(session: ReviewSession, due: List<JSONObject>, fallback: Boolean = false) {
+        val notifications = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        if (!notifications.areNotificationsEnabled()) return
+        val prefs = ReviewOverlayBridge.prefs(this)
+        val day = LocalDate.now().toString()
+        val previous = if (prefs.getString("notice_day_${session.account}", "") == day)
+            prefs.getStringSet("notice_ids_${session.account}", emptySet()).orEmpty() else emptySet()
+        val ids = due.map { it.getInt("item_id").toString() }.toSet()
+        if (ids.all { it in previous }) {
+            val existing = notifications.activeNotifications.firstOrNull { it.id == REMINDER } ?: return
+            if (existing.notification.number == due.size) return
+        }
+        if (fallback) ReviewOverlayBridge.message = "إذن الظهور غير متاح؛ تُستخدم تذكيرات عادية."
+        val notice = Notification.Builder(this, READY_CHANNEL).setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("لديك كرت جاهز للمراجعة")
+            .setContentText(if (due.size == 1) "بطاقة واحدة بانتظارك" else "${due.size} بطاقات بانتظارك")
+            .setNumber(due.size).setOnlyAlertOnce(true).setContentIntent(openApp()).setAutoCancel(true).build()
+        try {
+            notifications.notify(REMINDER, notice)
+            prefs.edit().putString("notice_day_${session.account}", day)
+                .putStringSet("notice_ids_${session.account}", previous + ids).apply()
+        } catch (error: SecurityException) { Log.w("MoeenReview", "Review notification permission unavailable") }
     }
 
     private fun fallback() {
@@ -276,17 +349,108 @@ class FloatingReviewService : Service() {
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
+    private fun safeArea(): Rect {
+        if (Build.VERSION.SDK_INT >= 30) {
+            val metrics = windows.currentWindowMetrics
+            val insets = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+            return Rect(insets.left, insets.top, metrics.bounds.width() - insets.right, metrics.bounds.height() - insets.bottom)
+        }
+        val statusId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        val top = if (statusId != 0) resources.getDimensionPixelSize(statusId) else dp(24)
+        return Rect(0, top, resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels)
+    }
+
+    private fun showBubble(session: ReviewSession, count: Int) {
+        bubble?.let { it.updateCount(count); return }
+        val settings = snapshot?.optJSONObject("settings") ?: return
+        val view = FloatingReviewBubbleView(this, onOpen = { openNext(session) }, onSnooze = { defer(settings); hideQuestion() })
+        view.updateCount(count)
+        val area = safeArea()
+        val size = dp(76)
+        val left = area.left + dp(4)
+        val right = maxOf(left, area.right - size - dp(4))
+        val top = area.top + dp(4)
+        val bottom = maxOf(top, area.bottom - size - dp(4))
+        val prefs = ReviewOverlayBridge.prefs(this)
+        val params = WindowManager.LayoutParams(size, size, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT).apply {
+            gravity = Gravity.TOP or Gravity.LEFT
+            x = left + ((right - left) * prefs.getFloat("bubble_x_${session.account}", 1f).coerceIn(0f, 1f)).toInt()
+            y = top + ((bottom - top) * prefs.getFloat("bubble_y_${session.account}", 0f).coerceIn(0f, 1f)).toInt()
+        }
+        var downX = 0f; var downY = 0f; var originX = 0; var originY = 0
+        var dragging = false; var longPressed = false
+        val longPress = Runnable { if (!dragging && bubble === view) { longPressed = true; view.showActions() } }
+        view.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    view.animate().cancel(); view.translationX = 0f
+                    downX = event.rawX; downY = event.rawY; originX = params.x; originY = params.y
+                    dragging = false; longPressed = false
+                    handler.postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - downX; val dy = event.rawY - downY
+                    if (kotlin.math.abs(dx) + kotlin.math.abs(dy) > ViewConfiguration.get(this).scaledTouchSlop) {
+                        dragging = true
+                        handler.removeCallbacks(longPress)
+                    }
+                    if (dragging && bubble === view) {
+                        params.x = (originX + dx.toInt()).coerceIn(left, right)
+                        params.y = (originY + dy.toInt()).coerceIn(top, bottom)
+                        try { windows.updateViewLayout(view, params) }
+                        catch (error: IllegalArgumentException) { hideBubble() }
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    handler.removeCallbacks(longPress)
+                    if (dragging) prefs.edit()
+                        .putFloat("bubble_x_${session.account}", if (right > left) (params.x - left).toFloat() / (right - left) else 0f)
+                        .putFloat("bubble_y_${session.account}", if (bottom > top) (params.y - top).toFloat() / (bottom - top) else 0f).apply()
+                    else if (!longPressed) view.performClick()
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> { handler.removeCallbacks(longPress); true }
+                else -> false
+            }
+        }
+        try {
+            windows.addView(view, params)
+            bubble = view
+            if (ValueAnimator.areAnimatorsEnabled()) {
+                view.translationX = size.toFloat()
+                view.animate().translationX(0f).setDuration(450).setInterpolator(DecelerateInterpolator()).start()
+            }
+        } catch (error: RuntimeException) {
+            Log.w("MoeenReview", "Bubble unavailable: ${error.javaClass.simpleName}")
+            defer(settings)
+        }
+    }
+
+    private fun hideBubble() {
+        bubble?.let {
+            it.animate().cancel()
+            try { windows.removeView(it) }
+            catch (error: IllegalArgumentException) { Log.w("MoeenReview", "Bubble already detached") }
+        }
+        bubble = null
+    }
+
     private fun showQuestion(session: ReviewSession, item: JSONObject, settings: JSONObject) {
         val options = item.optJSONArray("options") ?: return
         val correct = item.optInt("correct_option", -1)
         if (options.length() !in 2..6 || correct !in 0 until options.length()) return
         val panel = FloatingReviewCardView(this, item,
-            onClose = { defer(settings); hideQuestion() },
+            onClose = { removeCard(); evaluate(session) },
             onSnooze = { defer(settings); hideQuestion() })
         val choices = panel.choices
         for (index in 0 until options.length()) {
             val choice = choices[index]
             choice.setOnClickListener {
+                if (!choice.isEnabled) return@setOnClickListener
                 if (stopped || ReviewOverlayBridge.session != session || ReviewOverlayBridge.quizBlocked) { hideQuestion(); return@setOnClickListener }
                 choices.forEach { it.isEnabled = false }
                 try {
@@ -303,10 +467,14 @@ class FloatingReviewService : Service() {
                     }
                     panel.showAnswer(index, index == correct,
                         if (index == correct) "إجابة صحيحة · حُفظت للمزامنة" else "الإجابة الصحيحة: ${options.getString(correct)} · حُفظت للمزامنة")
-                    defer(settings)
+                    currentAnswered = true
+                    val remaining = dueItems(session).size
+                    panel.showCompletion(remaining) { openNext(session) }
                     lastFetch = 0
                     worker.execute { refresh() }
-                    handler.postDelayed({ if (currentItem == item.optInt("item_id")) hideQuestion() }, 3000)
+                    if (remaining == 0) handler.postDelayed({
+                        if (currentItem == item.optInt("item_id") && currentAnswered) { removeCard(); evaluate(session) }
+                    }, 3000)
                 } catch (error: Exception) {
                     Log.e("MoeenReview", "Cannot persist answer", error)
                     panel.showError("تعذر حفظ الإجابة. حاول مجدداً.")
@@ -338,6 +506,8 @@ class FloatingReviewService : Service() {
             windows.addView(panel, params)
             window = panel
             currentItem = item.getInt("item_id")
+            currentAnswered = false
+            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).cancel(REMINDER)
         } catch (error: RuntimeException) {
             Log.w("MoeenReview", "Overlay unavailable: ${error.javaClass.simpleName}")
             fallback()
@@ -347,12 +517,24 @@ class FloatingReviewService : Service() {
 
     internal fun hideQuestion() {
         if (Looper.myLooper() != Looper.getMainLooper()) { handler.post { hideQuestion() }; return }
+        hideBubble()
+        removeCard()
+    }
+
+    private fun removeCard() {
         window?.let {
             try { windows.removeView(it) }
             catch (error: IllegalArgumentException) { Log.w("MoeenReview", "Overlay already detached") }
         }
         window = null
         currentItem = 0
+        currentAnswered = false
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        hideQuestion()
+        ReviewOverlayBridge.session?.let { evaluate(it) }
     }
 
     internal fun holdUntilNextReview() {

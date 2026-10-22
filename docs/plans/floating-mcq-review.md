@@ -24,13 +24,56 @@ in-app review, exam protection, account isolation, and the pending import/edit f
 
 ## Platform Limits
 
-Android only, API 26+. A user-started session is not restarted from boot or after
-force-stop/process death. Respect OS/other-app overlay blocking and battery
+Android only, API 26+. Sessions are not restarted in the background after boot,
+force-stop or process death; an opted-in account resumes on its next app opening.
+Respect OS/other-app overlay blocking and battery
 restrictions. Do not request Accessibility or full-screen intent permission.
 Special-use foreground services require review against store distribution policy.
 Native operation is not considered verified by widget tests or compilation alone.
 
+## Automatic Session Resume
+
+- An opt-in `auto_start_<account>` preference is stored on the device separately
+  from service state; existing accounts remain opted out until they enable it.
+- Session configuration on app launch/resume restores the service only for the
+  current account, floating mode, a visible non-exam activity, and granted overlay
+  and notification permissions. It does not prompt for permissions automatically.
+- Disabling the switch, ending the session in settings, or using the notification
+  Stop action clears automatic activation. Logout/workspace switching stops the
+  session but preserves the account's preference for its next student login.
+- No boot receiver, background restart loop, or persisted token is introduced.
+  Opening the app again after reboot/force-stop is still required. Existing exam,
+  lock-screen, quiet-time and due-MCQ checks remain in effect.
+- Updated QA: six Flutter bridge tests passed as part of 23 related Flutter tests;
+  targeted analysis and Release compilation passed. The Release APK was installed
+  and automatic enable/reopen and disable/reopen were verified through the real
+  app. Another 21 isolated native device scenarios covered service lifecycle,
+  permissions, account isolation, display filtering, local answers and large text.
+  See `one-line-release-qa-2026-10-22.md` for evidence and remaining release gates.
+
 ## Card Presentation
+
+### Bubble-First Interaction
+
+- Due valid MCQs now show a draggable launcher-icon bubble, not an unsolicited
+  question. Its badge counts unique due items not completed today; future and
+  malformed items are excluded. Position is saved per account using normalized
+  coordinates constrained to system-bar/cutout-safe bounds.
+- Tap opens a question. Close returns to the bubble without completing it.
+  Answer feedback offers an explicit Next button for remaining due items; the
+  last answer closes after feedback. No automatic jump to the next question.
+- Long press opens a snooze action, also exposed to accessibility services.
+  Snooze uses the existing review interval and survives service recreation.
+- A separate normal-importance ready channel announces newly due IDs once per
+  account/day. Refresh/restart does not re-alert the same items. Existing ready
+  notification counts can update silently; dismissed reminders stay dismissed.
+- The bubble uses a 450ms right-to-left entry transition and respects disabled
+  system animations. App foreground, exam security, lock, quiet time, logout and
+  service Stop suppress both bubble and question through the existing gates.
+- Backend and API contracts are unchanged. Native compile and 22 isolated device
+  scenarios passed during implementation; these tests use local questions only.
+  The subsequent bubble Release APK was built, signature-verified and installed
+  as an update on SM-G998U; its installed SHA-256 matched the local build exactly.
 
 - The native overlay now follows the in-app MCQ card: packaged Cairo fonts,
   existing Material icons, a white rounded surface, package accent, circular
@@ -39,8 +82,8 @@ Native operation is not considered verified by widget tests or compilation alone
   its existing answer persistence, timing, suppression, and synchronization.
 - Long questions and choices scroll inside a height-limited body while close
   and snooze remain outside it. Text uses Android scalable font units.
-- Device visual review of this redesign is deferred at the user's request;
-  the earlier device results below refer to the previous card presentation.
+- End-to-end overlay review of this redesign was deferred at the user's request;
+  the earlier overlay results below refer to the previous card presentation.
 - A later isolated Android preview rendered the same view and packaged Release
   fonts with local sample content. The image was visually checked; the temporary
   preview app was uninstalled without changing the main app or account data.
@@ -72,5 +115,6 @@ Native operation is not considered verified by widget tests or compilation alone
   progress without a second increment; offline/native synchronization was checked
   locally, not against production.
 - Actual exam submission/security, process-death recovery, battery/OEM variations,
-  and other Android models were not exercised on the production account. Sessions
-  require an explicit restart after force-stop or process death by design.
+  and other Android models were not comprehensively exercised on the production
+  account. Force-stop/open automatic recovery was verified in the updated QA;
+  returning to the app is still required, rather than restarting from background.
