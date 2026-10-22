@@ -25,6 +25,7 @@ internal class FloatingReviewBubbleView(context: Context, onOpen: () -> Unit, pr
         minimumHeight = dp(26)
         setPadding(dp(5), 0, dp(5), 0)
         background = GradientDrawable().apply { setColor(0xFFBE123C.toInt()); cornerRadius = dp(16).toFloat() }
+        elevation = dp(7).toFloat()
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
     }
 
@@ -47,7 +48,7 @@ internal class FloatingReviewBubbleView(context: Context, onOpen: () -> Unit, pr
             importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         addView(icon, LayoutParams(dp(56), dp(56), Gravity.CENTER))
-        addView(badge, LayoutParams(-2, -2, Gravity.TOP or Gravity.RIGHT).apply { topMargin = dp(2); rightMargin = dp(2) })
+        addView(badge, LayoutParams(-2, -2, Gravity.TOP or Gravity.LEFT).apply { topMargin = dp(2); leftMargin = dp(2) })
         setOnClickListener { onOpen() }
         setOnLongClickListener { showActions(); true }
         accessibilityDelegate = object : AccessibilityDelegate() {
