@@ -17,6 +17,8 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "moeen/review_overlay")
+            .setMethodCallHandler { call, result -> ReviewOverlayBridge.handle(this, call, result) }
 
         securityChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "moeen/security")
         securityChannel?.setMethodCallHandler { call, result ->
@@ -24,6 +26,7 @@ class MainActivity : FlutterActivity() {
                     "setSecureScreen" -> {
                         val enabled = call.argument<Boolean>("enabled") ?: false
                         runOnUiThread {
+                            ReviewOverlayBridge.blockQuiz(enabled)
                             quizSecurityEnabled = enabled
                             if (enabled) {
                                 window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -66,6 +69,17 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        ReviewOverlayBridge.appVisible = true
+        FloatingReviewService.instance?.hideQuestion()
+    }
+
+    override fun onStop() {
+        ReviewOverlayBridge.appVisible = false
+        super.onStop()
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {

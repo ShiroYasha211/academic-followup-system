@@ -933,11 +933,14 @@ class StudentContentRepository {
 
   Future<Map<String, dynamic>> previewFlashcardImport({
     required int packId,
-    required String filePath,
+    String? filePath,
+    List<int>? fileBytes,
     required String fileName,
   }) async {
     final form = FormData.fromMap({
-      'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      'file': fileBytes != null
+          ? MultipartFile.fromBytes(fileBytes, filename: fileName)
+          : await MultipartFile.fromFile(filePath!, filename: fileName),
     });
     final response = await _api.post(
       '/student/flashcards/$packId/import-preview',
@@ -969,13 +972,29 @@ class StudentContentRepository {
     return (response['message'] ?? 'تم حذف البطاقة بنجاح.').toString();
   }
 
+  Future<String> updateFlashcardItem(
+    int itemId,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _api.put(
+      '/student/flashcards/items/$itemId',
+      data: data,
+    );
+    return (response['message'] ?? 'تم تعديل البطاقة بنجاح.').toString();
+  }
+
   Future<String> recordFlashcardProgress({
     required int itemId,
     required String responseLevel,
+    String? clientEventId,
   }) async {
     final response = await _api.post(
       '/student/flashcards/progress',
-      data: {'item_id': itemId, 'response_level': responseLevel},
+      data: {
+        'item_id': itemId,
+        'response_level': responseLevel,
+        if (clientEventId != null) 'client_event_id': clientEventId,
+      },
     );
     return (response['message'] ?? 'تم تسجيل المراجعة.').toString();
   }

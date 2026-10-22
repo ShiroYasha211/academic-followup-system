@@ -179,6 +179,7 @@ class _StudentFlashcardReviewScreenState
           .addPendingProgress(itemId: itemId, responseLevel: level);
       savedOffline = true;
     }
+    await FloatingReview.completed(itemId);
     if (!mounted) return;
     _registerAnswer(level, _itemType(item) == 'mcq');
     setState(() => _recording = false);

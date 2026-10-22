@@ -2,10 +2,11 @@
 part of 'student_content_screens.dart';
 
 class _FlashcardItemTile extends StatelessWidget {
-  const _FlashcardItemTile(this.item, {this.onDelete});
+  const _FlashcardItemTile(this.item, {this.onDelete, this.onEdit});
 
   final Map<String, dynamic> item;
   final VoidCallback? onDelete;
+  final VoidCallback? onEdit;
 
   Widget _buildPriorityBadge(String priority) {
     final (label, badgeColor) = switch (priority) {
@@ -150,18 +151,33 @@ class _FlashcardItemTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (onDelete != null) ...[
+              if (onEdit != null || onDelete != null) ...[
                 const SizedBox(width: 8),
-                IconButton(
-                  onPressed: onDelete,
-                  icon: const Icon(
-                    Icons.delete_outline_rounded,
-                    color: AppColors.rose,
-                  ),
-                  style: IconButton.styleFrom(
-                    foregroundColor: AppColors.rose,
-                    backgroundColor: AppColors.rose.withValues(alpha: 0.1),
-                  ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onEdit != null)
+                      IconButton(
+                        tooltip: 'تعديل العنصر',
+                        onPressed: onEdit,
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                    if (onDelete != null)
+                      IconButton(
+                        tooltip: 'حذف العنصر',
+                        onPressed: onDelete,
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: AppColors.rose,
+                        ),
+                        style: IconButton.styleFrom(
+                          foregroundColor: AppColors.rose,
+                          backgroundColor: AppColors.rose.withValues(
+                            alpha: 0.1,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ],

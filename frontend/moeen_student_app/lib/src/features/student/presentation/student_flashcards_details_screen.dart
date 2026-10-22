@@ -42,15 +42,27 @@ class _StudentFlashcardDetailsScreenState
         ) ??
         AppColors.royalBlue;
 
-    final isPublic = state.whenOrNull(
+    final isPublic =
+        state.whenOrNull(
           data: (data) => boolValue(asMap(data['pack']), 'is_public'),
+        ) ??
+        false;
+    final canManageItems =
+        state.whenOrNull(
+          data: (data) {
+            if (data.containsKey('can_manage_items'))
+              return data['can_manage_items'] == true;
+            final pack = asMap(data['pack']);
+            return !boolValue(pack, 'is_public') &&
+                !boolValue(pack, 'is_assigned');
+          },
         ) ??
         false;
 
     return StudentShell(
       currentIndex: 15,
       title: 'تفاصيل الحزمة',
-      floatingActionButton: isPublic
+      floatingActionButton: !canManageItems
           ? null
           : FloatingActionButton.extended(
               onPressed: () => _showAddItem(context, ref),
@@ -151,8 +163,7 @@ class _StudentFlashcardDetailsScreenState
                       Expanded(
                         child: FilledButton.icon(
                           onPressed: () {
-                            final clonedId =
-                                number(myClonedPack, 'id').toInt();
+                            final clonedId = number(myClonedPack, 'id').toInt();
                             context.push(
                               StudentFlashcardsScreen.reviewPath(clonedId),
                             );
@@ -179,8 +190,7 @@ class _StudentFlashcardDetailsScreenState
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () {
-                            final clonedId =
-                                number(myClonedPack, 'id').toInt();
+                            final clonedId = number(myClonedPack, 'id').toInt();
                             context.push(
                               StudentFlashcardsScreen.detailsPath(clonedId),
                             );
@@ -277,30 +287,35 @@ class _StudentFlashcardDetailsScreenState
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      flex: 2,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _showAddChildPack(context, ref, pack),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(
-                            color: packColor.withValues(alpha: 0.5),
+                    if (canManageItems)
+                      Expanded(
+                        flex: 2,
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              _showAddChildPack(context, ref, pack),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: packColor.withValues(alpha: 0.5),
+                            ),
+                            foregroundColor: packColor,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          foregroundColor: packColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                          icon: const Icon(
+                            Icons.account_tree_rounded,
+                            size: 20,
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        icon: const Icon(Icons.account_tree_rounded, size: 20),
-                        label: const Text(
-                          'حزمة فرعية',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                          label: const Text(
+                            'حزمة فرعية',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     const SizedBox(width: 8),
                     IconButton.outlined(
                       onPressed: () => _showEditPack(
@@ -325,65 +340,60 @@ class _StudentFlashcardDetailsScreenState
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _showFlashcardImport(
-                          context: context,
-                          ref: ref,
-                          packId: widget.packId,
-                          packColor: packColor,
-                          onDone: () {
-                            ref.invalidate(
-                              _flashcardDetailsProvider(widget.packId),
-                            );
-                            ref.invalidate(_flashcardsProvider);
-                            ref.invalidate(_flashcardDailyQueueProvider);
-                            ref.invalidate(_flashcardUpcomingProvider);
-                          },
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: packColor,
-                          side: BorderSide(
-                            color: packColor.withValues(alpha: 0.35),
+                if (canManageItems) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showFlashcardImport(
+                            context: context,
+                            ref: ref,
+                            packId: widget.packId,
+                            packColor: packColor,
+                            onDone: () => _refreshItemData(ref),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: packColor,
+                            side: BorderSide(
+                              color: packColor.withValues(alpha: 0.35),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                        ),
-                        icon: const Icon(Icons.upload_file_rounded),
-                        label: const Text(
-                          'استيراد من Excel / CSV',
-                          style: TextStyle(fontWeight: FontWeight.w900),
+                          icon: const Icon(Icons.upload_file_rounded),
+                          label: const Text(
+                            'استيراد من Excel / CSV',
+                            style: TextStyle(fontWeight: FontWeight.w900),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Tooltip(
-                      message: 'تنزيل قالب الاستيراد',
-                      child: IconButton.outlined(
-                        onPressed: () => _downloadFlashcardImportTemplate(
-                          context: context,
-                          ref: ref,
-                        ),
-                        style: IconButton.styleFrom(
-                          foregroundColor: packColor,
-                          side: BorderSide(
-                            color: packColor.withValues(alpha: 0.35),
+                      const SizedBox(width: 8),
+                      Tooltip(
+                        message: 'تنزيل قالب الاستيراد',
+                        child: IconButton.outlined(
+                          onPressed: () => _downloadFlashcardImportTemplate(
+                            context: context,
+                            ref: ref,
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                          style: IconButton.styleFrom(
+                            foregroundColor: packColor,
+                            side: BorderSide(
+                              color: packColor.withValues(alpha: 0.35),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            padding: const EdgeInsets.all(13),
                           ),
-                          padding: const EdgeInsets.all(13),
+                          icon: const Icon(Icons.download_rounded),
                         ),
-                        icon: const Icon(Icons.download_rounded),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ],
               const SizedBox(height: 16),
               if (children.isNotEmpty) ...[
@@ -422,7 +432,10 @@ class _StudentFlashcardDetailsScreenState
                       ...filteredItems.map(
                         (item) => _FlashcardItemTile(
                           item,
-                          onDelete: isPublic
+                          onEdit: !canManageItems
+                              ? null
+                              : () => _showItemForm(context, ref, item: item),
+                          onDelete: !canManageItems
                               ? null
                               : () => _deleteItem(context, ref, item),
                         ),
@@ -608,219 +621,247 @@ class _StudentFlashcardDetailsScreenState
     );
   }
 
-  Future<void> _showAddItem(BuildContext context, WidgetRef ref) async {
+  Future<void> _showAddItem(BuildContext context, WidgetRef ref) =>
+      _showItemForm(context, ref);
+
+  Future<void> _showItemForm(
+    BuildContext context,
+    WidgetRef ref, {
+    Map<String, dynamic>? item,
+  }) async {
     final formKey = GlobalKey<FormState>();
-    final front = TextEditingController();
-    final back = TextEditingController();
-    final optionControllers = List.generate(4, (_) => TextEditingController());
-    String type = 'one_line';
-    String priority = 'normal';
-    int correctOption = 0;
+    final front = TextEditingController(
+      text: item?['front_content']?.toString(),
+    );
+    final back = TextEditingController(text: item?['back_content']?.toString());
+    final existingOptions = item == null ? <String>[] : _flashcardOptions(item);
+    final optionControllers = List.generate(
+      6,
+      (index) => TextEditingController(
+        text: index < existingOptions.length ? existingOptions[index] : '',
+      ),
+    );
+    String type = item == null ? 'one_line' : _itemType(item);
+    String priority = item == null
+        ? 'normal'
+        : text(item, 'priority', fallback: 'normal');
+    int correctOption = item == null
+        ? 0
+        : _correctOptionIndex(item).clamp(0, 5);
     final ok = await showMoeenBottomSheet<bool>(
       context: context,
-      title: 'عنصر جديد',
+      title: item == null ? 'عنصر جديد' : 'تعديل العنصر',
       icon: Icons.note_add_rounded,
       color: AppColors.goldDeep,
-      child: StatefulBuilder(
-        builder: (sheetContext, setLocal) => Form(
-          key: formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: front,
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? 'اكتب نص البطاقة.'
-                    : null,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'النص / السؤال'),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'نوع العنصر',
-                style: TextStyle(
-                  color: AppColors.midnight,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  _TypeSelectorCard(
-                    label: 'One Line',
-                    icon: Icons.article_rounded,
-                    value: 'one_line',
-                    groupValue: type,
-                    onChanged: (val) => setLocal(() {
-                      type = val;
-                      correctOption = 0;
-                    }),
-                  ),
-                  const SizedBox(width: 8),
-                  _TypeSelectorCard(
-                    label: 'Flash Card',
-                    icon: Icons.flip_to_front_rounded,
-                    value: 'flash_card',
-                    groupValue: type,
-                    onChanged: (val) => setLocal(() {
-                      type = val;
-                      correctOption = 0;
-                    }),
-                  ),
-                  const SizedBox(width: 8),
-                  _TypeSelectorCard(
-                    label: 'Q/A',
-                    icon: Icons.question_answer_rounded,
-                    value: 'qa',
-                    groupValue: type,
-                    onChanged: (val) => setLocal(() {
-                      type = val;
-                      correctOption = 0;
-                    }),
-                  ),
-                  const SizedBox(width: 8),
-                  _TypeSelectorCard(
-                    label: 'MCQ',
-                    icon: Icons.checklist_rounded,
-                    value: 'mcq',
-                    groupValue: type,
-                    onChanged: (val) => setLocal(() {
-                      type = val;
-                      correctOption = 0;
-                    }),
-                  ),
-                ],
-              ),
-              if (type == 'mcq') ...[
-                const SizedBox(height: 16),
-                ...optionControllers.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: TextFormField(
-                      controller: entry.value,
-                      validator: (value) {
-                        final filledCount = optionControllers
-                            .where(
-                              (controller) => controller.text.trim().isNotEmpty,
-                            )
-                            .length;
-                        if (index < 2 &&
-                            (value == null || value.trim().isEmpty)) {
-                          return 'اكتب خيارين على الأقل.';
-                        }
-                        if (index == correctOption &&
-                            (value == null || value.trim().isEmpty)) {
-                          return 'اكتب الإجابة الصحيحة.';
-                        }
-                        if (filledCount < 2) {
-                          return 'اكتب خيارين على الأقل.';
-                        }
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        labelText: 'الخيار ${index + 1}',
-                        suffixIcon: Radio<int>(
-                          value: index,
-                          groupValue: correctOption,
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setLocal(() => correctOption = value);
-                          },
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-                Text(
-                  'حدد الإجابة الصحيحة من علامة الاختيار بجانب الخيار.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.slate500,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ] else if (type != 'one_line') ...[
-                const SizedBox(height: 16),
+      child: _FlashcardEditorBody(
+        controllers: [front, back, ...optionControllers],
+        child: StatefulBuilder(
+          builder: (sheetContext, setLocal) => Form(
+            key: formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 TextFormField(
-                  controller: back,
+                  controller: front,
                   validator: (value) => value == null || value.trim().isEmpty
-                      ? 'اكتب الإجابة.'
+                      ? 'اكتب نص البطاقة.'
                       : null,
                   maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'الإجابة'),
+                  decoration: const InputDecoration(labelText: 'النص / السؤال'),
                 ),
-              ],
-              const SizedBox(height: 16),
-              const Text(
-                'الأولوية',
-                style: TextStyle(
-                  color: AppColors.midnight,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                const SizedBox(height: 16),
+                const Text(
+                  'نوع العنصر',
+                  style: TextStyle(
+                    color: AppColors.midnight,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  _PrioritySelectorChip(
-                    label: 'سهل',
-                    value: 'normal',
-                    badgeColor: AppColors.slate500,
-                    groupValue: priority,
-                    onChanged: (val) => setLocal(() => priority = val),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _TypeSelectorCard(
+                      label: 'One Line',
+                      icon: Icons.article_rounded,
+                      value: 'one_line',
+                      groupValue: type,
+                      onChanged: (val) => setLocal(() {
+                        type = val;
+                        correctOption = 0;
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    _TypeSelectorCard(
+                      label: 'Flash Card',
+                      icon: Icons.flip_to_front_rounded,
+                      value: 'flash_card',
+                      groupValue: type,
+                      onChanged: (val) => setLocal(() {
+                        type = val;
+                        correctOption = 0;
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    _TypeSelectorCard(
+                      label: 'Q/A',
+                      icon: Icons.question_answer_rounded,
+                      value: 'qa',
+                      groupValue: type,
+                      onChanged: (val) => setLocal(() {
+                        type = val;
+                        correctOption = 0;
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    _TypeSelectorCard(
+                      label: 'MCQ',
+                      icon: Icons.checklist_rounded,
+                      value: 'mcq',
+                      groupValue: type,
+                      onChanged: (val) => setLocal(() {
+                        type = val;
+                        correctOption = 0;
+                      }),
+                    ),
+                  ],
+                ),
+                if (type == 'mcq') ...[
+                  const SizedBox(height: 16),
+                  ...optionControllers.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: TextFormField(
+                        controller: entry.value,
+                        validator: (value) {
+                          final filledCount = optionControllers
+                              .where(
+                                (controller) =>
+                                    controller.text.trim().isNotEmpty,
+                              )
+                              .length;
+                          if (index < 2 &&
+                              (value == null || value.trim().isEmpty)) {
+                            return 'اكتب خيارين على الأقل.';
+                          }
+                          if (index == correctOption &&
+                              (value == null || value.trim().isEmpty)) {
+                            return 'اكتب الإجابة الصحيحة.';
+                          }
+                          if (filledCount < 2) {
+                            return 'اكتب خيارين على الأقل.';
+                          }
+                          return null;
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'الخيار ${index + 1}',
+                          suffixIcon: Radio<int>(
+                            value: index,
+                            groupValue: correctOption,
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setLocal(() => correctOption = value);
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                  Text(
+                    'حدد الإجابة الصحيحة من علامة الاختيار بجانب الخيار.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.slate500,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  _PrioritySelectorChip(
-                    label: 'متوسط',
-                    value: 'high',
-                    badgeColor: AppColors.goldDeep,
-                    groupValue: priority,
-                    onChanged: (val) => setLocal(() => priority = val),
-                  ),
-                  const SizedBox(width: 8),
-                  _PrioritySelectorChip(
-                    label: 'صعب',
-                    value: 'critical',
-                    badgeColor: AppColors.rose,
-                    groupValue: priority,
-                    onChanged: (val) => setLocal(() => priority = val),
+                ] else if (type != 'one_line') ...[
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: back,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'اكتب الإجابة.'
+                        : null,
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: 'الإجابة'),
                   ),
                 ],
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () {
-                  if (formKey.currentState?.validate() != true) return;
-                  Navigator.pop(sheetContext, true);
-                },
-                child: const Text('حفظ'),
-              ),
-            ],
+                const SizedBox(height: 16),
+                const Text(
+                  'الأولوية',
+                  style: TextStyle(
+                    color: AppColors.midnight,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _PrioritySelectorChip(
+                      label: 'سهل',
+                      value: 'normal',
+                      badgeColor: AppColors.slate500,
+                      groupValue: priority,
+                      onChanged: (val) => setLocal(() => priority = val),
+                    ),
+                    const SizedBox(width: 8),
+                    _PrioritySelectorChip(
+                      label: 'متوسط',
+                      value: 'high',
+                      badgeColor: AppColors.goldDeep,
+                      groupValue: priority,
+                      onChanged: (val) => setLocal(() => priority = val),
+                    ),
+                    const SizedBox(width: 8),
+                    _PrioritySelectorChip(
+                      label: 'صعب',
+                      value: 'critical',
+                      badgeColor: AppColors.rose,
+                      groupValue: priority,
+                      onChanged: (val) => setLocal(() => priority = val),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: () {
+                    if (formKey.currentState?.validate() != true) return;
+                    Navigator.pop(sheetContext, true);
+                  },
+                  child: const Text('حفظ'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
-    if (ok != true || front.text.trim().isEmpty) return;
-    if (!context.mounted) return;
+    final selectedOptions = optionControllers
+        .where((controller) => controller.text.trim().isNotEmpty)
+        .toList();
+    final correctIndex = selectedOptions.indexOf(
+      optionControllers[correctOption.clamp(0, 5)],
+    );
+    final payload = <String, dynamic>{
+      'item_type': type,
+      'front_content': front.text.trim(),
+      if (type == 'mcq')
+        'options': selectedOptions
+            .map((controller) => controller.text.trim())
+            .toList(),
+      if (type == 'mcq') 'correct_option': correctIndex,
+      if (type != 'one_line' && type != 'mcq') 'back_content': back.text.trim(),
+      'priority': priority,
+    };
+    if (ok != true || !context.mounted) return;
+    final repository = ref.read(studentContentRepositoryProvider);
     await _runSnack(
       context,
-      () => ref
-          .read(studentContentRepositoryProvider)
-          .createFlashcardItem(widget.packId, {
-            'item_type': type,
-            'front_content': front.text.trim(),
-            if (type == 'mcq')
-              'options': optionControllers
-                  .map((controller) => controller.text.trim())
-                  .where((value) => value.isNotEmpty)
-                  .toList(),
-            if (type == 'mcq') 'correct_option': correctOption + 1,
-            if (type != 'one_line' && type != 'mcq')
-              'back_content': back.text.trim(),
-            'priority': priority,
-          }),
-      onDone: () => ref.invalidate(_flashcardDetailsProvider(widget.packId)),
+      () => item == null
+          ? repository.createFlashcardItem(widget.packId, payload)
+          : repository.updateFlashcardItem(number(item, 'id').toInt(), payload),
+      onDone: () => _refreshItemData(ref),
     );
   }
 
@@ -942,8 +983,16 @@ class _StudentFlashcardDetailsScreenState
           restartMode: 'none',
         ),
       }),
-      onDone: () => ref.invalidate(_flashcardDetailsProvider(widget.packId)),
+      onDone: () => _refreshItemData(ref),
     );
+  }
+
+  void _refreshItemData(WidgetRef ref) {
+    ref.invalidate(_flashcardDetailsProvider(widget.packId));
+    ref.invalidate(_flashcardsProvider);
+    ref.invalidate(_flashcardDailyQueueProvider);
+    ref.invalidate(_flashcardUpcomingProvider);
+    ref.invalidate(_flashcardOneLineNotificationsProvider);
   }
 
   Future<void> _deleteItem(
@@ -966,7 +1015,7 @@ class _StudentFlashcardDetailsScreenState
       () => ref
           .read(studentContentRepositoryProvider)
           .deleteFlashcardItem(number(item, 'id').toInt()),
-      onDone: () => ref.invalidate(_flashcardDetailsProvider(widget.packId)),
+      onDone: () => _refreshItemData(ref),
     );
   }
 
@@ -984,10 +1033,7 @@ class _StudentFlashcardDetailsScreenState
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: AppColors.success,
-          ),
+          SnackBar(content: Text(message), backgroundColor: AppColors.success),
         );
         ref.invalidate(_flashcardsProvider);
       }
@@ -1030,3 +1076,26 @@ class _StudentFlashcardDetailsScreenState
   }
 }
 
+class _FlashcardEditorBody extends StatefulWidget {
+  const _FlashcardEditorBody({required this.controllers, required this.child});
+
+  final List<TextEditingController> controllers;
+  final Widget child;
+
+  @override
+  State<_FlashcardEditorBody> createState() => _FlashcardEditorBodyState();
+}
+
+class _FlashcardEditorBodyState extends State<_FlashcardEditorBody> {
+  @override
+  void dispose() {
+    // The closing animation still uses these fields after Navigator.pop resolves.
+    for (final controller in widget.controllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}

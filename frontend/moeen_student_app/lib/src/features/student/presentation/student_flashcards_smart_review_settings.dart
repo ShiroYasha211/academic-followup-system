@@ -157,6 +157,7 @@ class _FlashcardSmartReviewSettingsCardState
         .read(flashcardLocalStoreProvider)
         .applyServerSmartReviewSettings(data, clearSnooze: true);
     if (enabled == false) {
+      await FloatingReview.endSession();
       await PushNotificationService.cancelFlashcardSmartReview();
     } else if (enabled == true || snoozeMinutes != null) {
       await _scheduleNextSmartReviewNotification(ref);
@@ -248,6 +249,8 @@ class _SmartReviewSettingsSheetState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
+              const _FloatingReviewSettings(),
+              const SizedBox(height: 16),
               // Premium Info Panel
               Container(
                 padding: const EdgeInsets.all(14),
@@ -536,6 +539,7 @@ class _SmartReviewSettingsSheetState
         .read(flashcardLocalStoreProvider)
         .applyServerSmartReviewSettings(data, clearSnooze: true);
     if (enabled == false) {
+      await FloatingReview.endSession();
       await PushNotificationService.cancelFlashcardSmartReview();
     } else if (enabled == true ||
         snoozeMinutes != null ||

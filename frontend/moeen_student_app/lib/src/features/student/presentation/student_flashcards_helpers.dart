@@ -17,7 +17,11 @@ Future<int> _syncFlashcardPendingProgress(WidgetRef ref) async {
     final level = entry['response_level']?.toString();
     if (itemId == null || level == null || level.isEmpty) continue;
     try {
-      await repo.recordFlashcardProgress(itemId: itemId, responseLevel: level);
+      await repo.recordFlashcardProgress(
+        itemId: itemId,
+        responseLevel: level,
+        clientEventId: entry['client_event_id']?.toString(),
+      );
       synced++;
     } catch (_) {
       remaining.add(entry);
@@ -144,6 +148,7 @@ List<Map<String, dynamic>> _oneLineShotNotificationItems(
 
 Future<void> _scheduleNextSmartReviewNotification(WidgetRef ref) async {
   await PushNotificationService.cancelFlashcardSmartReview();
+  final floating = await FloatingReview.status();
 
   final store = ref.read(flashcardLocalStoreProvider);
   final state = await store.load();
@@ -163,7 +168,10 @@ Future<void> _scheduleNextSmartReviewNotification(WidgetRef ref) async {
   }
   if (data == null) return;
 
-  final queue = _todayPendingReviewItems(data, state);
+  final queue = _todayPendingReviewItems(
+    data,
+    state,
+  ).where((item) => !floating.running || _itemType(item) != 'mcq').toList();
   if (queue.isEmpty) return;
 
   final settings = asMap(data['settings']);
@@ -529,7 +537,7 @@ List<String> _flashcardOptions(Map<String, dynamic> item) {
 
 int _correctOptionIndex(Map<String, dynamic> item) {
   final parsed = int.tryParse(item['correct_option']?.toString() ?? '') ?? 0;
-  return parsed > 0 ? parsed - 1 : parsed;
+  return parsed < 0 ? 0 : parsed;
 }
 
 int _parseHex(String input) {

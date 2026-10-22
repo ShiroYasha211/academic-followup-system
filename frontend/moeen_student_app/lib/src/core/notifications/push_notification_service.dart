@@ -435,6 +435,17 @@ class PushNotificationService {
     }
   }
 
+  static Future<bool> requestReviewNotificationPermission() async {
+    if (!Platform.isAndroid) return false;
+    await initialize();
+    final android = _localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    await android?.requestNotificationsPermission();
+    return await android?.areNotificationsEnabled() ?? false;
+  }
+
   static Future<void> unregisterDevice(AuthSession session) async {
     ++_tokenRegistrationVersion;
     try {

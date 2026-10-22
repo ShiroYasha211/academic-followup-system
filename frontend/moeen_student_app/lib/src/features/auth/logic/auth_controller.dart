@@ -10,6 +10,7 @@ import '../data/auth_repository.dart';
 import '../data/auth_session.dart';
 import '../../student/logic/one_line_background_tasks.dart';
 import '../../student/logic/one_line_notification_scheduler.dart';
+import '../../student/logic/floating_review.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(
@@ -123,6 +124,7 @@ class AuthController extends AsyncNotifier<AuthSession?> {
 
   Future<void> logout() async {
     _sessionVersion++;
+    await FloatingReview.stop();
     _permissionSyncTimer?.cancel();
     _permissionSyncTimer = null;
     final session = state.valueOrNull;
@@ -165,6 +167,7 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     final updated = session.copyWith(workspace: workspace);
     _sessionVersion++;
     if (workspace == AuthWorkspace.delegate) {
+      await FloatingReview.stop();
       ref.read(oneLineNotificationSchedulerProvider).dispose();
       await OneLineBackgroundTasks.stop();
     }

@@ -13,6 +13,8 @@ import 'features/auth/data/auth_session.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/student/logic/one_line_notification_scheduler.dart';
 import 'features/student/logic/one_line_background_tasks.dart';
+import 'features/student/logic/floating_review.dart';
+import 'features/student/data/student_repositories.dart';
 import 'features/student/logic/student_controllers.dart';
 import 'features/student/presentation/student_content_screens.dart';
 import 'features/student/presentation/widgets/student_shell.dart';
@@ -59,6 +61,9 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp>
       _authSubscription = ref.listenManual<AsyncValue<AuthSession?>>(
         authControllerProvider,
         (previous, next) {
+          if (next.hasValue && next.valueOrNull == null) {
+            unawaited(FloatingReview.stop());
+          }
           if (StudentFeatureFlags.showOneLineShot && next.valueOrNull != null) {
             unawaited(_syncOneLineNotifications());
           }
@@ -100,6 +105,16 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp>
     try {
       final session = await ref.read(authControllerProvider.future);
       if (!mounted || session == null || session.isDelegate) return;
+      try {
+        await FloatingReview.configure(session);
+        if (!mounted) return;
+        await FloatingReview.synchronize(
+          session,
+          ref.read(studentContentRepositoryProvider),
+        );
+      } catch (error) {
+        debugPrint('Floating review synchronization deferred: $error');
+      }
       try {
         await OneLineBackgroundTasks.register();
       } catch (error, stackTrace) {

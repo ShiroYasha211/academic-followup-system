@@ -295,6 +295,7 @@ class _StudentFlashcardQuickReviewScreenState
           .addPendingProgress(itemId: itemId, responseLevel: level);
       savedOffline = true;
     }
+    await FloatingReview.completed(itemId);
     if (!mounted) return;
     setState(() {
       _recording = false;
@@ -502,4 +503,3 @@ class _QuickReviewMetric extends StatelessWidget {
     );
   }
 }
-

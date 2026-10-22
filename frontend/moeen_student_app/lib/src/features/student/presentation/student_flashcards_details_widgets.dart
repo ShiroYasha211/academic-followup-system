@@ -107,23 +107,15 @@ class _PackDetailsHero extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 12,
+              runSpacing: 10,
               children: [
                 _buildStatItem(Icons.copy_rounded, '$itemsCount عناصر'),
-                Container(
-                  width: 1,
-                  height: 18,
-                  color: Colors.white.withValues(alpha: 0.15),
-                ),
                 _buildStatItem(
                   Icons.account_tree_rounded,
                   '$childPacksCount حزم فرعية',
-                ),
-                Container(
-                  width: 1,
-                  height: 18,
-                  color: Colors.white.withValues(alpha: 0.15),
                 ),
                 _buildStatItem(Icons.layers_rounded, modeLabel),
               ],
@@ -301,4 +293,3 @@ class _ChildPackCompactCard extends StatelessWidget {
     );
   }
 }
-

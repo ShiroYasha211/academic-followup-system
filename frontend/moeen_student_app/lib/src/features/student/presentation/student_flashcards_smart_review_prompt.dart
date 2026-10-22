@@ -10,6 +10,32 @@ Future<bool> showStudentFlashcardSmartReviewPrompt({
   final store = ref.read(flashcardLocalStoreProvider);
   final canShow = force || await store.canShowSmartReview();
   if (!canShow || !context.mounted) return false;
+  final lease = await FloatingReview.beginInApp(force: force);
+  if (lease == null) return false;
+  try {
+    if (!context.mounted) return false;
+    return await _showAcquiredSmartReviewPrompt(
+      context: context,
+      ref: ref,
+      store: store,
+      availableOnly: availableOnly,
+    );
+  } finally {
+    await FloatingReview.endInApp(lease);
+  }
+}
+
+Future<bool> _showAcquiredSmartReviewPrompt({
+  required BuildContext context,
+  required WidgetRef ref,
+  required FlashcardLocalStore store,
+  required bool availableOnly,
+}) async {
+  final native = await FloatingReview.status();
+  for (final id in native.seenIds) {
+    await store.markSmartReviewItemCompletedToday(id);
+  }
+  if (!context.mounted) return false;
 
   Map<String, dynamic>? data;
   try {
@@ -88,6 +114,7 @@ class _SmartReviewPromptSheetState
     extends ConsumerState<_SmartReviewPromptSheet> {
   bool _showBack = false;
   bool _recording = false;
+  final _eventId = FloatingReview.eventId();
 
   @override
   Widget build(BuildContext context) {
@@ -145,11 +172,19 @@ class _SmartReviewPromptSheetState
       if (!isOnline) {
         await ref
             .read(flashcardLocalStoreProvider)
-            .addPendingProgress(itemId: itemId, responseLevel: level);
+            .addPendingProgress(
+              itemId: itemId,
+              responseLevel: level,
+              clientEventId: _eventId,
+            );
       } else {
         await ref
             .read(studentContentRepositoryProvider)
-            .recordFlashcardProgress(itemId: itemId, responseLevel: level);
+            .recordFlashcardProgress(
+              itemId: itemId,
+              responseLevel: level,
+              clientEventId: _eventId,
+            );
         await ref
             .read(flashcardLocalStoreProvider)
             .markSmartReviewItemCompletedToday(itemId);
@@ -169,12 +204,21 @@ class _SmartReviewPromptSheetState
       }
       await ref
           .read(flashcardLocalStoreProvider)
-          .addPendingProgress(itemId: itemId, responseLevel: level);
+          .addPendingProgress(
+            itemId: itemId,
+            responseLevel: level,
+            clientEventId: _eventId,
+          );
     } catch (_) {
       await ref
           .read(flashcardLocalStoreProvider)
-          .addPendingProgress(itemId: itemId, responseLevel: level);
+          .addPendingProgress(
+            itemId: itemId,
+            responseLevel: level,
+            clientEventId: _eventId,
+          );
     }
+    await FloatingReview.completed(itemId);
     if (!mounted) return;
     await ref.read(flashcardLocalStoreProvider).snoozeSmartReview();
     await _scheduleNextSmartReviewNotification(ref);
@@ -184,9 +228,9 @@ class _SmartReviewPromptSheetState
   }
 
   Future<void> _snooze() async {
+    await FloatingReview.snooze();
     await ref.read(flashcardLocalStoreProvider).snoozeSmartReview();
     await _scheduleNextSmartReviewNotification(ref);
     if (mounted) Navigator.of(context).pop();
   }
 }
-

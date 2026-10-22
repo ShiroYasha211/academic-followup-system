@@ -42,16 +42,42 @@ Future<void> _showFlashcardImport({
   required Color packColor,
   required VoidCallback onDone,
 }) async {
-  final result = await FilePicker.platform.pickFiles(
-    type: FileType.custom,
-    allowedExtensions: const ['xlsx', 'xls', 'csv'],
-    withData: false,
-  );
+  FilePickerResult? result;
+  try {
+    result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['xlsx', 'xls', 'csv'],
+      withReadStream: true,
+    );
+  } on PlatformException {
+    if (!context.mounted) return;
+    await showMoeenInfoDialog(
+      context: context,
+      title: 'تعذر اختيار الملف',
+      message: 'تعذر فتح الملف. جرّب تنزيله إلى الهاتف ثم اختياره مجدداً.',
+      icon: Icons.error_rounded,
+      color: AppColors.danger,
+    );
+    return;
+  }
   if (result == null || result.files.isEmpty) return;
 
   final file = result.files.single;
   final path = file.path;
-  if (path == null || path.isEmpty) {
+  if (file.size > 10 * 1024 * 1024) {
+    if (!context.mounted) return;
+    await showMoeenInfoDialog(
+      context: context,
+      title: 'حجم الملف كبير',
+      message: 'الحد الأقصى لحجم ملف الاستيراد هو 10 ميجابايت.',
+      icon: Icons.error_rounded,
+      color: AppColors.danger,
+    );
+    return;
+  }
+  if ((path == null || path.isEmpty) &&
+      file.bytes == null &&
+      file.readStream == null) {
     if (!context.mounted) return;
     await showMoeenInfoDialog(
       context: context,
@@ -65,11 +91,23 @@ Future<void> _showFlashcardImport({
 
   Map<String, dynamic> preview;
   try {
+    List<int>? bytes = file.bytes;
+    if ((path == null || path.isEmpty) && bytes == null) {
+      bytes = <int>[];
+      await for (final chunk in file.readStream!) {
+        if (bytes.length + chunk.length > 10 * 1024 * 1024) {
+          throw const FileSystemException('حجم الملف يتجاوز 10 ميجابايت.');
+        }
+        bytes.addAll(chunk);
+      }
+    }
+    if (!context.mounted) return;
     preview = await ref
         .read(studentContentRepositoryProvider)
         .previewFlashcardImport(
           packId: packId,
           filePath: path,
+          fileBytes: bytes,
           fileName: file.name,
         );
   } on ApiException catch (error) {
@@ -78,6 +116,17 @@ Future<void> _showFlashcardImport({
       context: context,
       title: 'تعذر معاينة الملف',
       message: error.message,
+      icon: Icons.error_rounded,
+      color: AppColors.danger,
+    );
+    return;
+  } on FileSystemException catch (error) {
+    if (!context.mounted) return;
+    await showMoeenInfoDialog(
+      context: context,
+      title: 'تعذر قراءة الملف',
+      message:
+          'تعذر الوصول إلى الملف المحدد. جرّب تنزيله إلى الهاتف وإعادة اختياره.\n${error.message}',
       icon: Icons.error_rounded,
       color: AppColors.danger,
     );
@@ -100,17 +149,30 @@ Future<void> _showFlashcardImport({
 
     if (!context.mounted) return;
     final report = asMap(data['report']);
+    final errors = asList(report['errors'])
+        .map(asMap)
+        .take(5)
+        .map((error) => 'الصف ${text(error, 'row')}: ${text(error, 'reason')}')
+        .join('\n');
+    final hasFailures = number(report, 'failed_count') > 0;
+    final hasChanges =
+        number(report, 'success_count') + number(report, 'updated_count') > 0;
     await showMoeenInfoDialog(
       context: context,
-      title: 'تم استيراد الملف',
+      title: hasFailures
+          ? (hasChanges ? 'اكتمل الاستيراد جزئياً' : 'لم تتم إضافة بطاقات')
+          : 'تم استيراد الملف',
       message:
           '${text(data, 'message', fallback: 'تم استيراد الملف بنجاح.')}\n\n'
           'جديدة: ${number(report, 'success_count').toInt()}\n'
           'محدثة: ${number(report, 'updated_count').toInt()}\n'
           'متجاهلة: ${number(report, 'ignored_count').toInt()}\n'
-          'لم تُستورد: ${number(report, 'failed_count').toInt()}',
-      icon: Icons.check_circle_rounded,
-      color: AppColors.success,
+          'لم تُستورد: ${number(report, 'failed_count').toInt()}'
+          '${errors.isEmpty ? '' : '\n\n$errors'}',
+      icon: hasFailures
+          ? Icons.warning_amber_rounded
+          : Icons.check_circle_rounded,
+      color: hasFailures ? AppColors.goldDeep : AppColors.success,
     );
   } on ApiException catch (error) {
     if (!context.mounted) return;
@@ -132,18 +194,28 @@ Future<Map<String, dynamic>?> _showFlashcardImportPreviewSheet({
   final columns = asList(preview['columns']).map((value) => '$value').toList();
   final rows = asList(preview['preview_rows']).map(asList).toList();
   final guessed = asMap(preview['guessed_mapping']);
+  if (columns.isEmpty) return Future.value(null);
+  int safeColumn(Object? value, {bool required = false}) {
+    final column = _importInt(value, fallback: -1);
+    return column >= 0 && column < columns.length
+        ? column
+        : (required ? 0 : -1);
+  }
 
   bool hasHeaders = boolValue(preview, 'is_first_row_header');
   String duplicateStrategy = 'ignore';
-  int itemTypeCol = _importInt(guessed['item_type_col'], fallback: -1);
-  int frontContentCol = _importInt(guessed['front_content_col']);
-  int backContentCol = _importInt(guessed['back_content_col'], fallback: -1);
-  int correctOptionCol = _importInt(guessed['correct_option_col'], fallback: -1);
-  int priorityCol = _importInt(guessed['priority_col'], fallback: -1);
-  int colorCol = _importInt(guessed['color_col'], fallback: -1);
+  int itemTypeCol = safeColumn(guessed['item_type_col']);
+  int frontContentCol = safeColumn(
+    guessed['front_content_col'],
+    required: true,
+  );
+  int backContentCol = safeColumn(guessed['back_content_col']);
+  int correctOptionCol = safeColumn(guessed['correct_option_col']);
+  int priorityCol = safeColumn(guessed['priority_col']);
+  int colorCol = safeColumn(guessed['color_col']);
   final optionsCols = asList(
     guessed['options_cols'],
-  ).map((value) => _importInt(value, fallback: -1)).where((value) => value >= 0).toSet();
+  ).map((value) => safeColumn(value)).where((value) => value >= 0).toSet();
 
   return showMoeenBottomSheet<Map<String, dynamic>>(
     context: context,
@@ -180,14 +252,8 @@ Future<Map<String, dynamic>?> _showFlashcardImportPreviewSheet({
               value: duplicateStrategy,
               decoration: const InputDecoration(labelText: 'معالجة التكرار'),
               items: const [
-                DropdownMenuItem(
-                  value: 'ignore',
-                  child: Text('تجاهل المكرر'),
-                ),
-                DropdownMenuItem(
-                  value: 'update',
-                  child: Text('تحديث المكرر'),
-                ),
+                DropdownMenuItem(value: 'ignore', child: Text('تجاهل المكرر')),
+                DropdownMenuItem(value: 'update', child: Text('تحديث المكرر')),
                 DropdownMenuItem(
                   value: 'allow',
                   child: Text('السماح بالتكرار'),
@@ -370,8 +436,8 @@ class _ImportColumnSelect extends StatelessWidget {
     final safeValue = value >= 0 && value < columns.length
         ? value
         : allowDefault
-            ? -1
-            : 0;
+        ? -1
+        : 0;
     return DropdownButtonFormField<int>(
       value: safeValue,
       decoration: InputDecoration(labelText: label),
@@ -430,7 +496,11 @@ class _FlashcardImportPreviewTable extends StatelessWidget {
                 DataRow(
                   cells: [
                     DataCell(Text('${rowIndex + 1}')),
-                    for (var colIndex = 0; colIndex < columns.length; colIndex++)
+                    for (
+                      var colIndex = 0;
+                      colIndex < columns.length;
+                      colIndex++
+                    )
                       DataCell(
                         SizedBox(
                           width: 130,

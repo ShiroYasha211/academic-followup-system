@@ -64,6 +64,7 @@ class FlashcardLocalStore {
   Future<void> addPendingProgress({
     required int itemId,
     required String responseLevel,
+    String? clientEventId,
   }) async {
     final state = await load();
     final today = _dateKey(DateTime.now());
@@ -73,6 +74,7 @@ class FlashcardLocalStore {
         'item_id': itemId,
         'response_level': responseLevel,
         'recorded_at': DateTime.now().toUtc().toIso8601String(),
+        if (clientEventId != null) 'client_event_id': clientEventId,
       },
     ];
     final seenIds = state.smartReviewSeenDate == today
