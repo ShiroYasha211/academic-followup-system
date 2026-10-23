@@ -41,6 +41,9 @@ internal class FloatingReviewCardView(
     private val choiceLabels = mutableListOf<TextView>()
     private val choiceIcons = mutableListOf<TextView>()
     val choices = mutableListOf<View>()
+    val ratings = linkedMapOf<String, TextView>()
+    var answerRevealed = false
+        private set
     val dragHandle: View
     private val header: LinearLayout
     private val footer: TextView
@@ -73,6 +76,21 @@ internal class FloatingReviewCardView(
     }
 
     private fun space(height: Int) = addView(View(context), LayoutParams(1, dp(height)))
+
+    private fun action(label: String, color: Int) = object : TextView(context) {
+        override fun getAccessibilityClassName(): CharSequence = Button::class.java.name
+    }.apply {
+        text = label
+        textSize = 14f
+        typeface = bold
+        setTextColor(color)
+        gravity = Gravity.CENTER
+        minimumHeight = dp(48)
+        setPadding(dp(8), dp(10), dp(8), dp(10))
+        background = RippleDrawable(ColorStateList.valueOf(tint(color, 26)), shape(tint(color, 20), 16), null)
+        isFocusable = true
+        isClickable = true
+    }
 
     init {
         orientation = VERTICAL
@@ -119,7 +137,13 @@ internal class FloatingReviewCardView(
         space(16)
 
         val content = LinearLayout(context).apply { orientation = VERTICAL }
-        content.addView(text("اختيارات", 12f, BLUE, heavy).apply {
+        val type = item.optString("item_type")
+        val typeLabel = when (type) {
+            "mcq" -> "اختيارات"
+            "qa" -> "سؤال وجواب"
+            else -> "بطاقة تعليمية"
+        }
+        content.addView(text(typeLabel, 12f, BLUE, heavy).apply {
             setPadding(dp(10), dp(6), dp(10), dp(6))
             background = shape(tint(BLUE, 26), 12)
         }, LayoutParams(-2, -2).apply { gravity = Gravity.RIGHT; bottomMargin = dp(20) })
@@ -127,9 +151,9 @@ internal class FloatingReviewCardView(
             gravity = Gravity.CENTER
         }, LayoutParams(-1, -2).apply { bottomMargin = dp(24) })
 
-        val options = item.getJSONArray("options")
-        for (index in 0 until options.length()) {
-            val option = options.getString(index)
+        val options = if (type == "mcq") item.optJSONArray("options") else null
+        for (index in 0 until (options?.length() ?: 0)) {
+            val option = options!!.getString(index)
             val row = object : LinearLayout(context) {
                 override fun getAccessibilityClassName(): CharSequence = Button::class.java.name
             }.apply {
@@ -153,6 +177,55 @@ internal class FloatingReviewCardView(
             choices.add(row)
             content.addView(row, LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         }
+        if (type == "qa" || type == "flash_card") {
+            val answer = LinearLayout(context).apply {
+                orientation = VERTICAL
+                visibility = GONE
+            }
+            val answerTitle = text("الإجابة", 12f, BLUE, heavy)
+            answer.addView(answerTitle, LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+            answer.addView(text(item.optString("back_content"), 18f, weight = regular).apply {
+                accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE
+            }, LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
+            val ratingRow = object : LinearLayout(context) {
+                override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                    val labelWidth = ratings.values.maxOfOrNull {
+                        kotlin.math.ceil(it.paint.measureText(it.text.toString()).toDouble()).toInt() + it.paddingLeft + it.paddingRight
+                    } ?: 0
+                    val stacked = MeasureSpec.getSize(widthMeasureSpec) < labelWidth * childCount + dp(8) * (childCount - 1)
+                    orientation = if (stacked) VERTICAL else HORIZONTAL
+                    for (index in 0 until childCount) {
+                        (getChildAt(index).layoutParams as LayoutParams).apply {
+                            width = if (stacked) -1 else 0
+                            weight = if (stacked) 0f else 1f
+                            marginStart = if (!stacked && index > 0) dp(8) else 0
+                            topMargin = if (stacked && index > 0) dp(8) else 0
+                        }
+                    }
+                    super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+                }
+            }.apply { visibility = GONE }
+            listOf(Triple("easy", "سهل", 0xFF065F46.toInt()),
+                Triple("medium", "متوسط", 0xFF92400E.toInt()),
+                Triple("hard", "صعب", ERROR)).forEachIndexed { index, (level, label, color) ->
+                val button = action(label, color)
+                ratings[level] = button
+                ratingRow.addView(button, LayoutParams(0, -2, 1f).apply { if (index > 0) marginStart = dp(8) })
+            }
+            content.addView(action("إظهار الإجابة", BLUE).apply {
+                setOnClickListener {
+                    answerRevealed = true
+                    visibility = GONE
+                    answer.visibility = VISIBLE
+                    ratingRow.visibility = VISIBLE
+                    answerTitle.post {
+                        answerTitle.requestRectangleOnScreen(android.graphics.Rect(0, 0, answerTitle.width, answerTitle.height), false)
+                    }
+                }
+            }, LayoutParams(-1, -2))
+            content.addView(answer, LayoutParams(-1, -2))
+            content.addView(ratingRow, LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        }
         feedback = text("", 13f, weight = regular).apply {
             visibility = GONE
             accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE
@@ -160,6 +233,11 @@ internal class FloatingReviewCardView(
         }
         content.addView(feedback, LayoutParams(-1, -2))
         val scroll = object : ScrollView(context) {
+            override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+                super.onSizeChanged(width, height, oldWidth, oldHeight)
+                clipBounds = android.graphics.Rect(0, 0, width, height)
+            }
+
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
                 super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(bodyHeightLimit, MeasureSpec.AT_MOST))
             }
@@ -218,6 +296,25 @@ internal class FloatingReviewCardView(
             background = shape(tint(ERROR, 20), 12)
             visibility = VISIBLE
         }
+    }
+
+    fun setAnswering(answering: Boolean) {
+        choices.forEach { it.isEnabled = !answering }
+        ratings.values.forEach { it.isEnabled = !answering }
+    }
+
+    fun showReviewRecorded(level: String) {
+        ratings[level]?.apply {
+            isSelected = true
+            background = shape(tint(BLUE, 26), 16, BLUE, selected = true)
+        }
+        feedback.apply {
+            text = "تم تسجيل المراجعة · ${ratings[level]?.text} · حُفظت للمزامنة"
+            setTextColor(0xFF065F46.toInt())
+            background = shape(tint(SUCCESS, 20), 12)
+            visibility = VISIBLE
+        }
+        feedback.post { feedback.requestRectangleOnScreen(android.graphics.Rect(0, 0, feedback.width, feedback.height), false) }
     }
 
     fun showCompletion(remaining: Int, onContinue: () -> Unit) {

@@ -1,8 +1,8 @@
-# Floating MCQ Review
+# Floating Review
 
 ## Scope
 
-Opt-in Android floating MCQ sessions. Preserve text notifications, existing
+Opt-in Android floating MCQ, QA and flashcard sessions. Preserve text notifications, existing
 in-app review, exam protection, account isolation, and the pending import/edit fixes.
 
 ## Work
@@ -53,9 +53,27 @@ Native operation is not considered verified by widget tests or compilation alone
 
 ## Card Presentation
 
+### Review Types
+
+- The same bubble now includes due `mcq`, `qa`, and `flash_card` items. QA and
+  flashcards require a nonempty answer; malformed, future and completed entries
+  remain excluded. `one_line` text notifications retain their separate schedule.
+- QA/flashcard fronts hide the answer initially. Reveal exposes the answer and
+  Easy/Medium/Hard ratings; only selecting a rating records the review. Closing
+  or revealing alone does not complete a card or change the remaining count.
+- Ratings use the existing account-scoped, occurrence-aware answer journal and
+  progress API. MCQ selection and explicit Next/Finish behavior are preserved.
+- The existing scrollable card is reused; rating buttons stack when their labels
+  cannot fit side by side at the current width/text scale. No backend, API,
+  scheduling, permission or bubble-position changes are needed.
+- Focused native regression runner: `frontend/moeen_student_app/test/native/`.
+  Seven scenarios passed on SM-G998U in a network-isolated QA application,
+  including mixed-type completion and long Arabic answers at 1.6 text scale.
+  No production account questions were answered or changed during these checks.
+
 ### Bubble-First Interaction
 
-- Due valid MCQs now show a draggable launcher-icon bubble, not an unsolicited
+- Due valid review items now show a draggable launcher-icon bubble, not an unsolicited
   question. Its badge counts unique due items not completed today; future and
   malformed items are excluded. Position is saved per account using normalized
   coordinates constrained to system-bar/cutout-safe bounds.

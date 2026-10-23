@@ -306,6 +306,18 @@ class FloatingReviewService : Service() {
             !ReviewOverlayBridge.inAppPrompt && !locked && power.isInteractive
     }
 
+    private fun isReviewable(item: JSONObject): Boolean {
+        if (item.optInt("item_id") <= 0 || item.optString("front_content").isBlank()) return false
+        return when (item.optString("item_type")) {
+            "mcq" -> {
+                val options = item.optJSONArray("options") ?: return false
+                options.length() in 2..6 && item.optInt("correct_option", -1) in 0 until options.length()
+            }
+            "qa", "flash_card" -> !item.isNull("back_content") && item.optString("back_content").isNotBlank()
+            else -> false
+        }
+    }
+
     private fun dueItems(session: ReviewSession): List<JSONObject> {
         val data = snapshot ?: return emptyList()
         val settings = data.optJSONObject("settings") ?: return emptyList()
@@ -316,12 +328,9 @@ class FloatingReviewService : Service() {
         val due = linkedMapOf<Int, JSONObject>()
         for (index in 0 until queue.length()) {
             val item = queue.optJSONObject(index) ?: continue
-            if (item.optInt("item_id") <= 0 || item.optString("front_content").isBlank()) continue
+            if (!isReviewable(item)) continue
             val key = item.optString("review_key")
-            if (item.optString("item_type") != "mcq" ||
-                (if (key.isBlank()) item.optInt("item_id") in seen else key in seenKeys)) continue
-            val options = item.optJSONArray("options") ?: continue
-            if (options.length() !in 2..6 || item.optInt("correct_option", -1) !in 0 until options.length()) continue
+            if (if (key.isBlank()) item.optInt("item_id") in seen else key in seenKeys) continue
             val at = try { OffsetDateTime.parse(item.optString("scheduled_at")) } catch (_: Exception) { continue }
             val now = OffsetDateTime.now(at.offset)
             if (at.toLocalDate() != now.toLocalDate() || at.isAfter(now) || !allowedTime(settings, now.hour * 60 + now.minute)) continue
@@ -491,51 +500,54 @@ class FloatingReviewService : Service() {
     }
 
     private fun showQuestion(session: ReviewSession, item: JSONObject, settings: JSONObject) {
-        val options = item.optJSONArray("options") ?: return
+        if (!isReviewable(item)) return
+        val isMcq = item.optString("item_type") == "mcq"
+        val options = item.optJSONArray("options")
         val correct = item.optInt("correct_option", -1)
-        if (options.length() !in 2..6 || correct !in 0 until options.length()) return
         val panel = FloatingReviewCardView(this, item,
             onClose = { removeCard(); evaluate(session) },
             onSnooze = { defer(settings); hideQuestion() })
-        val choices = panel.choices
-        for (index in 0 until options.length()) {
-            val choice = choices[index]
-            choice.setOnClickListener {
-                if (!choice.isEnabled) return@setOnClickListener
-                if (stopped || ReviewOverlayBridge.session != session || ReviewOverlayBridge.quizBlocked) { hideQuestion(); return@setOnClickListener }
-                choices.forEach { it.isEnabled = false }
-                try {
-                    synchronized(ReviewOverlayBridge.journalLock) {
-                        val pending = ReviewOverlayBridge.pending(this, session.account)
-                        pending.put(JSONObject().put("client_event_id", UUID.randomUUID().toString())
-                            .put("item_id", item.getInt("item_id"))
-                            .put("review_key", item.optString("review_key"))
-                            .put("response_level", if (index == correct) "easy" else "hard"))
-                        val ids = (ReviewOverlayBridge.seen(this, session.account) + item.getInt("item_id")).distinct()
-                        val keys = (ReviewOverlayBridge.seenKeys(this, session.account) + item.optString("review_key")).filter { it.isNotBlank() }.distinct()
-                        check(ReviewOverlayBridge.prefs(this).edit()
-                            .putString("answers_${session.account}", pending.toString())
-                            .putString("seen_day_${session.account}", LocalDate.now().toString())
-                            .putString("seen_${session.account}", JSONArray(ids).toString())
-                            .putString("seen_keys_${session.account}", JSONArray(keys).toString()).commit())
-                    }
-                    panel.showAnswer(index, index == correct,
-                        if (index == correct) "إجابة صحيحة · حُفظت للمزامنة" else "الإجابة الصحيحة: ${options.getString(correct)} · حُفظت للمزامنة")
-                    currentAnswered = true
-                    val remaining = dueItems(session).size
-                    panel.showCompletion(remaining) { openNext(session) }
-                    lastFetch = 0
-                    worker.execute { refresh() }
-                    if (remaining == 0) handler.postDelayed({
-                        if (currentItem == item.optInt("item_id") && currentAnswered) { removeCard(); evaluate(session) }
-                    }, 3000)
-                } catch (error: Exception) {
-                    Log.e("MoeenReview", "Cannot persist answer", error)
-                    panel.showError("تعذر حفظ الإجابة. حاول مجدداً.")
-                    choices.forEach { it.isEnabled = true }
+        fun record(level: String, index: Int? = null) {
+            if (currentAnswered || window !== panel || (!isMcq && !panel.answerRevealed)) return
+            if (stopped || ReviewOverlayBridge.session != session || ReviewOverlayBridge.quizBlocked) { hideQuestion(); return }
+            panel.setAnswering(true)
+            try {
+                synchronized(ReviewOverlayBridge.journalLock) {
+                    val pending = ReviewOverlayBridge.pending(this, session.account)
+                    pending.put(JSONObject().put("client_event_id", UUID.randomUUID().toString())
+                        .put("item_id", item.getInt("item_id"))
+                        .put("review_key", item.optString("review_key"))
+                        .put("response_level", level))
+                    val ids = (ReviewOverlayBridge.seen(this, session.account) + item.getInt("item_id")).distinct()
+                    val keys = (ReviewOverlayBridge.seenKeys(this, session.account) + item.optString("review_key")).filter { it.isNotBlank() }.distinct()
+                    check(ReviewOverlayBridge.prefs(this).edit()
+                        .putString("answers_${session.account}", pending.toString())
+                        .putString("seen_day_${session.account}", LocalDate.now().toString())
+                        .putString("seen_${session.account}", JSONArray(ids).toString())
+                        .putString("seen_keys_${session.account}", JSONArray(keys).toString()).commit())
                 }
+            } catch (error: Exception) {
+                Log.e("MoeenReview", "Cannot persist answer", error)
+                panel.showError("تعذر حفظ الإجابة. حاول مجدداً.")
+                panel.setAnswering(false)
+                return
             }
+            currentAnswered = true
+            if (index != null) panel.showAnswer(index, index == correct,
+                if (index == correct) "إجابة صحيحة · حُفظت للمزامنة" else "الإجابة الصحيحة: ${options!!.getString(correct)} · حُفظت للمزامنة")
+            else panel.showReviewRecorded(level)
+            val remaining = dueItems(session).size
+            panel.showCompletion(remaining) { openNext(session) }
+            lastFetch = 0
+            worker.execute { refresh() }
+            if (remaining == 0) handler.postDelayed({
+                if (currentItem == item.optInt("item_id") && currentAnswered) { removeCard(); evaluate(session) }
+            }, 3000)
         }
+        panel.choices.forEachIndexed { index, choice ->
+            choice.setOnClickListener { if (choice.isEnabled) record(if (index == correct) "easy" else "hard", index) }
+        }
+        panel.ratings.forEach { (level, button) -> button.setOnClickListener { if (button.isEnabled) record(level) } }
         val width = minOf(dp(360), resources.displayMetrics.widthPixels - dp(24))
         val params = WindowManager.LayoutParams(width, -2, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
