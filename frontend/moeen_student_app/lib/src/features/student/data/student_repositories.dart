@@ -168,6 +168,7 @@ class CardGenerationRepository {
 }
 
 class StudentContentRepository {
+  static final Map<String, Future<void>> _settingsWrites = {};
   const StudentContentRepository(
     this._api,
     this._cache, {
@@ -1004,6 +1005,7 @@ class StudentContentRepository {
   }
 
   Future<Map<String, dynamic>> flashcardSettings() async {
+    await _settingsWrites[cacheScope];
     return _cachedMap(
       cache: _cache,
       key: '$cacheScope.student.flashcards.settings',
@@ -1051,8 +1053,29 @@ class StudentContentRepository {
   Future<Map<String, dynamic>> updateFlashcardSettings(
     Map<String, dynamic> data,
   ) async {
-    final response = await _api.put('/student/flashcards/settings', data: data);
-    return _data(response);
+    final operation = (_settingsWrites[cacheScope] ?? Future<void>.value())
+        .then((_) async {
+          final response = await _api.put(
+            '/student/flashcards/settings',
+            data: data,
+          );
+          final saved = _data(response);
+          await _cache.writeMap(
+            '$cacheScope.student.flashcards.settings',
+            saved,
+          );
+          return saved;
+        });
+    final tail = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    _settingsWrites[cacheScope] = tail;
+    tail.then((_) {
+      if (identical(_settingsWrites[cacheScope], tail))
+        _settingsWrites.remove(cacheScope);
+    });
+    return operation;
   }
 
   Future<Map<String, dynamic>> logTreeFarmSession({

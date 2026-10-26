@@ -123,7 +123,7 @@ class _StudentFlashcardsScreenState
                                 StudentFlashcardsScreen.quickReviewRoute,
                               );
                             } else {
-                              _showCreatePack(context, ref);
+                              context.push(StudentFlashcardsScreen.packsRoute);
                             }
                           },
                         );
@@ -136,11 +136,8 @@ class _StudentFlashcardsScreenState
                     pendingSync: 0,
                     reviewedTodayCount: 0,
                     loading: true,
-                    onStart: packs.isEmpty
-                        ? () => _showCreatePack(context, ref)
-                        : () => context.push(
-                            StudentFlashcardsScreen.quickReviewRoute,
-                          ),
+                    onStart: () =>
+                        context.push(StudentFlashcardsScreen.packsRoute),
                   ),
                   error: (_, _) => _OneLineShotHero(
                     stats: stats,
@@ -148,15 +145,31 @@ class _StudentFlashcardsScreenState
                     pendingSync: 0,
                     reviewedTodayCount: 0,
                     offlineMode: queueIsOffline,
-                    onStart: packs.isEmpty
-                        ? () => _showCreatePack(context, ref)
-                        : () => context.push(
-                            StudentFlashcardsScreen.quickReviewRoute,
-                          ),
+                    onStart: () =>
+                        context.push(StudentFlashcardsScreen.packsRoute),
                   ),
                 ),
                 const SizedBox(height: 12),
+                const _FlashcardPermissionPanel(),
+                const SizedBox(height: 12),
                 const _FlashcardSmartReviewSettingsCard(),
+                const SizedBox(height: 16),
+                oneLineState.when(
+                  data: (data) => _OneLineShotNotificationPanel(
+                    notificationData: data,
+                    offline: data['_offline'] == true,
+                  ),
+                  loading: () => const _OneLineShotNotificationPanel(
+                    notificationData: {},
+                    loading: true,
+                  ),
+                  error: (error, _) => _FlashcardsQueueWarning(
+                    message:
+                        'تعذر تحميل جدول رسائل One Line: ${error is ApiException ? error.message : 'تعذر الاتصال بالخادم.'}',
+                    onRetry: () =>
+                        ref.invalidate(_flashcardOneLineNotificationsProvider),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 queueState.when(
                   data: (queueData) {
@@ -177,27 +190,6 @@ class _StudentFlashcardsScreenState
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            oneLineState.when(
-                              data: (oneLineData) =>
-                                  _OneLineShotNotificationPanel(
-                                    notificationData: oneLineData,
-                                  ),
-                              loading: () =>
-                                  const _OneLineShotNotificationPanel(
-                                    notificationData: {},
-                                    loading: true,
-                                  ),
-                              error: (_, _) => _OneLineShotNotificationPanel(
-                                notificationData: {
-                                  'items': _oneLineShotNotificationItems(
-                                    queueData,
-                                  ),
-                                  'settings': asMap(queueData['settings']),
-                                },
-                                offline: true,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
                             _FlashcardsTodaySection(
                               queue: allQueue,
                               availableQueue: availableQueue,
@@ -221,7 +213,9 @@ class _StudentFlashcardsScreenState
                                     StudentFlashcardsScreen.quickReviewRoute,
                                   );
                                 } else {
-                                  _showCreatePack(context, ref);
+                                  context.push(
+                                    StudentFlashcardsScreen.packsRoute,
+                                  );
                                 }
                               },
                               onCreatePack: () => _showCreatePack(context, ref),
@@ -270,15 +264,8 @@ class _StudentFlashcardsScreenState
                       ),
                       const SizedBox(height: 16),
                       _FlashcardsQuickActions(
-                        onStart: () {
-                          if (packs.isEmpty) {
-                            _showCreatePack(context, ref);
-                          } else {
-                            context.push(
-                              StudentFlashcardsScreen.quickReviewRoute,
-                            );
-                          }
-                        },
+                        onStart: () =>
+                            context.push(StudentFlashcardsScreen.packsRoute),
                         onCreatePack: () => _showCreatePack(context, ref),
                         onOpenUpcoming: () =>
                             context.push(StudentFlashcardsScreen.upcomingRoute),

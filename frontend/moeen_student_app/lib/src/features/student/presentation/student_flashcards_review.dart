@@ -39,12 +39,12 @@ class _StudentFlashcardReviewScreenState
         state: state,
         onRetry: () => ref.invalidate(_flashcardReviewProvider(widget.packId)),
         builder: (data) {
-          final items = asList(
-            data['items'],
-          ).map(asMap).where((item) => !_isOneLineShotItem(item)).toList();
+          final items = asList(data['items']).map(asMap).toList();
           if (items.isEmpty) {
             return const Center(
-              child: EmptyState(message: 'لا توجد عناصر للمراجعة اليوم.'),
+              child: EmptyState(
+                message: 'هذه الحزمة لا تحتوي على عناصر للمراجعة.',
+              ),
             );
           }
           final item = items[_index.clamp(0, items.length - 1)];

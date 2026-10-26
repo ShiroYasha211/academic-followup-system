@@ -122,7 +122,6 @@ class _StudentShellState extends ConsumerState<StudentShell>
     with WidgetsBindingObserver {
   Timer? _refreshTimer;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _flashcardPromptOpen = false;
 
   @override
   void initState() {
@@ -132,10 +131,6 @@ class _StudentShellState extends ConsumerState<StudentShell>
       if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed)
         return;
       _refreshBadges();
-      _maybeShowFlashcardPrompt();
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _maybeShowFlashcardPrompt();
     });
   }
 
@@ -150,11 +145,13 @@ class _StudentShellState extends ConsumerState<StudentShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _refreshBadges();
-      _maybeShowFlashcardPrompt();
     }
   }
 
   void _refreshBadges() {
+    if (StudentFeatureFlags.showOneLineShot) {
+      ref.invalidate(studentDueFlashcardCountProvider);
+    }
     ref.invalidate(studentUnreadNotificationsCountProvider);
     ref.invalidate(studentUnreadScreenCountsProvider);
     ref.invalidate(studentUnreadMessagesCountProvider);
@@ -170,30 +167,6 @@ class _StudentShellState extends ConsumerState<StudentShell>
     unawaited(
       ref.read(authControllerProvider.notifier).refreshPermissionsNow(),
     );
-  }
-
-  Future<void> _maybeShowFlashcardPrompt() async {
-    if (!StudentFeatureFlags.showOneLineShot) return;
-    if (!mounted ||
-        _flashcardPromptOpen ||
-        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed)
-      return;
-    final path = GoRouterState.of(context).uri.path;
-    if (path == StudentFlashcardsScreen.quickReviewRoute ||
-        path.endsWith('/review') ||
-        path.startsWith('/student/quizzes')) {
-      return;
-    }
-    _flashcardPromptOpen = true;
-    try {
-      await Future<void>.delayed(const Duration(milliseconds: 650));
-      if (!mounted ||
-          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed)
-        return;
-      await showStudentFlashcardSmartReviewPrompt(context: context, ref: ref);
-    } finally {
-      _flashcardPromptOpen = false;
-    }
   }
 
   Future<void> _handleSystemBack() async {
@@ -556,6 +529,9 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
         const <String, int>{};
     final unreadMessages =
         ref.watch(studentUnreadMessagesCountProvider).valueOrNull ?? 0;
+    final dueFlashcards = StudentFeatureFlags.showOneLineShot
+        ? ref.watch(studentDueFlashcardCountProvider).valueOrNull ?? 0
+        : 0;
     final isSecondaryDevice = session?.isSecondaryDevice == true;
     final supportSettings =
         ref.watch(studentSupportSettingsProvider).valueOrNull ??
@@ -879,6 +855,8 @@ class _StudentDrawerState extends ConsumerState<_StudentDrawer> {
                           badgeCount:
                               item.route == StudentNotificationsScreen.route
                               ? unreadNotifications
+                              : item.route == StudentFlashcardsScreen.route
+                              ? dueFlashcards
                               : (item.route == StudentMessagesScreen.route
                                     ? unreadMessages
                                     : _badgeForRoute(

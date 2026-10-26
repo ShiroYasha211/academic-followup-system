@@ -333,7 +333,7 @@ class _ShotReviewCardState extends State<_ShotReviewCard>
   Widget build(BuildContext context) {
     final type = _itemType(widget.item);
 
-    if (type == 'mcq') {
+    if (type == 'mcq' || type == 'one_line') {
       return _buildCardContent(context, showBackContent: false);
     }
 

@@ -79,6 +79,7 @@ part 'student_flashcards_shot_review_card.dart';
 part 'student_flashcards_smart_review_prompt.dart';
 part 'student_flashcards_smart_review_settings.dart';
 part 'student_flashcards_floating_settings.dart';
+part 'student_flashcards_permissions.dart';
 part 'student_flashcards_helpers.dart';
 part 'student_assignments_screen.dart';
 part 'student_qr_scan_screen.dart';
@@ -299,6 +300,14 @@ final _flashcardDailyQueueProvider =
         rethrow;
       }
     });
+
+final studentDueFlashcardCountProvider = FutureProvider.autoDispose<int>((
+  ref,
+) async {
+  final data = await ref.watch(_flashcardDailyQueueProvider.future);
+  final local = await ref.watch(flashcardLocalStoreProvider).load();
+  return SmartReviewQueue.pending(data, local, availableOnly: true).length;
+});
 
 final _flashcardOneLineNotificationsProvider =
     FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {

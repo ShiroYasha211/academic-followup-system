@@ -15,6 +15,7 @@ class FloatingReviewStatus {
   const FloatingReviewStatus({
     this.supported = false,
     this.permission = false,
+    this.notificationsAllowed,
     this.running = false,
     this.autoStart = false,
     this.mode = ReviewDisplayMode.inApp,
@@ -26,6 +27,7 @@ class FloatingReviewStatus {
 
   final bool supported;
   final bool permission;
+  final bool? notificationsAllowed;
   final bool running;
   final bool autoStart;
   final ReviewDisplayMode mode;
@@ -42,6 +44,7 @@ class FloatingReviewStatus {
     return FloatingReviewStatus(
       supported: data['supported'] == true,
       permission: data['permission'] == true,
+      notificationsAllowed: data['notifications_allowed'] as bool?,
       running: data['running'] == true,
       autoStart: data['auto_start'] == true,
       mode: mode,
@@ -92,6 +95,11 @@ class FloatingReview {
 
   static Future<void> requestPermission() async {
     if (supportedPlatform) await _channel.invokeMethod<void>('permission');
+  }
+
+  static Future<void> openNotificationSettings() async {
+    if (supportedPlatform)
+      await _channel.invokeMethod<void>('notificationSettings');
   }
 
   static Future<void> start() async {

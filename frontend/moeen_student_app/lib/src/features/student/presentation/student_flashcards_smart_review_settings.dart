@@ -1,6 +1,69 @@
 // ignore_for_file: dead_code, unused_element, unused_element_parameter, unused_local_variable
 part of 'student_content_screens.dart';
 
+int? _parseReviewNumber(String value) {
+  final normalized = String.fromCharCodes(
+    value.trim().runes.map((rune) {
+      if (rune >= 0x660 && rune <= 0x669) return rune - 0x660 + 48;
+      if (rune >= 0x6f0 && rune <= 0x6f9) return rune - 0x6f0 + 48;
+      return rune;
+    }),
+  );
+  return int.tryParse(normalized);
+}
+
+Future<Map<String, dynamic>?> _saveFlashcardSettings(
+  BuildContext context,
+  WidgetRef ref,
+  Map<String, dynamic> payload,
+) async {
+  for (final key in [
+    'daily_card_limit',
+    'one_line_daily_limit',
+    'smart_review_frequency_minutes',
+    'one_line_frequency_minutes',
+  ]) {
+    if (!payload.containsKey(key)) continue;
+    final maximum = key.contains('daily_limit') || key == 'daily_card_limit'
+        ? 100
+        : 1440;
+    final value = payload[key] as int;
+    if (value < 1 || value > maximum) {
+      await showMoeenInfoDialog(
+        context: context,
+        title: 'قيمة غير صالحة',
+        message: 'يجب أن تكون القيمة بين 1 و$maximum.',
+        icon: Icons.error_outline_rounded,
+        color: AppColors.rose,
+      );
+      return null;
+    }
+  }
+  final repository = ref.read(studentContentRepositoryProvider);
+  final store = ref.read(flashcardLocalStoreProvider);
+  try {
+    final data = await repository.updateFlashcardSettings(payload);
+    if (asMap(data['settings']).isEmpty)
+      throw const ApiException('لم يؤكد الخادم حفظ الإعدادات.');
+    await store.cacheSettings(data);
+    await store.applyServerSmartReviewSettings(
+      data,
+      clearSnooze: payload.keys.any((key) => !key.startsWith('one_line_')),
+    );
+    return data;
+  } on ApiException catch (error) {
+    if (context.mounted)
+      await showMoeenInfoDialog(
+        context: context,
+        title: 'تعذر حفظ الإعدادات',
+        message: error.message,
+        icon: Icons.error_outline_rounded,
+        color: AppColors.rose,
+      );
+    return null;
+  }
+}
+
 class _FlashcardSmartReviewSettingsCard extends ConsumerStatefulWidget {
   const _FlashcardSmartReviewSettingsCard();
 
@@ -11,6 +74,7 @@ class _FlashcardSmartReviewSettingsCard extends ConsumerStatefulWidget {
 
 class _FlashcardSmartReviewSettingsCardState
     extends ConsumerState<_FlashcardSmartReviewSettingsCard> {
+  bool _saving = false;
   late Future<Map<String, dynamic>> _future;
   // Holds the last successfully loaded data to avoid flicker during reload
   Map<String, dynamic>? _lastData;
@@ -58,7 +122,16 @@ class _FlashcardSmartReviewSettingsCardState
       builder: (context, snapshot) {
         // Use last cached data while reloading to prevent flicker back to defaults
         final effectiveData = snapshot.data ?? _lastData;
-        final settings = asMap(effectiveData?['settings']);
+        if (effectiveData == null) {
+          if (snapshot.hasError) {
+            return _FlashcardsQueueWarning(
+              message: 'تعذر تحميل إعدادات المراجعة.',
+              onRetry: () => setState(() => _future = _loadSettings()),
+            );
+          }
+          return const Center(child: CircularProgressIndicator());
+        }
+        final settings = asMap(effectiveData['settings']);
         final enabled = _boolValueFallback(
           settings,
           'smart_review_enabled',
@@ -127,7 +200,7 @@ class _FlashcardSmartReviewSettingsCardState
               ),
               Switch(
                 value: enabled,
-                onChanged: (value) => _update(enabled: value),
+                onChanged: _saving ? null : (value) => _update(enabled: value),
               ),
             ],
           ),
@@ -142,33 +215,34 @@ class _FlashcardSmartReviewSettingsCardState
     int? snoozeMinutes,
     bool? autoRestart,
   }) async {
-    final payload = <String, dynamic>{
-      if (enabled != null) 'smart_review_enabled': enabled,
-      if (dailyLimit != null) 'daily_card_limit': dailyLimit,
-      if (snoozeMinutes != null)
-        'smart_review_frequency_minutes': snoozeMinutes,
-      if (autoRestart != null) 'auto_restart_enabled': autoRestart,
-    };
-    final data = await ref
-        .read(studentContentRepositoryProvider)
-        .updateFlashcardSettings(payload);
-    await ref.read(flashcardLocalStoreProvider).cacheSettings(data);
-    await ref
-        .read(flashcardLocalStoreProvider)
-        .applyServerSmartReviewSettings(data, clearSnooze: true);
-    if (enabled == false) {
-      await FloatingReview.endSession();
-      await PushNotificationService.cancelFlashcardSmartReview();
-    } else if (enabled == true || snoozeMinutes != null) {
-      await _scheduleNextSmartReviewNotification(ref);
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final payload = <String, dynamic>{
+        if (enabled != null) 'smart_review_enabled': enabled,
+        if (dailyLimit != null) 'daily_card_limit': dailyLimit,
+        if (snoozeMinutes != null)
+          'smart_review_frequency_minutes': snoozeMinutes,
+        if (autoRestart != null) 'auto_restart_enabled': autoRestart,
+      };
+      final data = await _saveFlashcardSettings(context, ref, payload);
+      if (data == null || !mounted) return;
+      if (enabled == false) {
+        await FloatingReview.endSession();
+        await PushNotificationService.cancelFlashcardSmartReview();
+      } else if (enabled == true || snoozeMinutes != null) {
+        await _scheduleNextSmartReviewNotification(ref);
+      }
+      if (!mounted) return;
+      setState(() {
+        _future = _loadSettings();
+      });
+      ref.invalidate(_flashcardSettingsProvider);
+      ref.invalidate(_flashcardDailyQueueProvider);
+      ref.invalidate(_flashcardsProvider);
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
-    if (!mounted) return;
-    setState(() {
-      _future = _loadSettings();
-    });
-    ref.invalidate(_flashcardSettingsProvider);
-    ref.invalidate(_flashcardDailyQueueProvider);
-    ref.invalidate(_flashcardsProvider);
   }
 }
 
@@ -182,6 +256,7 @@ class _SmartReviewSettingsSheet extends ConsumerStatefulWidget {
 
 class _SmartReviewSettingsSheetState
     extends ConsumerState<_SmartReviewSettingsSheet> {
+  bool _saving = false;
   late Future<Map<String, dynamic>> _sheetFuture;
   // Holds the last successfully loaded data to avoid flicker during reload
   Map<String, dynamic>? _lastData;
@@ -216,7 +291,16 @@ class _SmartReviewSettingsSheetState
       builder: (context, snapshot) {
         // Use last cached data while reloading to prevent flicker back to defaults
         final effectiveData = snapshot.data ?? _lastData;
-        final settings = asMap(effectiveData?['settings']);
+        if (effectiveData == null) {
+          if (snapshot.hasError) {
+            return _FlashcardsQueueWarning(
+              message: 'تعذر تحميل الإعدادات. لم يتم تغيير القيم المحفوظة.',
+              onRetry: () => setState(() => _sheetFuture = _loadSettings()),
+            );
+          }
+          return const Center(child: CircularProgressIndicator());
+        }
+        final settings = asMap(effectiveData['settings']);
         final enabled = _boolValueFallback(
           settings,
           'smart_review_enabled',
@@ -291,7 +375,7 @@ class _SmartReviewSettingsSheetState
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            'ميزة ذكية تعرض لك كرت مراجعة واحد تلقائياً في الواجهة عند فتح التطبيق أو العودة إليه لمساعدتك على الاستمرار.',
+                            'جدولة الكروت التفاعلية اليومية ومواعيد تذكيرها. المراجعة داخل التطبيق تبدأ باختيارك فقط.',
                             style: TextStyle(
                               color: Colors.grey.shade700,
                               fontSize: 11,
@@ -355,10 +439,10 @@ class _SmartReviewSettingsSheetState
                       ),
                       child: _SmartReviewNumberField(
                         label: 'حد المراجعة اليومي',
-                        value: dailyLimit,
+                        value: _dailyLimitDraft!,
                         suffix: 'مرات',
                         onChangedValue: (value) => _dailyLimitDraft = value,
-                        onSubmitted: (value) => _update(dailyLimit: value),
+                        onSubmitted: (value) => _dailyLimitDraft = value,
                       ),
                     ),
                   ),
@@ -373,10 +457,10 @@ class _SmartReviewSettingsSheetState
                       ),
                       child: _SmartReviewNumberField(
                         label: 'تكرار الظهور',
-                        value: frequency,
+                        value: _frequencyDraft!,
                         suffix: 'دقيقة',
                         onChangedValue: (value) => _frequencyDraft = value,
-                        onSubmitted: (value) => _update(snoozeMinutes: value),
+                        onSubmitted: (value) => _frequencyDraft = value,
                       ),
                     ),
                   ),
@@ -479,13 +563,16 @@ class _SmartReviewSettingsSheetState
 
               // Action button to save & dismiss
               FilledButton(
-                onPressed: () async {
-                  await _update(
-                    dailyLimit: _dailyLimitDraft,
-                    snoozeMinutes: _frequencyDraft,
-                  );
-                  if (context.mounted) Navigator.of(context).pop();
-                },
+                onPressed: _saving
+                    ? null
+                    : () async {
+                        final saved = await _update(
+                          dailyLimit: _dailyLimitDraft,
+                          snoozeMinutes: _frequencyDraft,
+                        );
+                        if (saved && context.mounted)
+                          Navigator.of(context).pop();
+                      },
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.midnight,
                   foregroundColor: Colors.white,
@@ -506,7 +593,7 @@ class _SmartReviewSettingsSheetState
     );
   }
 
-  Future<void> _update({
+  Future<bool> _update({
     bool? enabled,
     int? dailyLimit,
     int? snoozeMinutes,
@@ -516,46 +603,48 @@ class _SmartReviewSettingsSheetState
     String? quietStart,
     String? quietEnd,
   }) async {
-    final payload = <String, dynamic>{
-      if (enabled != null) 'smart_review_enabled': enabled,
-      if (dailyLimit != null) 'daily_card_limit': dailyLimit,
-      if (snoozeMinutes != null)
-        'smart_review_frequency_minutes': snoozeMinutes,
-      if (autoRestart != null) 'auto_restart_enabled': autoRestart,
-      if (activeFromTime != null)
-        'active_from_time': activeFromTime.isEmpty ? null : activeFromTime,
-      if (activeToTime != null)
-        'active_to_time': activeToTime.isEmpty ? null : activeToTime,
-      if (quietStart != null)
-        'quiet_start': quietStart.isEmpty ? null : quietStart,
-      if (quietEnd != null) 'quiet_end': quietEnd.isEmpty ? null : quietEnd,
-    };
-    if (payload.isEmpty) return;
-    final data = await ref
-        .read(studentContentRepositoryProvider)
-        .updateFlashcardSettings(payload);
-    await ref.read(flashcardLocalStoreProvider).cacheSettings(data);
-    await ref
-        .read(flashcardLocalStoreProvider)
-        .applyServerSmartReviewSettings(data, clearSnooze: true);
-    if (enabled == false) {
-      await FloatingReview.endSession();
-      await PushNotificationService.cancelFlashcardSmartReview();
-    } else if (enabled == true ||
-        snoozeMinutes != null ||
-        activeFromTime != null ||
-        activeToTime != null ||
-        quietStart != null ||
-        quietEnd != null) {
-      await _scheduleNextSmartReviewNotification(ref);
+    if (_saving) return false;
+    setState(() => _saving = true);
+    try {
+      final payload = <String, dynamic>{
+        if (enabled != null) 'smart_review_enabled': enabled,
+        if (dailyLimit != null) 'daily_card_limit': dailyLimit,
+        if (snoozeMinutes != null)
+          'smart_review_frequency_minutes': snoozeMinutes,
+        if (autoRestart != null) 'auto_restart_enabled': autoRestart,
+        if (activeFromTime != null)
+          'active_from_time': activeFromTime.isEmpty ? null : activeFromTime,
+        if (activeToTime != null)
+          'active_to_time': activeToTime.isEmpty ? null : activeToTime,
+        if (quietStart != null)
+          'quiet_start': quietStart.isEmpty ? null : quietStart,
+        if (quietEnd != null) 'quiet_end': quietEnd.isEmpty ? null : quietEnd,
+      };
+      if (payload.isEmpty) return true;
+      final data = await _saveFlashcardSettings(context, ref, payload);
+      if (data == null || !mounted) return false;
+      if (enabled == false) {
+        await FloatingReview.endSession();
+        await PushNotificationService.cancelFlashcardSmartReview();
+      } else if (enabled == true ||
+          snoozeMinutes != null ||
+          activeFromTime != null ||
+          activeToTime != null ||
+          quietStart != null ||
+          quietEnd != null) {
+        await _scheduleNextSmartReviewNotification(ref);
+      }
+      if (!mounted) return true;
+      setState(() {
+        _sheetFuture = Future.value(data);
+      });
+      ref.invalidate(_flashcardSettingsProvider);
+      ref.invalidate(_flashcardDailyQueueProvider);
+      ref.invalidate(_flashcardsProvider);
+      return true;
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
-    if (!mounted) return;
-    setState(() {
-      _sheetFuture = _loadSettings();
-    });
-    ref.invalidate(_flashcardSettingsProvider);
-    ref.invalidate(_flashcardDailyQueueProvider);
-    ref.invalidate(_flashcardsProvider);
   }
 }
 
@@ -688,9 +777,17 @@ class _OneLineShotNotificationPanel extends ConsumerWidget {
                           const SizedBox(height: 4),
                           Text(
                             next == null
-                                ? 'يتم تجهيز الرسائل تلقائيًا عند فتح التطبيق أو تحديث الإعدادات.'
+                                ? scheduled.isNotEmpty && enabled
+                                      ? 'انتهت مواعيد رسائل اليوم. راجع الجدول أدناه.'
+                                      : text(
+                                          asMap(notificationData['summary']),
+                                          'message',
+                                          fallback: scheduled.isNotEmpty
+                                              ? 'انتهت مواعيد رسائل اليوم. راجع الجدول أدناه.'
+                                              : 'راجع أيام الحزم وفترة النشاط والهدوء.',
+                                        )
                                 : '${text(next, 'notification_subtitle', fallback: text(next, 'pack_title'))} • ${_oneLineExactScheduleLabel(next)}',
-                            maxLines: 1,
+                            maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: AppColors.slate500,
@@ -1084,6 +1181,7 @@ class _OneLineNotificationSettingsSheet extends ConsumerStatefulWidget {
 
 class _OneLineNotificationSettingsSheetState
     extends ConsumerState<_OneLineNotificationSettingsSheet> {
+  bool _saving = false;
   late Future<Map<String, dynamic>> _future;
   int? _dailyLimitDraft;
   int? _frequencyDraft;
@@ -1108,6 +1206,12 @@ class _OneLineNotificationSettingsSheetState
       future: _future,
       builder: (context, snapshot) {
         final settings = asMap(snapshot.data?['settings']);
+        if (snapshot.hasError) {
+          return _FlashcardsQueueWarning(
+            message: 'تعذر تحميل إعدادات رسائل One Line.',
+            onRetry: () => setState(() => _future = _load()),
+          );
+        }
         if (settings.isEmpty &&
             snapshot.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
@@ -1167,7 +1271,9 @@ class _OneLineNotificationSettingsSheetState
             const SizedBox(height: 14),
             SwitchListTile(
               value: enabled,
-              onChanged: (value) => _update(oneLineNotificationsEnabled: value),
+              onChanged: _saving
+                  ? null
+                  : (value) => _update(oneLineNotificationsEnabled: value),
               title: const Text(
                 'تفعيل إشعارات One Line',
                 style: TextStyle(fontWeight: FontWeight.w900),
@@ -1180,21 +1286,20 @@ class _OneLineNotificationSettingsSheetState
                 Expanded(
                   child: _SmartReviewNumberField(
                     label: 'عدد الرسائل يوميًا',
-                    value: dailyLimit,
+                    value: _dailyLimitDraft!,
                     suffix: 'رسالة',
                     onChangedValue: (value) => _dailyLimitDraft = value,
-                    onSubmitted: (value) => _update(oneLineDailyLimit: value),
+                    onSubmitted: (value) => _dailyLimitDraft = value,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _SmartReviewNumberField(
                     label: 'الفاصل الزمني',
-                    value: frequency,
+                    value: _frequencyDraft!,
                     suffix: 'دقيقة',
                     onChangedValue: (value) => _frequencyDraft = value,
-                    onSubmitted: (value) =>
-                        _update(oneLineFrequencyMinutes: value),
+                    onSubmitted: (value) => _frequencyDraft = value,
                   ),
                 ),
               ],
@@ -1244,13 +1349,15 @@ class _OneLineNotificationSettingsSheetState
             ),
             const SizedBox(height: 18),
             FilledButton.icon(
-              onPressed: () async {
-                await _update(
-                  oneLineDailyLimit: _dailyLimitDraft,
-                  oneLineFrequencyMinutes: _frequencyDraft,
-                );
-                if (context.mounted) Navigator.of(context).pop();
-              },
+              onPressed: _saving
+                  ? null
+                  : () async {
+                      final saved = await _update(
+                        oneLineDailyLimit: _dailyLimitDraft,
+                        oneLineFrequencyMinutes: _frequencyDraft,
+                      );
+                      if (saved && context.mounted) Navigator.of(context).pop();
+                    },
               icon: const Icon(Icons.check_rounded),
               label: const Text('حفظ الإعدادات'),
             ),
@@ -1260,7 +1367,7 @@ class _OneLineNotificationSettingsSheetState
     );
   }
 
-  Future<void> _update({
+  Future<bool> _update({
     bool? oneLineNotificationsEnabled,
     int? oneLineDailyLimit,
     int? oneLineFrequencyMinutes,
@@ -1269,40 +1376,71 @@ class _OneLineNotificationSettingsSheetState
     String? oneLineQuietStart,
     String? oneLineQuietEnd,
   }) async {
-    final payload = <String, dynamic>{
-      if (oneLineNotificationsEnabled != null)
-        'one_line_notifications_enabled': oneLineNotificationsEnabled,
-      if (oneLineDailyLimit != null) 'one_line_daily_limit': oneLineDailyLimit,
-      if (oneLineFrequencyMinutes != null)
-        'one_line_frequency_minutes': oneLineFrequencyMinutes,
-      if (oneLineActiveFromTime != null)
-        'one_line_active_from_time': oneLineActiveFromTime.isEmpty
-            ? null
-            : oneLineActiveFromTime,
-      if (oneLineActiveToTime != null)
-        'one_line_active_to_time': oneLineActiveToTime.isEmpty
-            ? null
-            : oneLineActiveToTime,
-      if (oneLineQuietStart != null)
-        'one_line_quiet_start': oneLineQuietStart.isEmpty
-            ? null
-            : oneLineQuietStart,
-      if (oneLineQuietEnd != null)
-        'one_line_quiet_end': oneLineQuietEnd.isEmpty ? null : oneLineQuietEnd,
-    };
-    if (payload.isEmpty) return;
-    final data = await ref
-        .read(studentContentRepositoryProvider)
-        .updateFlashcardSettings(payload);
-    await ref.read(flashcardLocalStoreProvider).cacheSettings(data);
-    await ref.read(oneLineNotificationSchedulerProvider).sync(force: true);
-    if (!mounted) return;
-    setState(() {
-      _future = _load();
-    });
-    ref.invalidate(_flashcardSettingsProvider);
-    ref.invalidate(_flashcardOneLineNotificationsProvider);
-    ref.invalidate(_flashcardsProvider);
+    if (_saving) return false;
+    setState(() => _saving = true);
+    try {
+      final payload = <String, dynamic>{
+        if (oneLineNotificationsEnabled != null)
+          'one_line_notifications_enabled': oneLineNotificationsEnabled,
+        if (oneLineDailyLimit != null)
+          'one_line_daily_limit': oneLineDailyLimit,
+        if (oneLineFrequencyMinutes != null)
+          'one_line_frequency_minutes': oneLineFrequencyMinutes,
+        if (oneLineActiveFromTime != null)
+          'one_line_active_from_time': oneLineActiveFromTime.isEmpty
+              ? null
+              : oneLineActiveFromTime,
+        if (oneLineActiveToTime != null)
+          'one_line_active_to_time': oneLineActiveToTime.isEmpty
+              ? null
+              : oneLineActiveToTime,
+        if (oneLineQuietStart != null)
+          'one_line_quiet_start': oneLineQuietStart.isEmpty
+              ? null
+              : oneLineQuietStart,
+        if (oneLineQuietEnd != null)
+          'one_line_quiet_end': oneLineQuietEnd.isEmpty
+              ? null
+              : oneLineQuietEnd,
+      };
+      if (payload.isEmpty) return true;
+      final data = await _saveFlashcardSettings(context, ref, payload);
+      if (data == null || !mounted) return false;
+      final scheduler = ref.read(oneLineNotificationSchedulerProvider);
+      try {
+        await scheduler.sync(force: true);
+      } on ApiException catch (error) {
+        if (mounted)
+          await showMoeenInfoDialog(
+            context: context,
+            title: 'تم الحفظ وتعذّر تحديث الجدول',
+            message: error.message,
+            icon: Icons.error_outline_rounded,
+            color: AppColors.rose,
+          );
+        return false;
+      } on PlatformException catch (error) {
+        if (mounted)
+          await showMoeenInfoDialog(
+            context: context,
+            title: 'تم الحفظ وتعذّر تجهيز الإشعارات',
+            message: error.message ?? 'راجع أذونات الإشعارات ثم أعد المحاولة.',
+            icon: Icons.notifications_off_outlined,
+            color: AppColors.rose,
+          );
+        return false;
+      }
+      if (!mounted) return true;
+      setState(() {
+        _future = Future.value(data);
+      });
+      ref.invalidate(_flashcardSettingsProvider);
+      ref.invalidate(_flashcardOneLineNotificationsProvider);
+      ref.invalidate(_flashcardsProvider);
+      return true;
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 }
 
@@ -1351,21 +1489,20 @@ class _SmartReviewNumberFieldState extends State<_SmartReviewNumberField> {
   @override
   void dispose() {
     _debounce?.cancel();
-    _submit();
     _controller.dispose();
     super.dispose();
   }
 
   void _scheduleSubmit() {
-    final parsed = int.tryParse(_controller.text.trim());
-    if (parsed != null && parsed > 0) widget.onChangedValue?.call(parsed);
+    final parsed = _parseReviewNumber(_controller.text);
+    widget.onChangedValue?.call(parsed ?? 0);
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 600), _submit);
   }
 
   void _submit() {
-    final parsed = int.tryParse(_controller.text.trim());
-    if (parsed == null || parsed <= 0 || parsed == _lastSubmitted) return;
+    final parsed = _parseReviewNumber(_controller.text) ?? 0;
+    if (parsed == _lastSubmitted) return;
     _lastSubmitted = parsed;
     widget.onSubmitted(parsed);
   }

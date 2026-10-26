@@ -112,6 +112,15 @@ class _StudentFlashcardDetailsScreenState
           return ListView(
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 90),
             children: [
+              if (data['can_manage_pack'] == true ||
+                  (!data.containsKey('can_manage_pack') && !isPublic))
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: _FlashcardPackMenu(
+                    pack: pack,
+                    onDeleted: () => context.go(StudentFlashcardsScreen.route),
+                  ),
+                ),
               if (isPublic) ...[
                 Container(
                   margin: const EdgeInsets.only(bottom: 16),

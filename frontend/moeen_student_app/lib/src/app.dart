@@ -122,7 +122,12 @@ class _MoeenStudentAppState extends ConsumerState<MoeenStudentApp>
         debugPrintStack(stackTrace: stackTrace);
       }
       if (!mounted) return;
-      await scheduleStudentFlashcardSmartReviewNotification(ref);
+      try {
+        await scheduleStudentFlashcardSmartReviewNotification(ref);
+      } catch (error, stackTrace) {
+        debugPrint('Interactive review notification refresh failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
       if (!mounted) return;
       await ref.read(oneLineNotificationSchedulerProvider).sync(force: force);
     } catch (error, stackTrace) {

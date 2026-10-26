@@ -82,6 +82,7 @@ internal object ReviewOverlayBridge {
         return mapOf(
             "supported" to (Build.VERSION.SDK_INT >= 26),
             "permission" to Settings.canDrawOverlays(context),
+            "notifications_allowed" to (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).areNotificationsEnabled(),
             "mode" to (mode(context) ?: "inApp"),
             "running" to (starting || FloatingReviewService.instance != null),
             "auto_start" to autoStart(context),
@@ -156,6 +157,11 @@ internal object ReviewOverlayBridge {
                     result.success(null)
                 }
                 "status" -> result.success(status(activity))
+                "notificationSettings" -> {
+                    activity.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, activity.packageName))
+                    result.success(null)
+                }
                 "updateQueue" -> {
                     val current = session
                     if (current != null && call.argument<String>("account") == current.account) {

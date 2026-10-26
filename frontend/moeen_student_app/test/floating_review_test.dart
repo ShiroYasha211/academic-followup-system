@@ -88,7 +88,28 @@ void main() {
   test('Older status responses do not opt accounts into automatic review', () {
     expect(FloatingReviewStatus.fromMap({'running': true}).autoStart, isFalse);
     expect(const FloatingReviewStatus().autoStart, isFalse);
+    expect(FloatingReviewStatus.fromMap({}).notificationsAllowed, isNull);
   });
+
+  test(
+    'Notification permission is read separately and its settings can reopen',
+    () async {
+      expect(
+        FloatingReviewStatus.fromMap({
+          'notifications_allowed': true,
+        }).notificationsAllowed,
+        isTrue,
+      );
+      expect(
+        FloatingReviewStatus.fromMap({
+          'notifications_allowed': false,
+        }).notificationsAllowed,
+        isFalse,
+      );
+      await FloatingReview.openNotificationSettings();
+      expect(calls.last.method, 'notificationSettings');
+    },
+  );
 
   test(
     'Automatic review preference is sent independently of session state',

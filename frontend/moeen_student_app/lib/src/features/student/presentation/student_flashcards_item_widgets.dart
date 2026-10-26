@@ -350,6 +350,32 @@ class _ReviewBottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final type = _itemType(item);
     final isMcq = type == 'mcq';
+    if (type == 'one_line') {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          12 + MediaQuery.viewPaddingOf(context).bottom,
+        ),
+        child: Row(
+          children: [
+            TextButton(
+              onPressed: recording ? null : onSkip,
+              child: const Text('تخطي'),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: recording ? null : onEasy,
+                icon: const Icon(Icons.check_rounded),
+                label: const Text('تمت القراءة · التالي'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
       padding: EdgeInsets.fromLTRB(
         16,

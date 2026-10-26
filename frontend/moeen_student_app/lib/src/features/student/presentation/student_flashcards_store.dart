@@ -126,10 +126,7 @@ class _StudentFlashcardStoreScreenState
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: AppColors.success,
-          ),
+          SnackBar(content: Text(message), backgroundColor: AppColors.success),
         );
         ref.invalidate(_flashcardsProvider);
       }
@@ -243,7 +240,11 @@ class _StoreHero extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              const Icon(Icons.inventory_2_rounded, color: Colors.white70, size: 16),
+              const Icon(
+                Icons.inventory_2_rounded,
+                color: Colors.white70,
+                size: 16,
+              ),
               const SizedBox(width: 6),
               Text(
                 'يتوفر $itemsCount حزمة عامة جاهزة للإضافة',
@@ -296,11 +297,7 @@ class _StorePackCard extends ConsumerWidget {
                   color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(
-                  _modeIcon(displayMode),
-                  color: color,
-                  size: 24,
-                ),
+                child: Icon(_modeIcon(displayMode), color: color, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -411,13 +408,14 @@ class _StorePackCard extends ConsumerWidget {
                   final id = number(pack, 'id').toInt();
                   context.push(StudentFlashcardsScreen.detailsPath(id));
                 },
-                icon: Icon(Icons.remove_red_eye_rounded, size: 16, color: color),
+                icon: Icon(
+                  Icons.remove_red_eye_rounded,
+                  size: 16,
+                  color: color,
+                ),
                 label: Text(
                   'معاينة التفاصيل',
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(color: color, fontWeight: FontWeight.w900),
                 ),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: color.withValues(alpha: 0.3)),
@@ -450,58 +448,58 @@ class _StorePackCard extends ConsumerWidget {
                       ),
                     )
                   : isOwned
-                      ? OutlinedButton.icon(
-                          onPressed: () {
-                            showMoeenInfoDialog(
-                              context: context,
-                              title: 'الحزمة ممتلكة بالفعل',
-                              message: 'هذه الحزمة موجودة بالفعل في حسابك.',
-                              buttonLabel: 'حسناً',
-                              icon: Icons.info_outline_rounded,
-                              color: AppColors.royalBlue,
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.check_rounded,
-                            size: 16,
-                            color: AppColors.success,
-                          ),
-                          label: const Text(
-                            'ممتلكة',
-                            style: TextStyle(
-                              color: AppColors.slate600,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: AppColors.slate300),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            minimumSize: const Size(120, 36),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        )
-                      : FilledButton.icon(
-                          onPressed: onClone,
-                          icon: const Icon(Icons.add_rounded, size: 16),
-                          label: const Text('إضافة للمكتبة'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.royalBlue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            minimumSize: const Size(120, 36),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
+                  ? OutlinedButton.icon(
+                      onPressed: () {
+                        showMoeenInfoDialog(
+                          context: context,
+                          title: 'الحزمة ممتلكة بالفعل',
+                          message: 'هذه الحزمة موجودة بالفعل في حسابك.',
+                          buttonLabel: 'حسناً',
+                          icon: Icons.info_outline_rounded,
+                          color: AppColors.royalBlue,
+                        );
+                      },
+                      icon: const Icon(
+                        Icons.check_rounded,
+                        size: 16,
+                        color: AppColors.success,
+                      ),
+                      label: const Text(
+                        'ممتلكة',
+                        style: TextStyle(
+                          color: AppColors.slate600,
+                          fontWeight: FontWeight.w900,
                         ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.slate300),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        minimumSize: const Size(120, 36),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    )
+                  : FilledButton.icon(
+                      onPressed: onClone,
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: const Text('إضافة للمكتبة'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.royalBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        minimumSize: const Size(120, 36),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
             ],
           ),
         ],
@@ -511,14 +509,20 @@ class _StorePackCard extends ConsumerWidget {
 }
 
 class _FlashcardPackMenu extends ConsumerWidget {
-  const _FlashcardPackMenu({required this.pack, this.isDark = false});
+  const _FlashcardPackMenu({
+    required this.pack,
+    this.isDark = false,
+    this.onDeleted,
+  });
 
   final Map<String, dynamic> pack;
   final bool isDark;
+  final VoidCallback? onDeleted;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return PopupMenuButton<String>(
+      tooltip: 'إجراءات الحزمة',
       icon: Icon(
         Icons.more_vert_rounded,
         color: isDark ? Colors.white70 : AppColors.slate500,
@@ -548,7 +552,8 @@ class _FlashcardPackMenu extends ConsumerWidget {
           final ok = await showMoeenConfirmDialog(
             context: context,
             title: 'حذف الحزمة',
-            message: 'سيتم حذف الحزمة وعناصرها. هل تريد المتابعة؟',
+            message:
+                'سيتم حذف الحزمة بكامل عناصرها وحزمها الفرعية من مكتبتك. هل تريد المتابعة؟',
             danger: true,
             confirmLabel: 'حذف',
             icon: Icons.delete_rounded,
@@ -559,7 +564,25 @@ class _FlashcardPackMenu extends ConsumerWidget {
             () => ref
                 .read(studentContentRepositoryProvider)
                 .deleteFlashcardPack(id),
-            onDone: () => ref.invalidate(_flashcardsProvider),
+            onDone: () {
+              ref.invalidate(_flashcardsProvider);
+              ref.invalidate(_flashcardDailyQueueProvider);
+              ref.invalidate(_flashcardOneLineNotificationsProvider);
+              ref.invalidate(_flashcardUpcomingProvider);
+              unawaited(
+                ref.read(oneLineNotificationSchedulerProvider).sync().catchError((
+                  Object error,
+                  StackTrace stack,
+                ) {
+                  debugPrint(
+                    'Text schedule refresh after pack deletion failed: $error',
+                  );
+                  debugPrintStack(stackTrace: stack);
+                  return 0;
+                }),
+              );
+              onDeleted?.call();
+            },
           );
         }
       },
@@ -661,4 +684,3 @@ class _ColorPickerRow extends StatelessWidget {
     );
   }
 }
-
